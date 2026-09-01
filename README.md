@@ -580,3 +580,15 @@ De refresh in stationmapping is herschreven:
 - duidelijke HTTP 401 / ontbrekende Bearer-key melding
 - Playout stations uit Beheer worden ook centraal in Supabase gesynchroniseerd
 - SHOUTcast “Nu vernieuwen” toont weer een echte laadstatus en haalt verse data
+
+
+## 0.14.4 — Vercel syntax fix
+
+In 0.14.3 ontbrak één afsluitende JSX-brace bij de async knop
+`Playout stations ophalen` in `radio-api-module.tsx`.
+
+De bedoelde vorm is nu correct:
+
+`onClick={async()=>{ ... }}`
+
+De refresh-functionaliteit uit 0.14.3 blijft ongewijzigd.

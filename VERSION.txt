@@ -1,2 +1,2 @@
-VLACORA HUB 0.14.3
-Reliable refresh for Rotation One, Playout One mapping and SHOUTcast.
+VLACORA HUB 0.14.4
+Vercel syntax fix for the Playout station refresh button in Radio API Control.
