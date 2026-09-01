@@ -35,6 +35,30 @@ export async function syncSharedRotationStations(stations:RadioStation[]){
   if(stale.length){const {error}=await supabase.from("radio_stations").delete().eq("source","rotation").in("external_id",stale);if(error)throw error}
 }
 
+
+export async function loadSharedPlayoutStations():Promise<RadioStation[]>{
+  if(!(await loggedIn()))return [];
+  const supabase=createClient();
+  const {data,error}=await supabase.from("radio_stations").select("external_id,name,raw").eq("source","playout").order("name");
+  if(error)throw error;
+  return (data||[]).map((x:any)=>({id:String(x.external_id),name:String(x.name||x.external_id),raw:x.raw}));
+}
+
+export async function syncSharedPlayoutStations(stations:RadioStation[]){
+  if(!(await loggedIn()))return;
+  const supabase=createClient();
+  if(stations.length){
+    const rows=stations.map(s=>({source:"playout",external_id:s.id,name:s.name,raw:s.raw||null,updated_at:new Date().toISOString()}));
+    const {error}=await supabase.from("radio_stations").upsert(rows,{onConflict:"source,external_id"});
+    if(error)throw error;
+  }
+  const {data:existing,error:readError}=await supabase.from("radio_stations").select("external_id").eq("source","playout");
+  if(readError)throw readError;
+  const keep=new Set(stations.map(s=>s.id));
+  const stale=(existing||[]).map((x:any)=>String(x.external_id)).filter((id:string)=>!keep.has(id));
+  if(stale.length){const {error}=await supabase.from("radio_stations").delete().eq("source","playout").in("external_id",stale);if(error)throw error}
+}
+
 export async function loadSharedProgramming(stationSlug:string):Promise<SharedProgramBlock[]>{
   if(!(await loggedIn()))return [];
   const supabase=createClient();

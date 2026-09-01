@@ -1,7 +1,7 @@
 "use client";
 
 import { createClient,isSupabaseBrowserConfigured } from "@/lib/supabase/client";
-import type { IntegrationStore } from "@/lib/radio/client-config";
+import type { IntegrationStore,RadioMapping } from "@/lib/radio/client-config";
 import { CONFIG_KEY,readIntegrationStore } from "@/lib/radio/client-config";
 
 export type SettingScope="global"|`station:${string}`|`user:${string}`;
@@ -49,4 +49,15 @@ export async function hydrateSharedIntegrationSettings(stationSlug:string){
   if(!Object.keys(remote).length)return false;
   const merged={...readIntegrationStore(),...remote};
   try{localStorage.setItem(CONFIG_KEY,JSON.stringify(merged));return true}catch{return false}
+}
+
+
+export async function loadSharedRadioMapping(stationSlug:string):Promise<RadioMapping|null>{
+  if(!stationSlug||stationSlug==="all")return null;
+  return loadSharedSetting<RadioMapping>(`station:${stationSlug}`,"radio-mapping");
+}
+
+export async function saveSharedRadioMapping(stationSlug:string,mapping:RadioMapping){
+  if(!stationSlug||stationSlug==="all")return;
+  await saveSharedSetting(`station:${stationSlug}`,"radio-mapping",mapping);
 }

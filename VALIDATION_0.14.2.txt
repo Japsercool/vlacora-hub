@@ -1,0 +1,12 @@
+VLACORA HUB 0.14.2 static validation
+[PASS] version 0.14.2
+[PASS] shared mapping persistence
+[PASS] shared playout station cache
+[PASS] playout explicit refresh
+[PASS] id based auto match
+[PASS] shoutcast mapping block
+[PASS] editorial shows shoutcast
+[PASS] no extra interval in mapping
+[PASS] edge functions excluded
+
+Global tsc parser reached dependency/type resolution; no new TS/JSX syntax parse error was reported before missing local npm dependencies.

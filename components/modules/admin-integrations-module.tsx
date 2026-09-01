@@ -2,7 +2,7 @@
 
 import { useEffect,useMemo,useState } from "react";
 import { isSupabaseBrowserConfigured } from "@/lib/supabase/client";
-import { syncSharedRotationStations } from "@/lib/supabase/hub-data";
+import { syncSharedPlayoutStations,syncSharedRotationStations } from "@/lib/supabase/hub-data";
 import {
   CONFIG_KEY,readIntegrationStore,saveStationCache,sessionKey,writeIntegrationStore,
   type ClientIntegrationConfig,type IntegrationKind,type IntegrationStore,type Protocol
@@ -104,13 +104,13 @@ export default function AdminIntegrationsModule({stationName,stationSlug}:{stati
       const secret=kind===selected?keyInput:(sessionStorage.getItem(sessionKey(kind))||"");
       const header=kind===selected?keyHeader:(sessionStorage.getItem(`${sessionKey(kind)}:header`)||"Authorization");
       const prefix=kind===selected?keyPrefix:(sessionStorage.getItem(`${sessionKey(kind)}:prefix`)||"Bearer");
-      const response=await fetch("/api/radio/manual/test",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({kind,action,config:c,apiKey:secret,apiKeyHeader:header,apiKeyPrefix:prefix})});
+      const response=await fetch("/api/radio/manual/test",{method:"POST",cache:"no-store",headers:{"Content-Type":"application/json","Cache-Control":"no-cache"},body:JSON.stringify({kind,action,config:c,apiKey:secret,apiKeyHeader:header,apiKeyPrefix:prefix})});
       const data=await response.json();setDiagnostic(data);
       if(!response.ok){const code=data?.httpError?.code||data?.tcp?.error?.code||"";throw new Error(`${data?.phase||"verbinding"}${code?` • ${code}`:""}: ${data?.message||data?.error||`HTTP ${response.status}`}`)}
       if(action==="stations"){
-        const read=await fetch("/api/radio/manual/read",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({kind,action:"stations",path:c.stationPath,config:c,apiKey:secret,apiKeyHeader:header,apiKeyPrefix:prefix})});
+        const read=await fetch("/api/radio/manual/read",{method:"POST",cache:"no-store",headers:{"Content-Type":"application/json","Cache-Control":"no-cache"},body:JSON.stringify({kind,action:"stations",path:c.stationPath,config:c,apiKey:secret,apiKeyHeader:header,apiKeyPrefix:prefix,requestId:`admin-${Date.now()}`})});
         const list=await read.json();if(!read.ok)throw new Error(list.error||"Stations ophalen mislukt");
-        saveStationCache(kind,list.stations||[]);if(kind==="rotation")await syncSharedRotationStations(list.stations||[]).catch(()=>{});
+        saveStationCache(kind,list.stations||[]);if(kind==="rotation")await syncSharedRotationStations(list.stations||[]).catch(()=>{});if(kind==="playout")await syncSharedPlayoutStations(list.stations||[]).catch(()=>{});
       }
       const changed={...configs,[kind]:{...configs[kind],enabled:true,lastOk:new Date().toLocaleString("nl-BE"),lastError:""}};
       setConfigs(changed);writeIntegrationStore(changed);

@@ -1,2 +1,2 @@
-VLACORA HUB 0.14.1
-Vercel/Next.js build fix: Supabase Deno Edge Functions excluded from Next TypeScript type checking.
+VLACORA HUB 0.14.3
+Reliable refresh for Rotation One, Playout One mapping and SHOUTcast.

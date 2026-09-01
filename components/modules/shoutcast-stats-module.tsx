@@ -70,6 +70,7 @@ function useShoutcast(stationSlug:string,intervalMs:number){
   },[stationSlug,loadHistory]);
 
   const refresh=useCallback(async()=>{
+    setLoading(true);
     if(stationSlug==="all"){setLoading(false);setError("Kies één station om de SHOUTcast-stream te tonen.");return}
     try{
       await hydrateSharedIntegrationSettings(stationSlug);

@@ -3,8 +3,10 @@
 import { useEffect, useMemo, useState } from "react";
 import type { MusicSong } from "@/components/modules/music-library-module";
 import { useHubStation } from "@/lib/radio/hub-stations";
-import { pathFor,radioRead,readIntegration,readMappings,readStationCache,saveMappings,type RadioMappingStore,type RadioStation } from "@/lib/radio/client-config";
+import { pathFor,radioRead,readIntegration,readMappings,readSecret,readStationCache,saveMappings,saveStationCache,type RadioMappingStore,type RadioStation } from "@/lib/radio/client-config";
 import { emitActivity } from "@/lib/collaboration/activity";
+import { hydrateSharedIntegrationSettings,loadSharedRadioMapping,saveSharedRadioMapping } from "@/lib/supabase/settings";
+import { loadSharedPlayoutStations,syncSharedPlayoutStations } from "@/lib/supabase/hub-data";
 
 type EditorialType = "music" | "talk" | "imaging" | "promo" | "weather" | "traffic" | "news" | "commercial";
 type EditorialItem = {
@@ -128,12 +130,21 @@ export default function EditorialModule({stationSlug}:{stationSlug:string}) {
   const [playlistVersion,setPlaylistVersion] = useState<string>("—");
   const [programmingPrograms,setProgrammingPrograms] = useState<{name:string;host:string}[]>([]);
   useEffect(()=>{
-    setMappingsState(readMappings());setRotationStations(readStationCache("rotation"));setPlayoutStations(readStationCache("playout"));
+    let alive=true;
+    const refreshCaches=()=>{setRotationStations(readStationCache("rotation"));setPlayoutStations(readStationCache("playout"))};
+    (async()=>{
+      await hydrateSharedIntegrationSettings(station.slug).catch(()=>false);
+      const shared=await loadSharedRadioMapping(station.slug).catch(()=>null);if(!alive)return;
+      const local=readMappings();const next=shared?{...local,[station.slug]:{...local[station.slug],...shared}}:local;setMappingsState(next);if(shared)saveMappings(next);
+      if(readStationCache("playout").length===0){const sharedPlayout=await loadSharedPlayoutStations().catch(()=>[]);if(sharedPlayout.length)saveStationCache("playout",sharedPlayout)}
+      refreshCaches();
+      const pc=readIntegration("playout");if(pc?.host&&readStationCache("playout").length===0&&readSecret("playout").apiKey){try{const result=await radioRead("playout",pc.stationPath,"stations");saveStationCache("playout",result.stations||[]);await syncSharedPlayoutStations(result.stations||[]).catch(()=>{});refreshCaches()}catch{}}
+    })();
     const loadPrograms=()=>{try{const raw=localStorage.getItem(`vlacora:${station.slug}:programming:v10`);const items=raw?JSON.parse(raw):[];setProgrammingPrograms(Array.isArray(items)?items.filter((x:any)=>x?.active!==false).map((x:any)=>({name:String(x.name||"Programma"),host:String(x.host||"")})):[])}catch{setProgrammingPrograms([])}};
-    loadPrograms();window.addEventListener("vlacora:programming-changed",loadPrograms as EventListener);return()=>window.removeEventListener("vlacora:programming-changed",loadPrograms as EventListener);
+    loadPrograms();window.addEventListener("vlacora:programming-changed",loadPrograms as EventListener);window.addEventListener("vlacora:hub-stations-changed",refreshCaches as EventListener);return()=>{alive=false;window.removeEventListener("vlacora:programming-changed",loadPrograms as EventListener);window.removeEventListener("vlacora:hub-stations-changed",refreshCaches as EventListener)};
   },[station.slug]);
   const mapping=mappings[station.slug]||{rotationId:station.rotationId||"",rotationName:station.rotationId?station.name:"",playoutId:"",playoutName:""};
-  function setMapping(patch:Partial<typeof mapping>){const next={...mappings,[station.slug]:{...mapping,...patch}};setMappingsState(next);saveMappings(next)}
+  function setMapping(patch:Partial<typeof mapping>){const value={...mapping,...patch};const next={...mappings,[station.slug]:value};setMappingsState(next);saveMappings(next);void saveSharedRadioMapping(station.slug,value).catch(()=>{})}
 
   const selected = playlist.find(i=>i.id===selectedId) || playlist[0];
   useEffect(()=>{emitActivity({detail:selected?`Redactie • ${date} ${hour} • ${selected.artist?`${selected.artist} – `:""}${selected.title}`:`Redactie • ${date} ${hour}`,entityType:"playlist-item",entityId:selected?.id})},[selected?.id,selected?.artist,selected?.title,date,hour]);
@@ -181,8 +192,22 @@ async function pullRotation(){
   }catch(e){setLastStatus(e instanceof Error?e.message:"Rotation One fout");flash(e instanceof Error?e.message:"Rotation One kon niet worden bereikt")}
 }
 async function pushRotation(){flash("Schrijven naar Rotation One staat bewust nog uit. Eerst lezen en mapping volledig valideren.")}
+async function fetchPlayoutStations(){
+  if(busy)return;setBusy(true);
+  try{
+    await hydrateSharedIntegrationSettings(station.slug).catch(()=>false);
+    const pc=readIntegration("playout");if(!pc?.host)throw new Error("Playout One is nog niet ingesteld.");
+    if(!readSecret("playout").apiKey)throw new Error("Playout One Bearer API-key ontbreekt in deze browsersessie. Vul hem opnieuw in bij Beheer → Integraties.");
+    const result=await radioRead("playout",pc.stationPath,"stations");const list=result.stations||[];
+    setPlayoutStations(list);saveStationCache("playout",list);await syncSharedPlayoutStations(list).catch(()=>{});
+    flash(`${list.length} Playout One station(s) vers opgehaald`);
+  }catch(e){
+    const m=e instanceof Error?e.message:"Playout stations ophalen mislukt";
+    flash(m.includes("401")?"HTTP 401: controleer de Playout One Bearer API-key.":m);
+  }finally{setBusy(false)}
+}
 async function testConnections(){
-  try{const rc=readIntegration("rotation"),pc=readIntegration("playout");const parts:string[]=[];if(rc?.host){await radioRead("rotation",rc.statusPath,"raw");parts.push("Rotation online")}else parts.push("Rotation niet ingesteld");if(pc?.host){await radioRead("playout",pc.statusPath,"raw");parts.push("Playout online")}else parts.push("Playout niet ingesteld");setLastStatus(parts.join(" • "));flash(parts.join(" • "))}catch(e){setLastStatus(e instanceof Error?e.message:"Statuscontrole mislukt");flash(e instanceof Error?e.message:"Statuscontrole mislukt")}
+  try{await hydrateSharedIntegrationSettings(station.slug).catch(()=>false);const rc=readIntegration("rotation"),pc=readIntegration("playout"),sc=readIntegration("shoutcast");const parts:string[]=[];if(rc?.host){await radioRead("rotation",rc.statusPath,"raw");parts.push("Rotation online")}else parts.push("Rotation niet ingesteld");if(pc?.host){await radioRead("playout",pc.statusPath,"raw");parts.push("Playout online")}else parts.push("Playout niet ingesteld");if(sc?.host){const s=await radioRead("shoutcast",sc.statusPath||"/stats?sid=1&json=1","raw");const raw=s.raw||{};const x=raw.streams?.[0]||raw.stream||raw.stats||raw;const listeners=Number(x.currentlisteners??x.currentListeners??x.listeners??0);parts.push(`SHOUTcast online${Number.isFinite(listeners)?` • ${listeners} luisteraar(s)`:""}`)}else parts.push("SHOUTcast niet ingesteld");setLastStatus(parts.join(" • "));flash(parts.join(" • "))}catch(e){setLastStatus(e instanceof Error?e.message:"Statuscontrole mislukt");flash(e instanceof Error?e.message:"Statuscontrole mislukt")}
 }
 
   return <div>
@@ -280,7 +305,9 @@ async function testConnections(){
         <label className="field">Rotation One station<select className="select" value={mapping.rotationId} onChange={e=>{const x=rotationStations.find(s=>s.id===e.target.value);setMapping({rotationId:e.target.value,rotationName:x?.name||""})}}><option value="">Niet gekoppeld</option>{rotationStations.map(s=><option key={s.id} value={s.id}>{s.name} • {s.id}</option>)}</select></label>
         <label className="field">Playout One station<select className="select" value={mapping.playoutId} onChange={e=>{const x=playoutStations.find(s=>s.id===e.target.value);setMapping({playoutId:e.target.value,playoutName:x?.name||""})}}><option value="">Niet gekoppeld</option>{playoutStations.map(s=><option key={s.id} value={s.id}>{s.name} • {s.id}</option>)}</select></label>
         {rotationStations.length===0&&<p className="muted">Geen Rotation One-stations in cache. Ga naar Beheer → Integraties → Rotation One → Stations ophalen.</p>}
-        <button className="primary" onClick={testConnections}>Test verbindingen</button>
+        {playoutStations.length===0&&<div className="mapping-warning"><strong>Geen Playout One-stations zichtbaar</strong><span>{readIntegration("playout")?.host?(readSecret("playout").apiKey?"De API-key is aanwezig, maar de stationslijst is nog niet opgehaald.":"Playout One is ingesteld, maar de Bearer API-key ontbreekt in deze browsersessie."):"Playout One is nog niet ingesteld."}</span><button className="ghost" onClick={fetchPlayoutStations}>↻ Playout stations ophalen</button></div>}
+        <div className="mapping-service-block"><div className="mapping-service-head"><strong>SHOUTcast voor {station.name}</strong><span className={`mapping-pill ${readIntegration("shoutcast")?.host?"ok":"off"}`}>{readIntegration("shoutcast")?.host?"INGESTELD":"NIET INGESTELD"}</span></div>{readIntegration("shoutcast")?.host?<code className="mapping-endpoint">{`${readIntegration("shoutcast")?.protocol}://${readIntegration("shoutcast")?.host}:${readIntegration("shoutcast")?.port}${readIntegration("shoutcast")?.basePath||""}${readIntegration("shoutcast")?.statusPath||""}`}</code>:<small>Stel de SHOUTcast host, poort en SID per station in via Beheer → Integraties.</small>}</div>
+        <button className="primary" onClick={testConnections}>Test Rotation + Playout + SHOUTcast</button>
       </div>
       <div className="card">
         <h3>Wat VLACORA kan ophalen</h3>

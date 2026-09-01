@@ -554,3 +554,29 @@ Fix:
 - `supabase/functions/**/*` toegevoegd aan `tsconfig.json -> exclude`
 - de Edge Function blijft gewoon in de repository en blijft deploybaar naar Supabase
 - geen wijziging aan de werkende Supabase functie of database
+
+
+## 0.14.2 — Rotation + Playout + SHOUTcast zichtbaar per station
+
+- Station mapping toont nu drie duidelijke koppelingen: Rotation One, Playout One en SHOUTcast.
+- Als Playout One 0 stations teruggeeft, toont VLACORA expliciet of de Bearer-key ontbreekt of dat de stationslijst nog moet worden opgehaald.
+- Extra knop `Playout stations ophalen` rechtstreeks op de mapping.
+- Playout wordt automatisch gematcht op gelijk station-ID (bijvoorbeeld `hits` → `hits`) vóór naam-matching.
+- SHOUTcast is geen aparte stationlijst: de host/poort/SID-config hoort per VLACORA-station. De mapping toont daarom de echte stream endpoint.
+- `Test alle live koppelingen` test Rotation One, Playout One én SHOUTcast in één actie.
+- Stationmapping wordt naast localStorage ook centraal in Supabase `hub_settings` bewaard, zodat hij niet verdwijnt bij deploys of op een andere pc.
+- Geen extra achtergrondpolling: automatische Playout discovery gebeurt alleen als er nog geen cache is en er in de huidige sessie een API-key bestaat.
+
+- Playout One station discovery wordt na een geslaagde fetch ook als publieke stationmetadata in Supabase `radio_stations` bewaard. Daardoor blijft de dropdown op andere toestellen zichtbaar zonder opnieuw discovery uit te voeren.
+
+
+## 0.14.3 — Refresh fix
+
+De refresh in stationmapping is herschreven:
+- force refresh met no-store/no-cache
+- Playout stations direct opnieuw uit Hub :5099
+- dropdown wordt meteen vernieuwd
+- automatische mapping wordt meteen opnieuw berekend en centraal opgeslagen
+- duidelijke HTTP 401 / ontbrekende Bearer-key melding
+- Playout stations uit Beheer worden ook centraal in Supabase gesynchroniseerd
+- SHOUTcast “Nu vernieuwen” toont weer een echte laadstatus en haalt verse data
