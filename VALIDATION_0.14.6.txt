@@ -1,0 +1,7 @@
+VLACORA HUB 0.14.6 validation
+[PASS] busy state declared
+[PASS] fetchPlayoutStations uses busy
+[PASS] busy reset in finally
+[PASS] version 0.14.6
+[PASS] Supabase Deno functions excluded from Next build
+[PASS] CSS escaped newline corruption still absent

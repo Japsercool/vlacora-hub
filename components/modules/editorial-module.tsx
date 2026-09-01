@@ -129,6 +129,7 @@ export default function EditorialModule({stationSlug}:{stationSlug:string}) {
   const [lastStatus,setLastStatus] = useState("Nog niet getest");
   const [playlistVersion,setPlaylistVersion] = useState<string>("—");
   const [programmingPrograms,setProgrammingPrograms] = useState<{name:string;host:string}[]>([]);
+  const [busy,setBusy] = useState(false);
   useEffect(()=>{
     let alive=true;
     const refreshCaches=()=>{setRotationStations(readStationCache("rotation"));setPlayoutStations(readStationCache("playout"))};

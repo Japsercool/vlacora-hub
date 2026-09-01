@@ -1,2 +1,2 @@
-VLACORA HUB 0.14.5
-Vercel CSS build fix: removes literal escaped newline tokens from globals.css.
+VLACORA HUB 0.14.6
+Vercel type fix: add missing busy/setBusy state to EditorialModule refresh workflow.

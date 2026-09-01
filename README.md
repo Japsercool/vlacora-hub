@@ -605,3 +605,17 @@ tokens in het CSS-bestand in plaats van echte regeleinden.
 Fix:
 - alle letterlijke `\n` tokens in `app/globals.css` vervangen door echte newlines
 - alle 0.14.2/0.14.3/0.14.4 functionaliteit blijft behouden
+
+
+## 0.14.6 — Editorial refresh type fix
+
+Vercel vond na de eerdere syntax/CSS-fixes nog één TypeScript-fout in
+`components/modules/editorial-module.tsx`.
+
+De Playout refreshfunctie gebruikte `busy` en `setBusy`, maar die state was nog niet
+gedeclareerd in `EditorialModule`.
+
+Fix:
+- `const [busy,setBusy] = useState(false);` toegevoegd
+- dubbele refresh-clicks blijven daardoor geblokkeerd
+- de 0.14.3 refreshlogica blijft behouden
