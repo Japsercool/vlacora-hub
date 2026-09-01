@@ -24,6 +24,11 @@ export async function middleware(request:NextRequest){
   const loggedIn=Boolean(data?.claims);
   const path=request.nextUrl.pathname;
   if(path.startsWith("/hub")&&!loggedIn){const target=request.nextUrl.clone();target.pathname="/login";target.searchParams.set("next",path);return NextResponse.redirect(target)}
+  if(path.startsWith("/hub")&&loggedIn){
+    // One small profile read on navigation enforces the central account Active switch.
+    const {data:profile}=await supabase.from("profiles").select("active").eq("id",String(data?.claims?.sub||"")).maybeSingle();
+    if(profile?.active===false){const target=request.nextUrl.clone();target.pathname="/login";target.search="";target.searchParams.set("error","account-disabled");return NextResponse.redirect(target)}
+  }
   // A recovery link creates a temporary authenticated session; /reset-password must remain reachable.
   if(path==="/login"&&loggedIn){const target=request.nextUrl.clone();target.pathname="/hub/all/dashboard";target.search="";return NextResponse.redirect(target)}
   return response;

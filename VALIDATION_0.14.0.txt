@@ -1,0 +1,24 @@
+VLACORA HUB 0.14.0 static release validation
+[PASS] Supabase public config present
+[PASS] persistent settings helper
+[PASS] team rights module
+[PASS] incident workflow module
+[PASS] template builder module
+[PASS] SHOUTcast stats module
+[PASS] migration 014
+[PASS] migration 015
+[PASS] migration 016
+[PASS] migration 017
+[PASS] admin users edge function source
+[PASS] package version 0.14.0
+[PASS] settings use hub_settings
+[PASS] team invokes central user admin
+[PASS] incident supports In behandeling
+[PASS] incident has updates
+[PASS] templates support unlimited JSON fields
+[PASS] templates support after songs
+[PASS] SHOUTcast endpoint default
+[PASS] listener samples table used
+
+Note: full Next.js compile was not run in this sandbox because npm dependency installation timed out.
+Vercel will perform the real Next.js build after push.

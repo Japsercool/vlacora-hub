@@ -74,7 +74,7 @@ const CollaborationContext=createContext<CollaborationContextValue|null>(null);
 const MODULES:Record<string,string>={
   dashboard:"TODAY",stations:"Stations",meldingen:"Meldingen",taken:"Taken",meldpunt:"Meldpunt",
   messenger:"Messenger",communicatie:"Communicatie",muziekmappen:"Muziekmappen PDF",kalender:"Kalender",
-  programmering:"Programmering",muziek:"Muziek",meetings:"Muziekmeeting",redactie:"Redactie",
+  programmering:"Programmering",sjablonen:"Sjablonen",muziek:"Muziek",meetings:"Muziekmeeting",redactie:"Redactie",
   playlists:"Playlists",hitlijsten:"Hitlijsten",presentatie:"Presentatie",social:"Social Studio",
   statistieken:"Luistercijfers",control:"On-Air Control","radio-api":"Radio API",team:"Team",beheer:"Beheer"
 };
@@ -197,6 +197,7 @@ export function CollaborationProvider({
       }catch{}
       const me={id:user.id,name:displayName,email:user.email||"",role};
       setCurrentUser(me);
+      void (async()=>{try{await supabase.rpc("vlacora_touch_last_seen")}catch{}})();
       await loadRemoteNotifications(user.id).catch(()=>loadLocalNotifications(user.id));
 
       const channel:any=supabase.channel("vlacora-collaboration-v13",{config:{presence:{key:user.id}}});

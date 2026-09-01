@@ -16,6 +16,7 @@ export const navItems = [
   ["muziekmappen", "▦", "Muziekmappen PDF"],
   ["kalender", "□", "Kalender"],
   ["programmering", "◫", "Programmering"],
+  ["sjablonen", "▧", "Sjablonen"],
   ["muziek", "♫", "Muziek"],
   ["meetings", "◎", "Muziekmeetings"],
   ["redactie", "✎", "Redactie"],

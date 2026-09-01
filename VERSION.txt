@@ -1,2 +1,2 @@
-VLACORA HUB 0.13.3
-Supabase public project configuration prefilled for central Auth/Realtime/Database use.
+VLACORA HUB 0.14.0
+Persistent Supabase settings + real team/RBAC + incident workflow + flexible templates + SHOUTcast listener stats.

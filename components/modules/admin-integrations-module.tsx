@@ -1,69 +1,33 @@
 "use client";
-import { syncSharedRotationStations } from "@/lib/supabase/hub-data";
+
+import { useEffect,useMemo,useState } from "react";
 import { isSupabaseBrowserConfigured } from "@/lib/supabase/client";
+import { syncSharedRotationStations } from "@/lib/supabase/hub-data";
+import {
+  CONFIG_KEY,readIntegrationStore,saveStationCache,sessionKey,writeIntegrationStore,
+  type ClientIntegrationConfig,type IntegrationKind,type IntegrationStore,type Protocol
+} from "@/lib/radio/client-config";
+import {
+  loadSharedIntegrationStore,loadSharedSetting,saveSharedIntegrationStore,saveSharedSetting
+} from "@/lib/supabase/settings";
 
-import { useEffect, useState } from "react";
-import { saveStationCache } from "@/lib/radio/client-config";
+type StationSettings={timezone:string;active:boolean;playlistWarnings:boolean;newsCheck:boolean;socialReminders:boolean};
 
-type Protocol = "http" | "https";
-type IntegrationKind = "rotation" | "playout" | "shoutcast";
-
-type PublicConfig = {
-  enabled: boolean;
-  protocol: Protocol;
-  host: string;
-  port: string;
-  basePath: string;
-  stationPath: string;
-  statusPath: string;
-  playlistPath?: string;
-  coveragePath?: string;
-  revisionPath?: string;
-  nowPath?: string;
-  musicFoldersPath?: string;
-  musicFolderItemsPath?: string;
-  chartListPath?: string;
-  chartEditionsPath?: string;
-  chartEditionPath?: string;
-  chartRevisionPath?: string;
-  chartWritePath?: string;
-  chartWriteEnabled?: boolean;
-  readOnly: boolean;
-  lastOk?: string;
-  lastError?: string;
-};
-
-type Store = Record<IntegrationKind,PublicConfig>;
-
-const seed:Store = {
+const seed:IntegrationStore={
   rotation:{
-    enabled:false, protocol:"http", host:"", port:"5090", basePath:"",
-    stationPath:"/api/v1/stations", statusPath:"/api/v1/health",
-    playlistPath:"/api/v1/stations/{stationId}/schedule", coveragePath:"/api/v1/stations/{stationId}/schedule/coverage", revisionPath:"/api/v1/stations/{stationId}/schedule/revision", musicFoldersPath:"", musicFolderItemsPath:"",
-    chartListPath:"/api/v1/stations/{stationId}/charts", chartEditionsPath:"/api/v1/stations/{stationId}/charts/{chartId}/editions", chartEditionPath:"/api/v1/stations/{stationId}/charts/{chartId}/editions/{editionId}", chartRevisionPath:"/api/v1/stations/{stationId}/charts/revision", chartWritePath:"/api/v1/stations/{stationId}/charts/{chartId}/editions/{editionId}", chartWriteEnabled:false, readOnly:true
+    enabled:false,protocol:"http",host:"",port:"5500",basePath:"",stationPath:"/api/v1/stations",statusPath:"/api/v1/health",
+    playlistPath:"/api/v1/stations/{stationId}/schedule",coveragePath:"/api/v1/stations/{stationId}/schedule/coverage",revisionPath:"/api/v1/stations/{stationId}/schedule/revision",
+    musicFoldersPath:"/api/v1/stations/{stationId}/music/folders",musicFolderItemsPath:"/api/v1/stations/{stationId}/music/folders/{folderId}/songs",
+    chartListPath:"/api/v1/stations/{stationId}/charts",chartEditionsPath:"/api/v1/stations/{stationId}/charts/{chartId}/editions",chartEditionPath:"/api/v1/stations/{stationId}/charts/{chartId}/editions/{editionId}",chartRevisionPath:"/api/v1/stations/{stationId}/charts/revision",chartWritePath:"/api/v1/stations/{stationId}/charts/{chartId}/editions/{editionId}",chartWriteEnabled:false,readOnly:true
   },
-  playout:{
-    enabled:false, protocol:"http", host:"", port:"5099", basePath:"",
-    stationPath:"/api/v1/integration/stations", statusPath:"/api/v1/integration/health",
-    nowPath:"/api/v1/integration/stations/{stationId}/status", readOnly:true
-  },
-  shoutcast:{
-    enabled:false, protocol:"http", host:"", port:"8000", basePath:"",
-    stationPath:"/stats?sid=1&json=1", statusPath:"/stats?sid=1&json=1", readOnly:true
-  }
+  playout:{enabled:false,protocol:"http",host:"",port:"5099",basePath:"",stationPath:"/api/v1/integration/stations",statusPath:"/api/v1/integration/health",nowPath:"/api/v1/integration/stations/{stationId}/status",readOnly:true},
+  shoutcast:{enabled:false,protocol:"http",host:"",port:"8000",basePath:"",stationPath:"/stats?sid=1&json=1",statusPath:"/stats?sid=1&json=1",readOnly:true}
 };
+const stationSeed:StationSettings={timezone:"Europe/Brussels",active:true,playlistWarnings:true,newsCheck:true,socialReminders:true};
 
-function useStored<T>(key:string,initial:T){
-  const[v,s]=useState<T>(initial); const[r,setR]=useState(false);
-  useEffect(()=>{try{const x=localStorage.getItem(key);if(x)s(JSON.parse(x))}catch{}setR(true)},[key]);
-  useEffect(()=>{if(r)try{localStorage.setItem(key,JSON.stringify(v))}catch{}},[key,r,v]);
-  return[v,s] as const;
-}
-
-function sessionKey(kind:IntegrationKind){ return `vlacora:integration:key:${kind}`; }
-
-export default function AdminIntegrationsModule({stationName}:{stationName:string}) {
-  const[configs,setConfigs]=useStored<Store>("vlacora:integrations:public:v8",seed);
+export default function AdminIntegrationsModule({stationName,stationSlug}:{stationName:string;stationSlug:string}){
+  const[configs,setConfigs]=useState<IntegrationStore>(seed);
+  const[stationSettings,setStationSettings]=useState<StationSettings>(stationSeed);
   const[selected,setSelected]=useState<IntegrationKind|null>(null);
   const[keyInput,setKeyInput]=useState("");
   const[keyHeader,setKeyHeader]=useState("Authorization");
@@ -71,219 +35,166 @@ export default function AdminIntegrationsModule({stationName}:{stationName:strin
   const[notice,setNotice]=useState("");
   const[busy,setBusy]=useState(false);
   const[diagnostic,setDiagnostic]=useState<any>(null);
-
-  const cfg = selected ? configs[selected] : null;
-  const[supabaseConfigured,setSupabaseConfigured]=useState(false);
-  useEffect(()=>setSupabaseConfigured(isSupabaseBrowserConfigured()),[]);
+  const[loaded,setLoaded]=useState(false);
+  const supabaseConfigured=useMemo(()=>isSupabaseBrowserConfigured(),[]);
+  const cfg=selected?configs[selected]:null;
 
   useEffect(()=>{
-    if(selected){
-      setKeyInput(sessionStorage.getItem(sessionKey(selected)) || "");
-      setKeyHeader(sessionStorage.getItem(`${sessionKey(selected)}:header`) || "Authorization");
-      setKeyPrefix(sessionStorage.getItem(`${sessionKey(selected)}:prefix`) || "Bearer");
-    }
+    let alive=true;
+    (async()=>{
+      const local=readIntegrationStore();
+      let merged:IntegrationStore={...seed,rotation:{...seed.rotation,...local.rotation},playout:{...seed.playout,...local.playout},shoutcast:{...seed.shoutcast,...local.shoutcast}};
+      if(supabaseConfigured){
+        const remote=await loadSharedIntegrationStore(stationSlug);
+        const hasRemote=Boolean(remote.rotation||remote.playout||remote.shoutcast);
+        merged={...merged,rotation:{...merged.rotation,...remote.rotation},playout:{...merged.playout,...remote.playout},shoutcast:{...merged.shoutcast,...remote.shoutcast}};
+        // One-time migration: an existing browser configuration is copied into Supabase instead of being lost after this update.
+        if(!hasRemote&&(local.rotation?.host||local.playout?.host||local.shoutcast?.host))void saveSharedIntegrationStore(merged,stationSlug).catch(()=>{});
+        const remoteStation=await loadSharedSetting<StationSettings>(`station:${stationSlug}`,"station-settings");
+        if(alive&&remoteStation)setStationSettings({...stationSeed,...remoteStation});
+        else if(alive){
+          try{const raw=localStorage.getItem(`vlacora:${stationSlug}:settings`);if(raw){const legacy={...stationSeed,...JSON.parse(raw)};setStationSettings(legacy);void saveSharedSetting(`station:${stationSlug}`,"station-settings",legacy).catch(()=>{})}}catch{}
+        }
+      }
+      if(!alive)return;
+      setConfigs(merged);writeIntegrationStore(merged);setLoaded(true);
+    })().catch(()=>setLoaded(true));
+    return()=>{alive=false};
+  },[stationSlug,supabaseConfigured]);
+
+  useEffect(()=>{
+    if(!selected)return;
+    setKeyInput(sessionStorage.getItem(sessionKey(selected))||"");
+    setKeyHeader(sessionStorage.getItem(`${sessionKey(selected)}:header`)||"Authorization");
+    setKeyPrefix(sessionStorage.getItem(`${sessionKey(selected)}:prefix`)||"Bearer");
   },[selected]);
 
-  function flash(x:string){setNotice(x);setTimeout(()=>setNotice(""),2600)}
-  function update(kind:IntegrationKind,patch:Partial<PublicConfig>){
-    setConfigs({...configs,[kind]:{...configs[kind],...patch}});
+  function flash(text:string){setNotice(text);window.setTimeout(()=>setNotice(""),3200)}
+  function update(kind:IntegrationKind,patch:Partial<ClientIntegrationConfig>){
+    setConfigs(current=>({...current,[kind]:{...current[kind],...patch}}));
   }
-  function saveSessionSecret(){
+  function saveSessionSecret(kind:IntegrationKind){
+    if(keyInput)sessionStorage.setItem(sessionKey(kind),keyInput);else sessionStorage.removeItem(sessionKey(kind));
+    sessionStorage.setItem(`${sessionKey(kind)}:header`,keyHeader);
+    sessionStorage.setItem(`${sessionKey(kind)}:prefix`,keyPrefix);
+  }
+  async function saveIntegration(){
     if(!selected)return;
-    if(keyInput)sessionStorage.setItem(sessionKey(selected),keyInput);else sessionStorage.removeItem(sessionKey(selected));
-    sessionStorage.setItem(`${sessionKey(selected)}:header`,keyHeader);
-    sessionStorage.setItem(`${sessionKey(selected)}:prefix`,keyPrefix);
-  }
-  function save(){
-    if(!selected||!cfg)return;
-    saveSessionSecret();
-    flash("Configuratie opgeslagen op dit toestel. Geheime sleutel blijft alleen in deze browsersessie.");
-  }
-  function clearSecret(){
-    if(!selected)return;
-    sessionStorage.removeItem(sessionKey(selected));
-    setKeyInput("");
-    flash("Tijdelijke API-sleutel verwijderd");
-  }
-
-  async function test(kind:IntegrationKind, action:"status"|"stations"){
-    const c=configs[kind];
-    if(!c.host.trim()) return flash("Vul eerst het vaste IP-adres in.");
-    setBusy(true);
-    setDiagnostic(null);
+    saveSessionSecret(selected);
+    writeIntegrationStore(configs);
     try{
-      const secret = kind===selected ? keyInput : (sessionStorage.getItem(sessionKey(kind))||"");
-      const header = kind===selected ? keyHeader : (sessionStorage.getItem(`${sessionKey(kind)}:header`)||"Authorization");
-      const prefix = kind===selected ? keyPrefix : (sessionStorage.getItem(`${sessionKey(kind)}:prefix`)||"Bearer");
-      const response=await fetch("/api/radio/manual/test",{
-        method:"POST",
-        headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({kind,action,config:c,apiKey:secret,apiKeyHeader:header,apiKeyPrefix:prefix})
-      });
-      const data=await response.json();
-      setDiagnostic(data);
+      if(supabaseConfigured){await saveSharedIntegrationStore(configs,stationSlug);flash("Centraal opgeslagen in Supabase. Deze instellingen blijven behouden na updates en op andere toestellen.")}
+      else flash("Lokaal opgeslagen. Activeer Supabase om instellingen centraal te bewaren.");
+      setSelected(null);
+    }catch(e){flash(e instanceof Error?e.message:"Opslaan mislukt")}
+  }
+  async function saveStationSettings(){
+    try{
+      if(supabaseConfigured){await saveSharedSetting(`station:${stationSlug}`,"station-settings",stationSettings);flash("Stationinstellingen centraal opgeslagen")}
+      else{localStorage.setItem(`vlacora:station-settings:${stationSlug}`,JSON.stringify(stationSettings));flash("Stationinstellingen lokaal opgeslagen")}
+    }catch(e){flash(e instanceof Error?e.message:"Opslaan mislukt")}
+  }
+  function clearSecret(){if(!selected)return;sessionStorage.removeItem(sessionKey(selected));setKeyInput("");flash("Tijdelijke API-sleutel verwijderd")}
 
-      if(!response.ok){
-        const code=data?.httpError?.code||data?.tcp?.error?.code||data?.fetchError?.code||data?.fetchError?.cause?.code||"";
-        const phase=data?.phase||"verbinding";
-        throw new Error(`${phase}${code?` • ${code}`:""}: ${data?.message||data?.error||"verbinding mislukt"}`);
-      }
-
+  async function test(kind:IntegrationKind,action:"status"|"stations"){
+    const c=configs[kind];if(!c.host.trim())return flash("Vul eerst het publieke IP-adres in.");
+    if(kind==="shoutcast"&&action==="stations")return;
+    setBusy(true);setDiagnostic(null);
+    try{
+      const secret=kind===selected?keyInput:(sessionStorage.getItem(sessionKey(kind))||"");
+      const header=kind===selected?keyHeader:(sessionStorage.getItem(`${sessionKey(kind)}:header`)||"Authorization");
+      const prefix=kind===selected?keyPrefix:(sessionStorage.getItem(`${sessionKey(kind)}:prefix`)||"Bearer");
+      const response=await fetch("/api/radio/manual/test",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({kind,action,config:c,apiKey:secret,apiKeyHeader:header,apiKeyPrefix:prefix})});
+      const data=await response.json();setDiagnostic(data);
+      if(!response.ok){const code=data?.httpError?.code||data?.tcp?.error?.code||"";throw new Error(`${data?.phase||"verbinding"}${code?` • ${code}`:""}: ${data?.message||data?.error||`HTTP ${response.status}`}`)}
       if(action==="stations"){
         const read=await fetch("/api/radio/manual/read",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({kind,action:"stations",path:c.stationPath,config:c,apiKey:secret,apiKeyHeader:header,apiKeyPrefix:prefix})});
-        const list=await read.json();
-        if(!read.ok)throw new Error(list.error||"Stations ophalen mislukt");
-        saveStationCache(kind,list.stations||[]);
-        if(kind==="rotation")await syncSharedRotationStations(list.stations||[]).catch(()=>{});
-        flash(`${(list.stations||[]).length} echte station(s) opgehaald`);
+        const list=await read.json();if(!read.ok)throw new Error(list.error||"Stations ophalen mislukt");
+        saveStationCache(kind,list.stations||[]);if(kind==="rotation")await syncSharedRotationStations(list.stations||[]).catch(()=>{});
       }
-
-      update(kind,{lastOk:new Date().toLocaleString("nl-BE"),lastError:"",enabled:true});
+      const changed={...configs,[kind]:{...configs[kind],enabled:true,lastOk:new Date().toLocaleString("nl-BE"),lastError:""}};
+      setConfigs(changed);writeIntegrationStore(changed);
       flash(`${kind==="rotation"?"Rotation One":kind==="playout"?"Playout One":"SHOUTcast"}: verbinding geslaagd`);
-    }catch(e){
-      const message=e instanceof Error?e.message:"Verbinding mislukt";
-      update(kind,{lastError:message});
-      flash(message);
-    }finally{
-      setBusy(false);
-    }
+    }catch(e){const message=e instanceof Error?e.message:"Verbinding mislukt";update(kind,{lastError:message});flash(message)}finally{setBusy(false)}
   }
 
   const cards:[IntegrationKind,string,string][]=[
-    ["rotation","Rotation One","Playlists, stations en muziekplanning"],
-    ["playout","Playout One","Now/next, playoutstatus en actieve playlist"],
-    ["shoutcast","SHOUTcast","Streamstatus en luistercijfers"]
+    ["rotation","Rotation One","Stations, muziek, playlists en hitlijsten"],
+    ["playout","Playout One","Live engine, NOW/NEXT, encoder en stream"],
+    ["shoutcast","SHOUTcast","Echte live luistercijfers voor dit station"]
   ];
 
   return <div>
     {notice&&<div className="inline-notice standalone">{notice}</div>}
+    <div className="settings-persistence-banner"><strong>✓ Centrale instellingen</strong><span>{supabaseConfigured?"Publieke configuratie en stationinstellingen worden in Supabase bewaard en verdwijnen niet bij een nieuwe VLACORA-deploy.":"Supabase is niet actief; instellingen vallen terug op dit toestel."}</span></div>
 
     <div className="settings-grid admin-v8-grid">
       <div className="card">
         <h3>Stationinstellingen</h3>
         <label className="field">Naam<input className="input" value={stationName} disabled/></label>
-        <label className="field">Tijdzone<select className="select" defaultValue="Europe/Brussels"><option>Europe/Brussels</option><option>Europe/Amsterdam</option></select></label>
-        <div className="toggle-row"><div><strong>Actief station</strong><small>Toon in VLACORA</small></div><input type="checkbox" defaultChecked/></div>
+        <label className="field">Tijdzone<select className="select" value={stationSettings.timezone} onChange={e=>setStationSettings({...stationSettings,timezone:e.target.value})}><option>Europe/Brussels</option><option>Europe/Amsterdam</option></select></label>
+        <label className="toggle-row"><div><strong>Actief station</strong><small>Toon in VLACORA</small></div><input type="checkbox" checked={stationSettings.active} onChange={e=>setStationSettings({...stationSettings,active:e.target.checked})}/></label>
+        <button className="primary wide" onClick={saveStationSettings}>Stationinstellingen opslaan</button>
       </div>
 
       <div className="card integration-admin-card">
-        <div className="module-title-row"><div><h3>Integraties</h3><small>Instellen kan nu volledig hier.</small></div></div>
-        {cards.map(([kind,name,desc])=>{
-          const c=configs[kind];
-          return <div className="integration-v8" key={kind}>
-            <div className={`integration-status-dot ${c.lastOk&&!c.lastError?"online":c.host?"configured":""}`}/>
-            <div className="integration-v8-info">
-              <strong>{name}</strong>
-              <span>{c.lastOk&&!c.lastError?"Verbonden":c.host?"Ingesteld • nog testen":"Nog niet gekoppeld"}</span>
-              <small>{desc}</small>
-            </div>
-            <div className="integration-v8-actions">
-              {c.host&&<button className="ghost" disabled={busy} onClick={()=>test(kind,"status")}>Test</button>}
-              <button className="primary soft" onClick={()=>setSelected(kind)}>Instellen</button>
-            </div>
-          </div>
-        })}
-        <div className="integration-v8">
-          <div className={`integration-status-dot ${supabaseConfigured?"online":""}`}/>
-          <div className="integration-v8-info"><strong>Supabase Auth</strong><span>{supabaseConfigured?"Echte login actief":"Nog niet geconfigureerd"}</span><small>Cookie-based login voor VLACORA teamaccounts</small></div>
-          <button className="ghost" onClick={()=>{window.location.href="/login"}}>{supabaseConfigured?"Login":"Instellen"}</button>
-        </div>
+        <div className="module-title-row"><div><h3>Integraties</h3><small>{loaded?"Centraal gesynchroniseerd":"Instellingen laden…"}</small></div></div>
+        {cards.map(([kind,name,desc])=>{const c=configs[kind];return <div className="integration-v8" key={kind}>
+          <div className={`integration-status-dot ${c.lastOk&&!c.lastError?"online":c.host?"configured":""}`}/>
+          <div className="integration-v8-info"><strong>{name}</strong><span>{c.lastOk&&!c.lastError?"Verbonden":c.host?"Ingesteld":"Nog niet gekoppeld"}</span><small>{desc}</small></div>
+          <div className="integration-v8-actions">{c.host&&<button className="ghost" disabled={busy} onClick={()=>test(kind,"status")}>Test</button>}<button className="primary soft" onClick={()=>setSelected(kind)}>Instellen</button></div>
+        </div>})}
+        <div className="integration-v8"><div className={`integration-status-dot ${supabaseConfigured?"online":""}`}/><div className="integration-v8-info"><strong>Supabase Auth</strong><span>{supabaseConfigured?"Echte login actief":"Nog niet geconfigureerd"}</span><small>Gebruikers, rechten, meldingen en instellingen</small></div><button className="ghost" onClick={()=>location.href="/login"}>Account</button></div>
       </div>
 
       <div className="card">
         <h3>Automatisering</h3>
-        {["Playlistwaarschuwingen","Nieuwscontrole","Social reminders"].map(x=><label className="toggle-row" key={x}><div><strong>{x}</strong><small>Actief voor dit station</small></div><input type="checkbox" defaultChecked/></label>)}
+        <label className="toggle-row"><div><strong>Playlistwaarschuwingen</strong><small>Actief voor dit station</small></div><input type="checkbox" checked={stationSettings.playlistWarnings} onChange={e=>setStationSettings({...stationSettings,playlistWarnings:e.target.checked})}/></label>
+        <label className="toggle-row"><div><strong>Nieuwscontrole</strong><small>Actief voor dit station</small></div><input type="checkbox" checked={stationSettings.newsCheck} onChange={e=>setStationSettings({...stationSettings,newsCheck:e.target.checked})}/></label>
+        <label className="toggle-row"><div><strong>Social reminders</strong><small>Actief voor dit station</small></div><input type="checkbox" checked={stationSettings.socialReminders} onChange={e=>setStationSettings({...stationSettings,socialReminders:e.target.checked})}/></label>
+        <button className="ghost wide" onClick={saveStationSettings}>Automatisering opslaan</button>
       </div>
     </div>
 
-    {selected&&cfg&&<div className="integration-drawer-backdrop" onMouseDown={()=>setSelected(null)}>
-      <div className="integration-drawer" onMouseDown={e=>e.stopPropagation()}>
-        <div className="integration-drawer-head">
-          <div><span className="eyebrow">INTEGRATIE INSTELLEN</span><h2>{selected==="rotation"?"Rotation One":selected==="playout"?"Playout One":"SHOUTcast"}</h2><p>Vul hier gewoon het vaste publieke IP en de poort in.</p></div>
-          <button className="mini-btn" onClick={()=>setSelected(null)}>×</button>
-        </div>
+    {selected&&cfg&&<div className="integration-drawer-backdrop" onMouseDown={()=>setSelected(null)}><div className="integration-drawer" onMouseDown={e=>e.stopPropagation()}>
+      <div className="integration-drawer-head"><div><span className="eyebrow">INTEGRATIE INSTELLEN</span><h2>{selected==="rotation"?"Rotation One":selected==="playout"?"Playout One":"SHOUTcast"}</h2><p>{selected==="shoutcast"?`Luistercijfers voor ${stationName}. Elke zender kan een eigen SHOUTcast endpoint hebben.`:"Centrale radio-API koppeling."}</p></div><button className="mini-btn" onClick={()=>setSelected(null)}>×</button></div>
 
-        <div className="easy-config-box">
-          <div className="two-form-cols">
-            <label className="field">Protocol<select className="select" value={cfg.protocol} onChange={e=>update(selected,{protocol:e.target.value as Protocol})}><option value="http">HTTP</option><option value="https">HTTPS</option></select></label>
-            <label className="field">Vast IP-adres<input className="input" value={cfg.host} onChange={e=>update(selected,{host:e.target.value.trim()})} placeholder="bv. 81.82.83.84"/></label>
-            <label className="field">Poort<input className="input" value={cfg.port} onChange={e=>update(selected,{port:e.target.value.replace(/\D/g,"")})} placeholder="5090"/></label>
-            <label className="field">Basis-pad<input className="input" value={cfg.basePath} onChange={e=>update(selected,{basePath:e.target.value})} placeholder="leeg laten indien niet nodig"/></label>
-          </div>
-          <div className="endpoint-preview"><span>Adres</span><strong>{cfg.protocol}://{cfg.host||"JOUW-IP"}{cfg.port?`:${cfg.port}`:""}{cfg.basePath||""}</strong></div>
-        </div>
+      <div className="easy-config-box"><div className="two-form-cols">
+        <label className="field">Protocol<select className="select" value={cfg.protocol} onChange={e=>update(selected,{protocol:e.target.value as Protocol})}><option value="http">HTTP</option><option value="https">HTTPS</option></select></label>
+        <label className="field">Publiek IP-adres<input className="input" value={cfg.host} onChange={e=>update(selected,{host:e.target.value.trim()})} placeholder="bv. 85.215.152.155"/></label>
+        <label className="field">Poort<input className="input" value={cfg.port} onChange={e=>update(selected,{port:e.target.value.replace(/\D/g,"")})} placeholder={selected==="rotation"?"5500":selected==="playout"?"5099":"8000"}/></label>
+        <label className="field">Basis-pad<input className="input" value={cfg.basePath} onChange={e=>update(selected,{basePath:e.target.value})} placeholder="meestal leeg"/></label>
+      </div><div className="endpoint-preview"><span>Adres</span><strong>{cfg.protocol}://{cfg.host||"JOUW-IP"}{cfg.port?`:${cfg.port}`:""}{cfg.basePath||""}</strong></div></div>
 
-        <div className="settings-section">
-          <h4>API beveiliging</h4>
-          <label className="field">API-key / shared secret<input className="input" type="password" value={keyInput} onChange={e=>setKeyInput(e.target.value)} placeholder="optioneel — alleen als jouw API dit gebruikt"/></label>
-          <div className="two-form-cols">
-            <label className="field">Header<input className="input" value={keyHeader} onChange={e=>setKeyHeader(e.target.value)} placeholder="Authorization"/></label>
-            <label className="field">Prefix<input className="input" value={keyPrefix} onChange={e=>setKeyPrefix(e.target.value)} placeholder="Bearer"/></label>
-          </div>
-          <div className="secret-explainer">
-            <strong>🔒 Niet permanent opgeslagen</strong>
-            <span>In deze testversie bewaren we de geheime sleutel alleen in de browsersessie. Sluit je de browser volledig, dan vul je hem opnieuw in. Zo hoeven we hem niet onveilig in localStorage of GitHub te zetten.</span>
-          </div>
-          {keyInput&&<button className="ghost danger-text" onClick={clearSecret}>Verwijder tijdelijke sleutel</button>}
-        </div>
+      <div className="settings-section"><h4>API beveiliging</h4><label className="field">API-key / shared secret<input className="input" type="password" value={keyInput} onChange={e=>setKeyInput(e.target.value)} placeholder="leeg laten als deze koppeling geen key gebruikt"/></label><div className="two-form-cols"><label className="field">Header<input className="input" value={keyHeader} onChange={e=>setKeyHeader(e.target.value)}/></label><label className="field">Prefix<input className="input" value={keyPrefix} onChange={e=>setKeyPrefix(e.target.value)}/></label></div><div className="secret-explainer"><strong>🔒 Geheim blijft apart</strong><span>De publieke instellingen worden centraal bewaard. Een API-secret blijft voorlopig alleen in je browsersessie; we zetten geheimen niet in GitHub of een leesbare tabel.</span></div>{keyInput&&<button className="ghost danger-text" onClick={clearSecret}>Verwijder tijdelijke sleutel</button>}</div>
 
-        <div className="settings-section">
-          <h4>Endpoints</h4>{selected==="playout"&&<div className="http-warning"><strong>Playout One Hub</strong><span>Gebruik bij voorkeur de centrale Hub/API. De standaardpaden kunnen per Playout One-build verschillen; test Status en Stations eerst voordat je Now Playing invult.</span></div>}
-          <label className="field">Status endpoint<input className="input" value={cfg.statusPath} onChange={e=>update(selected,{statusPath:e.target.value})}/></label>
-          <label className="field">Stations endpoint<input className="input" value={cfg.stationPath} onChange={e=>update(selected,{stationPath:e.target.value})}/></label>
-          {selected==="rotation"&&<>
-            <label className="field">Schedule endpoint<input className="input" value={cfg.playlistPath||""} onChange={e=>update(selected,{playlistPath:e.target.value})}/></label>
-            <label className="field">Coverage endpoint<input className="input" value={cfg.coveragePath||""} onChange={e=>update(selected,{coveragePath:e.target.value})}/></label>
-            <label className="field">Revision endpoint<input className="input" value={cfg.revisionPath||""} onChange={e=>update(selected,{revisionPath:e.target.value})}/></label>
-            <div className="api-subsection-title"><strong>Muziekdatabase → PDF</strong><span>Deze twee paden zijn optioneel. We vullen ze niet met gok-endpoints.</span></div>
-            <label className="field">Muziekmappen endpoint<input className="input" value={cfg.musicFoldersPath||""} onChange={e=>update(selected,{musicFoldersPath:e.target.value})} placeholder="bv. een bevestigd endpoint met {stationId}"/></label>
-            <label className="field">Songs-in-map endpoint<input className="input" value={cfg.musicFolderItemsPath||""} onChange={e=>update(selected,{musicFolderItemsPath:e.target.value})} placeholder="bevestigd endpoint met {stationId} en {folderId}"/></label>
-            <div className="api-subsection-title"><strong>Hitlijsten uit Rotation One</strong><span>VLACORA haalt de index pas op wanneer je synchroniseert. Geen zware continue polling.</span></div>
-            <label className="field">Hitlijsten endpoint<input className="input" value={cfg.chartListPath||""} onChange={e=>update(selected,{chartListPath:e.target.value})}/></label>
-            <label className="field">Edities endpoint<input className="input" value={cfg.chartEditionsPath||""} onChange={e=>update(selected,{chartEditionsPath:e.target.value})}/></label>
-            <label className="field">Editie-detail endpoint<input className="input" value={cfg.chartEditionPath||""} onChange={e=>update(selected,{chartEditionPath:e.target.value})}/></label>
-            <label className="field">Hitlijst revision endpoint<input className="input" value={cfg.chartRevisionPath||""} onChange={e=>update(selected,{chartRevisionPath:e.target.value})}/></label>
-            <label className="field">Write endpoint<input className="input" value={cfg.chartWritePath||""} onChange={e=>update(selected,{chartWritePath:e.target.value})}/></label>
-            <label className="toggle-row chart-write-toggle"><div><strong>Hitlijsten terugschrijven</strong><small>{supabaseConfigured?"Alleen ingelogde VLACORA-gebruikers kunnen remote schrijven.":"Eerst echte Supabase-login activeren."}</small></div><input type="checkbox" checked={Boolean(cfg.chartWriteEnabled)} disabled={!supabaseConfigured} onChange={e=>update(selected,{chartWriteEnabled:e.target.checked})}/></label>
-          </>}
-          {selected==="playout"&&<label className="field">Now-playing/snapshot endpoint<input className="input" value={cfg.nowPath||""} onChange={e=>update(selected,{nowPath:e.target.value})} placeholder="/api/v1/integration/stations/{stationId}/status"/></label>}
-          {selected==="playout"&&<div className="secret-explainer"><strong>Playout One 0.11.19</strong><span>Gebruik Hub-poort 5099. Health, stations en live status komen uit de zuinige VLACORA Integration API; status/NOW/NEXT lezen de bestaande heartbeat in geheugen en veroorzaken geen extra stationpolling.</span></div>}
-        </div>
-
-        <div className="settings-section">
-          <h4>Veiligheidsmodus</h4>
-          <div className="read-only-lock">
-            <div><strong>Alleen lezen</strong><span>De algemene radio-koppeling blijft read-only. Alleen hitlijsten kunnen afzonderlijk worden teruggeschreven wanneer echte login actief is én je de write-schakelaar bewust aanzet.</span></div>
-            <input type="checkbox" checked readOnly/>
-          </div>
-          {cfg.protocol==="http"&&<div className="http-warning"><strong>HTTP actief</strong><span>Dat werkt met jouw vaste IP, maar verkeer tussen Vercel en de radioserver is niet versleuteld. Gebruik daarom een lange API-key en open alleen de strikt nodige poort(en).</span></div>}
-        </div>
-
-        {cfg.lastError&&<div className="config-error"><strong>Laatste fout</strong><span>{cfg.lastError}</span></div>}
-        {cfg.lastOk&&<div className="config-ok"><strong>Laatste verbinding</strong><span>{cfg.lastOk}</span></div>}
-
-        {diagnostic&&<div className="connection-diagnostic">
-          <div className="module-title-row"><div><h3>Technische diagnose</h3><small>Hier zie je exact waar de verbinding stopt.</small></div></div>
-          <div className="diagnostic-grid">
-            <span>Fase</span><strong>{diagnostic.phase||"—"}</strong>
-            <span>Doel</span><strong>{diagnostic.target||"—"}</strong>
-            <span>Transport</span><strong>{diagnostic.transport||"—"}</strong>
-            <span>TCP</span><strong>{diagnostic.tcp?.ok?"Verbonden":diagnostic.tcp?.error?.code||(!diagnostic.tcp?"Niet apart getest":"Mislukt")}</strong>
-            <span>TCP tijd</span><strong>{diagnostic.tcp?.durationMs!=null?`${diagnostic.tcp.durationMs} ms`:"—"}</strong>
-            <span>HTTP</span><strong>{diagnostic.status||diagnostic.httpError?.code||diagnostic.fetchError?.code||diagnostic.fetchError?.cause?.code||"—"}</strong>
-            <span>HTTP tijd</span><strong>{diagnostic.httpDurationMs!=null?`${diagnostic.httpDurationMs} ms`:"—"}</strong>
-            <span>Vercel regio</span><strong>{diagnostic.runtime?.vercelRegion||"onbekend"}</strong>
-            <span>Node</span><strong>{diagnostic.runtime?.node||"—"}</strong>
-          </div>
-          {(diagnostic.message||diagnostic.httpError?.message||diagnostic.fetchError?.message||diagnostic.tcp?.error?.message)&&<code className="diagnostic-error-text">{diagnostic.message||diagnostic.httpError?.message||diagnostic.fetchError?.message||diagnostic.tcp?.error?.message}</code>}
-        </div>}
-
-        <div className="drawer-actions">
-          <button className="ghost" disabled={busy} onClick={()=>test(selected,"stations")}>Stations ophalen</button>
-          <button className="ghost" disabled={busy} onClick={()=>test(selected,"status")}>Test verbinding</button>
-          <button className="primary" onClick={()=>{save();setSelected(null)}}>Opslaan</button>
-        </div>
+      <div className="settings-section"><h4>Endpoints</h4>
+        <label className="field">Status endpoint<input className="input" value={cfg.statusPath} onChange={e=>update(selected,{statusPath:e.target.value})}/></label>
+        {selected!=="shoutcast"&&<label className="field">Stations endpoint<input className="input" value={cfg.stationPath} onChange={e=>update(selected,{stationPath:e.target.value})}/></label>}
+        {selected==="shoutcast"&&<div className="shoutcast-config-note"><strong>Standaard voor SHOUTcast v2</strong><code>/stats?sid=1&amp;json=1</code><span>Gebruik hier de SID van de stream van dit station. VLACORA leest alleen publieke statistieken.</span></div>}
+        {selected==="rotation"&&<>
+          <label className="field">Schedule endpoint<input className="input" value={cfg.playlistPath||""} onChange={e=>update(selected,{playlistPath:e.target.value})}/></label>
+          <label className="field">Coverage endpoint<input className="input" value={cfg.coveragePath||""} onChange={e=>update(selected,{coveragePath:e.target.value})}/></label>
+          <label className="field">Revision endpoint<input className="input" value={cfg.revisionPath||""} onChange={e=>update(selected,{revisionPath:e.target.value})}/></label>
+          <div className="api-subsection-title"><strong>Muziekdatabase → PDF</strong><span>Echte Rotation One-paden.</span></div>
+          <label className="field">Muziekmappen endpoint<input className="input" value={cfg.musicFoldersPath||""} onChange={e=>update(selected,{musicFoldersPath:e.target.value})}/></label>
+          <label className="field">Songs-in-map endpoint<input className="input" value={cfg.musicFolderItemsPath||""} onChange={e=>update(selected,{musicFolderItemsPath:e.target.value})}/></label>
+          <div className="api-subsection-title"><strong>Hitlijsten uit Rotation One</strong><span>Index/edities worden alleen opgehaald wanneer nodig.</span></div>
+          <label className="field">Hitlijsten endpoint<input className="input" value={cfg.chartListPath||""} onChange={e=>update(selected,{chartListPath:e.target.value})}/></label>
+          <label className="field">Edities endpoint<input className="input" value={cfg.chartEditionsPath||""} onChange={e=>update(selected,{chartEditionsPath:e.target.value})}/></label>
+          <label className="field">Editie-detail endpoint<input className="input" value={cfg.chartEditionPath||""} onChange={e=>update(selected,{chartEditionPath:e.target.value})}/></label>
+          <label className="field">Hitlijst revision endpoint<input className="input" value={cfg.chartRevisionPath||""} onChange={e=>update(selected,{chartRevisionPath:e.target.value})}/></label>
+          <label className="field">Write endpoint<input className="input" value={cfg.chartWritePath||""} onChange={e=>update(selected,{chartWritePath:e.target.value})}/></label>
+          <label className="toggle-row chart-write-toggle"><div><strong>Hitlijsten terugschrijven</strong><small>Alleen voor ingelogde teamleden wanneer je dit bewust activeert.</small></div><input type="checkbox" checked={Boolean(cfg.chartWriteEnabled)} onChange={e=>update(selected,{chartWriteEnabled:e.target.checked})}/></label>
+        </>}
+        {selected==="playout"&&<><label className="field">Now-playing/snapshot endpoint<input className="input" value={cfg.nowPath||""} onChange={e=>update(selected,{nowPath:e.target.value})}/></label><div className="secret-explainer"><strong>Playout One Hub :5099</strong><span>Status/NOW/NEXT komen uit de bestaande heartbeat-snapshot en veroorzaken geen extra polling op de stationengine.</span></div></>}
       </div>
-    </div>}
+
+      {cfg.protocol==="http"&&<div className="http-warning"><strong>HTTP actief</strong><span>Functioneel, maar niet versleuteld. Gebruik voor APIs met Bearer-key later bij voorkeur HTTPS.</span></div>}
+      {cfg.lastError&&<div className="config-error"><strong>Laatste fout</strong><span>{cfg.lastError}</span></div>}
+      {cfg.lastOk&&<div className="config-ok"><strong>Laatste verbinding</strong><span>{cfg.lastOk}</span></div>}
+      {diagnostic&&<div className="connection-diagnostic"><div className="diagnostic-grid"><span>Fase</span><strong>{diagnostic.phase||"—"}</strong><span>Doel</span><strong>{diagnostic.target||"—"}</strong><span>HTTP</span><strong>{diagnostic.status||diagnostic.httpError?.code||"—"}</strong><span>Vercel regio</span><strong>{diagnostic.runtime?.vercelRegion||"onbekend"}</strong></div></div>}
+      <div className="drawer-actions">{selected!=="shoutcast"&&<button className="ghost" disabled={busy} onClick={()=>test(selected,"stations")}>Stations ophalen</button>}<button className="ghost" disabled={busy} onClick={()=>test(selected,"status")}>Test verbinding</button><button className="primary" onClick={saveIntegration}>Opslaan</button></div>
+    </div></div>}
   </div>
 }

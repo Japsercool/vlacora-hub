@@ -494,3 +494,51 @@ Still configure in Supabase Dashboard:
 - Authentication → URL Configuration → Site URL
 - allowed redirect URL ending in `/auth/callback**`
 - Auth users / invitations
+
+
+## 0.14.0 — Centrale instellingen, echt team, meldpunt-workflow, sjablonen & SHOUTcast
+
+### Instellingen blijven behouden
+- publieke Rotation One / Playout One integratieconfig staat centraal in `hub_settings`
+- SHOUTcast-config is per station centraal opgeslagen
+- stationinstellingen staan in Supabase in plaats van alleen in de browser
+- bestaande lokale config wordt bij de eerste run waar mogelijk éénmalig naar Supabase gemigreerd
+- API-secrets worden bewust niet als leesbare setting in Postgres/GitHub gezet
+
+### Echte teamgebruikers
+- Team & rechten leest echte Supabase Auth-gebruikers/profielen
+- superadmin kan teamleden uitnodigen
+- rol, functie, actief/inactief, stations en rechtenmatrix worden centraal opgeslagen
+- wachtwoord-resetlink kan vanuit Team & rechten worden verstuurd
+- station_memberships worden echt gebruikt door RLS
+- huidige eigenaar is gekoppeld aan het echte Supabase-account
+
+### Meldpunt
+- workflow: Open → In behandeling → Wachten op info → Opgelost → Gesloten
+- onbeperkt updates/tijdlijn per melding
+- statusupdates, werknotities en oplossing blijven bewaard
+- hoge/kritieke melding kan via de bestaande notification-laag onder de aandacht worden gebracht
+
+### Sjablonen
+- onbeperkt veel eigen velden via JSON
+- veldtypes zoals tekst, lange tekst, nummer, datum, tijd, keuze en checkbox
+- automatische regels: bij start, na X songs, na X items, op minuut, op tijdstip en bij einde
+- voorbeeldregel “na de tweede song”
+- regels zijn centraal en versie-onafhankelijk opgeslagen
+- directe on-air writes blijven uit tot de specifieke Rotation/Playout write-API expliciet is toegestaan
+
+### SHOUTcast luistercijfers
+- per station eigen SHOUTcast v2 endpoint, standaard `/stats?sid=1&json=1`
+- live listeners, piek, unieke listeners, gemiddelde luistertijd, bitrate en huidige song
+- live refresh alleen wanneer relevante pagina/dashboard open is
+- maximaal één database-sample per 10 minuten per station
+- daggrafiek wordt uit die lichte samples opgebouwd
+
+### Supabase
+Productiemigraties voor deze release:
+- `014_persistent_settings_team_incidents_templates.sql`
+- `015_shoutcast_listener_samples.sql`
+- `016_team_security_hardening.sql`
+- `017_function_acl_hardening.sql`
+
+Voor het gekoppelde VLACORA-project zijn deze migrations al toegepast.

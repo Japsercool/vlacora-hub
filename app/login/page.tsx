@@ -4,8 +4,10 @@ import { isSupabaseServerConfigured } from "@/lib/supabase/server";
 export default function LoginPage({searchParams}:{searchParams?:{error?:string}}){
   const configured=isSupabaseServerConfigured();
   const resetError=searchParams?.error==="reset-link-invalid";
+  const disabledError=searchParams?.error==="account-disabled";
   return <main className="login-page">{configured?<div className="login-page-stack">
     {resetError&&<div className="login-global-error">De resetlink is ongeldig of verlopen. Vraag hieronder een nieuwe link aan.</div>}
+    {disabledError&&<div className="login-global-error">Dit VLACORA-account is uitgeschakeld. Neem contact op met een beheerder.</div>}
     <LoginForm/>
   </div>:<div className="login-card">
     <div className="login-brand"><div className="brand-mark">V</div><div><strong>VLACORA</strong><span>HUB</span></div></div>
