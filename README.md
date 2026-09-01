@@ -444,3 +444,53 @@ Without Supabase the UI still works in local/setup mode, but cross-device presen
 
 ## 0.13.1 — Playout One 0.11.19 defaults
 Nieuwe Playout One-koppelingen gebruiken standaard Hub-poort `5099` met `/api/v1/integration/health`, `/api/v1/integration/stations` en `/api/v1/integration/stations/{stationId}/status`. Hierdoor werkt Test verbinding / Stations ophalen / NOW-NEXT direct met Playout One 0.11.19.
+
+
+## 0.13.2 — Wachtwoord vergeten
+
+De echte Supabase-teamlogin heeft nu volledig wachtwoordherstel:
+
+1. `Wachtwoord vergeten?` op `/login`
+2. gebruiker vult e-mailadres in
+3. Supabase Auth stuurt een recovery mail
+4. recovery-link landt via `/auth/callback?next=/reset-password`
+5. VLACORA wisselt de PKCE-code in voor de eigen sessie
+6. gebruiker kiest een nieuw wachtwoord
+7. na opslaan gaat de gebruiker terug naar de HUB
+
+Security:
+- login blijft een gesloten teamlogin; er is geen registratieknop
+- de UI zegt nooit of een ingevoerd e-mailadres wel/niet bestaat
+- resetmail heeft client-side 60s cooldown tegen per ongeluk spammen
+- resetlink gebruikt de bestaande Supabase Auth recovery-flow
+- minimaal 10 tekens voor het nieuwe wachtwoord
+- geen service-role key nodig
+
+Free-tier policy:
+Wachtwoordherstel maakt alleen een Auth-call wanneer iemand expliciet een resetmail vraagt.
+Er is geen polling, background job of extra database-opslag. Houd wel rekening met de normale
+Auth/e-mail rate limits van je gekozen Supabase mailconfiguratie.
+
+
+## 0.13.3 — Supabase project preconfigured
+
+The public Supabase project URL and publishable key are filled in under:
+
+`lib/supabase/public-config.ts`
+
+No service-role/admin secret is embedded.
+
+Database migrations have been prepared/applied on the connected Supabase project for:
+- profiles
+- radio_stations
+- station_programs
+- hitlists
+- station_memberships
+- hub_notifications
+- hub_notification_receipts
+- realtime publication for notifications/receipts
+
+Still configure in Supabase Dashboard:
+- Authentication → URL Configuration → Site URL
+- allowed redirect URL ending in `/auth/callback**`
+- Auth users / invitations

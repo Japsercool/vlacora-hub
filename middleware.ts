@@ -24,6 +24,7 @@ export async function middleware(request:NextRequest){
   const loggedIn=Boolean(data?.claims);
   const path=request.nextUrl.pathname;
   if(path.startsWith("/hub")&&!loggedIn){const target=request.nextUrl.clone();target.pathname="/login";target.searchParams.set("next",path);return NextResponse.redirect(target)}
+  // A recovery link creates a temporary authenticated session; /reset-password must remain reachable.
   if(path==="/login"&&loggedIn){const target=request.nextUrl.clone();target.pathname="/hub/all/dashboard";target.search="";return NextResponse.redirect(target)}
   return response;
 }

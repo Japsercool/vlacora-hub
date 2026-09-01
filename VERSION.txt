@@ -1,2 +1,2 @@
-VLACORA HUB 0.13.1
-Playout One 0.11.19 integration defaults: Hub 5099, health/stations/status endpoints preconfigured.
+VLACORA HUB 0.13.3
+Supabase public project configuration prefilled for central Auth/Realtime/Database use.
