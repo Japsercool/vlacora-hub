@@ -264,3 +264,10 @@ Security model for this prototype:
 - playlist writes are not exposed through this easy setup yet
 
 This is intentionally a safe testing bridge. Persistent shared secrets and real production RBAC will move to Supabase/Auth or another secured backend later.
+
+
+## 0.8.1 — Vercel Node runtime + diagnostics
+- All `/api/radio/**` routes now explicitly use the Node.js runtime.
+- Adds a raw TCP connection test before HTTP fetch.
+- Shows TCP timeout/refused vs HTTP/auth/API errors separately.
+- Shows target URL, phase, TCP duration, error code, Node version and Vercel region.

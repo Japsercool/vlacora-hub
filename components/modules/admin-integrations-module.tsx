@@ -56,6 +56,7 @@ export default function AdminIntegrationsModule({stationName}:{stationName:strin
   const[keyPrefix,setKeyPrefix]=useState("Bearer");
   const[notice,setNotice]=useState("");
   const[busy,setBusy]=useState(false);
+  const[diagnostic,setDiagnostic]=useState<any>(null);
 
   const cfg = selected ? configs[selected] : null;
 
@@ -93,6 +94,7 @@ export default function AdminIntegrationsModule({stationName}:{stationName:strin
     const c=configs[kind];
     if(!c.host.trim()) return flash("Vul eerst het vaste IP-adres in.");
     setBusy(true);
+    setDiagnostic(null);
     try{
       const secret = kind===selected ? keyInput : (sessionStorage.getItem(sessionKey(kind))||"");
       const header = kind===selected ? keyHeader : (sessionStorage.getItem(`${sessionKey(kind)}:header`)||"Authorization");
@@ -103,13 +105,23 @@ export default function AdminIntegrationsModule({stationName}:{stationName:strin
         body:JSON.stringify({kind,action,config:c,apiKey:secret,apiKeyHeader:header,apiKeyPrefix:prefix})
       });
       const data=await response.json();
-      if(!response.ok)throw new Error(data.error||`HTTP ${response.status}`);
+      setDiagnostic(data);
+
+      if(!response.ok){
+        const code=data?.tcp?.error?.code||data?.fetchError?.code||data?.fetchError?.cause?.code||"";
+        const phase=data?.phase||"verbinding";
+        throw new Error(`${phase}${code?` • ${code}`:""}: ${data?.message||data?.error||"verbinding mislukt"}`);
+      }
+
       update(kind,{lastOk:new Date().toLocaleString("nl-BE"),lastError:"",enabled:true});
       flash(`${kind==="rotation"?"Rotation One":kind==="playout"?"Playout One":"SHOUTcast"}: verbinding geslaagd`);
     }catch(e){
-      update(kind,{lastError:e instanceof Error?e.message:"Verbinding mislukt"});
-      flash(e instanceof Error?e.message:"Verbinding mislukt");
-    }finally{setBusy(false)}
+      const message=e instanceof Error?e.message:"Verbinding mislukt";
+      update(kind,{lastError:message});
+      flash(message);
+    }finally{
+      setBusy(false);
+    }
   }
 
   const cards:[IntegrationKind,string,string][]=[
@@ -209,6 +221,20 @@ export default function AdminIntegrationsModule({stationName}:{stationName:strin
 
         {cfg.lastError&&<div className="config-error"><strong>Laatste fout</strong><span>{cfg.lastError}</span></div>}
         {cfg.lastOk&&<div className="config-ok"><strong>Laatste verbinding</strong><span>{cfg.lastOk}</span></div>}
+
+        {diagnostic&&<div className="connection-diagnostic">
+          <div className="module-title-row"><div><h3>Technische diagnose</h3><small>Hier zie je exact waar de verbinding stopt.</small></div></div>
+          <div className="diagnostic-grid">
+            <span>Fase</span><strong>{diagnostic.phase||"—"}</strong>
+            <span>Doel</span><strong>{diagnostic.target||"—"}</strong>
+            <span>TCP</span><strong>{diagnostic.tcp?.ok?"Verbonden":diagnostic.tcp?.error?.code||"Mislukt"}</strong>
+            <span>TCP tijd</span><strong>{diagnostic.tcp?.durationMs!=null?`${diagnostic.tcp.durationMs} ms`:"—"}</strong>
+            <span>HTTP</span><strong>{diagnostic.status||diagnostic.fetchError?.code||diagnostic.fetchError?.cause?.code||"—"}</strong>
+            <span>Vercel regio</span><strong>{diagnostic.runtime?.vercelRegion||"onbekend"}</strong>
+            <span>Node</span><strong>{diagnostic.runtime?.node||"—"}</strong>
+          </div>
+          {(diagnostic.message||diagnostic.fetchError?.message||diagnostic.tcp?.error?.message)&&<code className="diagnostic-error-text">{diagnostic.message||diagnostic.fetchError?.message||diagnostic.tcp?.error?.message}</code>}
+        </div>}
 
         <div className="drawer-actions">
           <button className="ghost" disabled={busy} onClick={()=>test(selected,"stations")}>Stations ophalen</button>
