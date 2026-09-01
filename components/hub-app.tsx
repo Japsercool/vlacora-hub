@@ -8,6 +8,9 @@ import MessengerModule from "@/components/modules/messenger-module";
 import PresentationModule from "@/components/modules/presentation-module";
 import SocialStudioModule from "@/components/modules/social-studio-module";
 import MusicLibraryModule from "@/components/modules/music-library-module";
+import EditorialModule from "@/components/modules/editorial-module";
+import RadioApiModule from "@/components/modules/radio-api-module";
+import TeamRightsModule from "@/components/modules/team-rights-module";
 import MusicFoldersModule from "@/components/modules/music-folders-module";
 
 type Props = { stationSlug: string; moduleSlug: string };
@@ -285,6 +288,8 @@ export default function HubApp({ stationSlug, moduleSlug }: Props) {
               <Card className="inspector"><h3>Playlist inspector</h3><p className="muted">Items kun je nu wijzigen, verplaatsen en verwijderen.</p><div className="inspector-box"><span>Rotation One</span><strong>nog niet gekoppeld</strong><Badge tone="orange">DEMO</Badge></div><button className="primary wide" onClick={()=>setModal("playlist")}>+ Item toevoegen</button><button className="ghost wide spaced" onClick={()=>{setPlaylist(initialPlaylist);notify("Demo-playlist hersteld")}}>Reset demo</button></Card></div>
           </>}
 
+          {moduleSlug === "redactie" && <EditorialModule stationSlug={station.slug} />}
+
           {moduleSlug === "hitlijsten" && <>
             <div className="page-intro"><div><h2>Versuz TOP 50</h2><p>Week 36 • {chartPublished?"gepubliceerd":"concepteditie"}</p></div><div className="button-row"><button className="ghost" onClick={()=>setHistoryVisible(!historyVisible)}>{historyVisible?"Verberg historiek":"Historiek"}</button><button className="primary" onClick={()=>{setChartPublished(!chartPublished);notify(chartPublished?"Terug naar concept":"Hitlijst gepubliceerd")}}>{chartPublished?"Publicatie intrekken":"Publiceren"}</button></div></div>
             {historyVisible&&<Card className="history-card"><h3>Recente edities</h3><p>Week 35 • #1 ANOTR & 54 Ultra</p><p>Week 34 • #1 Jennifer Lopez & David Guetta</p><p>Week 33 • #1 Joel Corry</p></Card>}
@@ -307,10 +312,9 @@ export default function HubApp({ stationSlug, moduleSlug }: Props) {
             <Card className="table-card"><table><thead><tr><th>Station</th><th>Playout</th><th>Rotation</th><th>Stream</th><th>Playlists</th><th>Nieuws</th><th>Listeners</th></tr></thead><tbody><tr><td><b>Versuz Radio</b></td><td><Badge tone="green">Online</Badge></td><td><Badge tone="green">Online</Badge></td><td><Badge tone="green">Online</Badge></td><td>8 sep</td><td>✓ 08:00</td><td><b>184</b></td></tr><tr><td><b>Club FM</b></td><td><Badge tone="green">Online</Badge></td><td><Badge tone="green">Online</Badge></td><td><Badge tone="green">Online</Badge></td><td>7 sep</td><td>✓ 08:00</td><td><b>137</b></td></tr><tr><td><b>Vlacora One</b></td><td><Badge tone="red">Offline</Badge></td><td><Badge tone="green">Online</Badge></td><td><Badge tone="red">Offline</Badge></td><td>5 sep</td><td>⚠ ontbreekt</td><td><b>0</b></td></tr></tbody></table></Card>
           </>}
 
-          {moduleSlug === "team" && <>
-            <div className="page-intro"><div><h2>Team & rechten</h2><p>Teamleden in deze demo blijven lokaal bewaard.</p></div><button className="primary" onClick={()=>setModal("team")}>+ Gebruiker toevoegen</button></div>
-            <div className="team-grid">{team.map(member=><Card className="team-card" key={member.id}><div className="avatar large">{member.initials}</div><div><h3>{member.name}</h3><Badge tone="blue">{member.role}</Badge><p>{member.scope}</p></div><button className="ghost" onClick={()=>{const role=prompt("Nieuwe rol:",member.role);if(role)setTeam(team.map(x=>x.id===member.id?{...x,role}:x))}}>Beheer</button></Card>)}</div>
-          </>}
+          {moduleSlug === "radio-api" && <RadioApiModule stationSlug={station.slug} />}
+
+          {moduleSlug === "team" && <TeamRightsModule stationSlug={station.slug} />}
 
           {moduleSlug === "beheer" && <div className="settings-grid"><Card><h3>Stationinstellingen</h3><label className="field">Naam<input className="input" value={stationSettings.name} onChange={e=>setStationSettings({...stationSettings,name:e.target.value})}/></label><label className="field">Tijdzone<select className="select" value={stationSettings.timezone} onChange={e=>setStationSettings({...stationSettings,timezone:e.target.value})}><option>Europe/Brussels</option><option>Europe/Amsterdam</option></select></label><label className="toggle-row"><div><strong>Actief station</strong><small>Toon in VLACORA</small></div><input type="checkbox" checked={stationSettings.active} onChange={e=>setStationSettings({...stationSettings,active:e.target.checked})}/></label><button className="primary" onClick={()=>notify("Stationinstellingen opgeslagen")}>Opslaan</button></Card>
             <Card><h3>Integraties</h3>{[["Rotation One","Nog niet gekoppeld"],["Playout One","Nog niet gekoppeld"],["SHOUTcast","Nog niet gekoppeld"],["Supabase","Nog niet verbonden"]].map(([x,s])=><div className="integration" key={x}><div><strong>{x}</strong><small>{s}</small></div><button className="ghost" onClick={()=>notify(`${x}: configuratiescherm komt bij echte API-koppeling`)}>Instellen</button></div>)}</Card>

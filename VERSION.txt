@@ -1,2 +1,2 @@
-VLACORA HUB 0.4.0
-Editable social templates, music browser, refreshed messenger dropdowns and map assignment.
+VLACORA HUB 0.7.0
+Advanced Team & Rights + real HTTP fixed-IP support for Rotation One and Playout One.

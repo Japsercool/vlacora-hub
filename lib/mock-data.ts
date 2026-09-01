@@ -17,12 +17,14 @@ export const navItems = [
   ["programmering", "◫", "Programmering"],
   ["muziek", "♫", "Muziek"],
   ["meetings", "◎", "Muziekmeetings"],
+  ["redactie", "✎", "Redactie"],
   ["playlists", "≡", "Playlists"],
   ["hitlijsten", "↕", "Hitlijsten"],
   ["presentatie", "✎", "Presentatie"],
   ["social", "✦", "Social Studio"],
   ["statistieken", "▥", "Luistercijfers"],
   ["control", "⌁", "On-Air Control"],
+  ["radio-api", "↔", "Radio API"],
   ["team", "♙", "Team"],
   ["beheer", "⚙", "Beheer"]
 ] as const;

@@ -137,3 +137,96 @@ The new `Muziekmappen PDF` module lets you maintain folders/categories and songs
 - Music: searchable real song library, artwork, metadata, map and per-song presentation text.
 - Music folders: dropdown to move songs between maps + refresh library.
 - Social Studio: no prompt dialogs; upload background/logo/artwork and edit all visible text, colors, positions and sizes.
+
+
+## 0.5.0 — Redactie + radio API architecture
+
+New Redactie module:
+- edit playlist order
+- write a presenter text and notes for every playlist item
+- load the standard presenter text from the music library
+- add music from the shared music library
+- add editorial talk/weather/traffic/promo items
+- link program templates to shows
+- automatically insert template blocks into an hour
+
+Rotation One / Playout One:
+- Designed for the user's fixed public API IP addresses.
+- Browser does NOT call the public radio IP directly.
+- Vercel server routes proxy calls so API keys remain server-side and CORS is avoided.
+- Configure `ROTATION_ONE_BASE_URL` and `PLAYOUT_ONE_BASE_URL` in Vercel Environment Variables.
+- Playlist/status paths are configurable because the exact current Rotation One/Playout One route names may differ.
+
+Important: do not put the API keys in `NEXT_PUBLIC_*` variables.
+
+
+## 0.6.0 — Secure Rotation One / Playout One bridge
+
+This version adds:
+- Radio API control module
+- live station dropdown discovery from Rotation One and Playout One
+- automatic name-based station mapping
+- refreshable station dropdowns
+- live Rotation/Playout health check
+- Playout One now/next endpoint adapter
+- normalization layer for several common JSON field names
+- server-side API proxy routes
+
+### Security defaults
+
+Real radio access is **disabled by default**:
+- `RADIO_API_ENABLED=false`
+- `RADIO_API_WRITE_ENABLED=false`
+- plain HTTP is blocked unless explicitly enabled
+
+Before setting `RADIO_API_ENABLED=true`, protect VLACORA with:
+- `VLACORA_BASIC_AUTH_USER`
+- `VLACORA_BASIC_AUTH_PASSWORD`
+
+This Basic Auth layer is an interim safeguard. The intended production model is Supabase Auth + station/role permissions.
+
+Remote playlist writes have a second kill switch:
+- `RADIO_API_WRITE_ENABLED=true`
+
+Do not enable it until read-only playlist import is confirmed correct.
+
+### Fixed public IP
+
+A fixed public IP works from Vercel, but **HTTPS is strongly preferred**. If you use plain HTTP to a public IP, the radio API key can travel unencrypted over the public internet. A TLS reverse proxy / valid HTTPS endpoint is the recommended setup.
+
+Never use `NEXT_PUBLIC_` for radio API keys.
+
+
+## 0.7.0 — Team & Rights + HTTP fixed IP
+
+### Team & Rights
+- redesigned user directory
+- search/filter by role and station
+- activate/disable users
+- multiple station memberships
+- role presets
+- per-module permission matrix:
+  - none
+  - view
+  - edit
+  - publish
+  - admin
+- "Test as this user" demo mode
+- roles include Superadmin, Stationmanager, Muziekredactie, Redactie, Presentator, Social & Marketing, Techniek, Kijker
+
+The current permission editor is still browser-local for prototyping. Production enforcement will move to Supabase Auth/RBAC and server-side checks.
+
+### HTTP radio APIs
+
+Rotation One and Playout One can now use real plain HTTP fixed-IP URLs, e.g.:
+
+ROTATION_ONE_BASE_URL=http://YOUR_FIXED_IP:5090
+PLAYOUT_ONE_BASE_URL=http://YOUR_FIXED_IP:5190
+RADIO_API_ALLOW_INSECURE_HTTP=true
+
+This works through the Vercel server-side proxy. Radio API keys never need to be exposed to the browser.
+
+For extra protection with a fixed IP, configure:
+RADIO_API_ALLOWED_HOSTS=YOUR_FIXED_IP
+
+Important: plain HTTP itself is not encrypted. Use long random API secrets, keep write access disabled until read-only tests are correct, expose only required ports/endpoints, and apply firewall restrictions where possible.
