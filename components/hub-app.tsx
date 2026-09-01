@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { chart, initialPlaylist, navItems } from "@/lib/mock-data";
+import { initialPlaylist, navItems } from "@/lib/mock-data";
 import MessengerModule from "@/components/modules/messenger-module";
 import PresentationModule from "@/components/modules/presentation-module";
 import SocialStudioModule from "@/components/modules/social-studio-module";
@@ -14,6 +14,7 @@ import TeamRightsModule from "@/components/modules/team-rights-module";
 import AdminIntegrationsModule from "@/components/modules/admin-integrations-module";
 import MusicFoldersModule from "@/components/modules/music-folders-module";
 import ProgrammingModule from "@/components/modules/programming-module";
+import ChartsModule from "@/components/modules/charts-module";
 import { HUB_STATIONS_EVENT, allHubStation, readHubStations, type HubStation } from "@/lib/radio/hub-stations";
 import AccountWidget from "@/components/auth/account-widget";
 import { loadSharedRotationStations } from "@/lib/supabase/hub-data";
@@ -134,8 +135,6 @@ export default function HubApp({ stationSlug, moduleSlug }: Props) {
   const [modal, setModal] = useState<ModalType>(null);
   const [incidentCategory, setIncidentCategory] = useState("Technisch");
   const [toast, setToast] = useState("");
-  const [historyVisible, setHistoryVisible] = useState(false);
-  const [chartPublished, setChartPublished] = useLocalState(`${storagePrefix}:chartPublished`, false);
   const [meetingStarted, setMeetingStarted] = useLocalState(`${storagePrefix}:meetingStarted`, false);
   const [meetingIndex, setMeetingIndex] = useLocalState(`${storagePrefix}:meetingIndex`, 7);
   const [meetingDecision, setMeetingDecision] = useLocalState(`${storagePrefix}:meetingDecision`, "");
@@ -298,12 +297,7 @@ export default function HubApp({ stationSlug, moduleSlug }: Props) {
 
           {moduleSlug === "redactie" && <EditorialModule stationSlug={station.slug} />}
 
-          {moduleSlug === "hitlijsten" && <>
-            <div className="page-intro"><div><h2>Versuz TOP 50</h2><p>Week 36 • {chartPublished?"gepubliceerd":"concepteditie"}</p></div><div className="button-row"><button className="ghost" onClick={()=>setHistoryVisible(!historyVisible)}>{historyVisible?"Verberg historiek":"Historiek"}</button><button className="primary" onClick={()=>{setChartPublished(!chartPublished);notify(chartPublished?"Terug naar concept":"Hitlijst gepubliceerd")}}>{chartPublished?"Publicatie intrekken":"Publiceren"}</button></div></div>
-            {historyVisible&&<Card className="history-card"><h3>Recente edities</h3><p>Week 35 • #1 ANOTR & 54 Ultra</p><p>Week 34 • #1 Jennifer Lopez & David Guetta</p><p>Week 33 • #1 Joel Corry</p></Card>}
-            <div className="metric-grid compact"><Card><span className="metric-label">Nieuwe binnenkomers</span><strong className="metric">4</strong></Card><Card><span className="metric-label">Grootste stijger</span><strong className="metric">▲ 12</strong></Card><Card><span className="metric-label">Grootste daler</span><strong className="metric">▼ 9</strong></Card><Card><span className="metric-label">Langst genoteerd</span><strong className="metric">16 wk</strong></Card></div>
-            <Card className="table-card"><table><thead><tr><th>#</th><th>Vorige</th><th>Artiest</th><th>Titel</th><th>Trend</th><th>Weken</th><th>Peak</th></tr></thead><tbody>{chart.map((r,i)=><tr key={i}>{r.map((c,j)=><td key={j} className={j===4?(String(c).includes("▲")?"positive":String(c).includes("▼")?"negative":""):""}>{c}</td>)}</tr>)}</tbody></table></Card>
-          </>}
+          {moduleSlug === "hitlijsten" && <ChartsModule stationSlug={station.slug} stationName={station.name} />}
 
           {moduleSlug === "presentatie" && <PresentationModule stationSlug={station.slug} />}
 

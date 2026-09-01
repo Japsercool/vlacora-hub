@@ -1,2 +1,2 @@
-VLACORA HUB 0.10.0
-Live Rotation One station registry + editable/shared programming + music-folder PDF bridge + real Supabase team login.
+VLACORA HUB 0.11.0
+Volledige hitlijsteditor met meerdere edities, trends, Rotation One/VLACORA songkeuze, PDF/CSV en Supabase teamsync.

@@ -332,3 +332,25 @@ This is intentionally a safe testing bridge. Persistent shared secrets and real 
 ### Playout One
 - Playout One remains a separate station mapping per HUB station for actual on-air state (now/next, engine/player/stream status).
 - No guessed Playout endpoints are added. Configure the exact public endpoints from the actual Playout One build when confirmed.
+
+
+## 0.11.0 — Volledige Hitlijsten
+
+Hitlijsten zijn niet langer een vaste demo Top 50. Per echt station kun je nu meerdere lijsten en edities beheren.
+
+Functies:
+- nieuwe Top 10/20/30/40/50/100/500 of andere editie aanmaken
+- lijstnaam, editie, publicatiedatum en geldigheid van/tot beheren
+- koppelen aan een programma uit Programmering
+- vorige editie koppelen voor automatische vorige positie, trend, weken en peak
+- volgende editie maken met huidige rangschikking als startpunt
+- songs toevoegen uit VLACORA Muziek, uit een ingestelde Rotation One-map, handmatig of via Excel/bulk paste
+- dubbele songs blokkeren
+- rangschikking slepen of met pijlen wijzigen
+- concept, gepubliceerd en archief
+- PDF en CSV export
+- meerdere lijsten per station, bijvoorbeeld TOP 50, Ibiza 100, Jaarlijst en specials
+- optionele Supabase Teamcloud synchronisatie via migration `011_hitlists.sql`
+
+### Supabase
+Als Supabase al actief is, voer ook `supabase/migrations/011_hitlists.sql` uit. Zonder Supabase blijft de editor lokaal bruikbaar.

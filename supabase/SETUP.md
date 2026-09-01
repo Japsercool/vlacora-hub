@@ -11,3 +11,7 @@
 Once one global Supabase project is configured, `/hub/*` requires a real Supabase session.
 
 The Project URL and publishable key are public client configuration. Never paste a service-role key into public config.
+
+
+## Hitlijsten (0.11.0)
+Voer na de core migration ook `migrations/011_hitlists.sql` uit om hitlijsten voor het hele team te synchroniseren.
