@@ -1,0 +1,2 @@
+VLACORA HUB DEMO 0.1.1
+Updated .gitignore for GitHub Desktop, Next.js and Vercel.
