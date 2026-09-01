@@ -9,7 +9,7 @@ function pathFor(stationId:string,date:string,hour:string,write=false){
     : (process.env.ROTATION_ONE_PLAYLIST_PATH||"/api/v1/stations/{stationId}/playlists");
   let path=template.replace("{stationId}",encodeURIComponent(stationId));
   const q=new URLSearchParams(); if(date)q.set("date",date); if(hour)q.set("hour",hour);
-  if([...q].length)path+=`${path.includes("?")?"&":"?"}${q.toString()}`;
+  const query=q.toString(); if(query)path+=`${path.includes("?")?"&":"?"}${query}`;
   return path;
 }
 

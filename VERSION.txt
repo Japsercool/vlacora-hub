@@ -1,2 +1,2 @@
-VLACORA HUB 0.7.0
-Advanced Team & Rights + real HTTP fixed-IP support for Rotation One and Playout One.
+VLACORA HUB 0.7.1
+Vercel build fix: URLSearchParams iteration + ES2017 TypeScript target.

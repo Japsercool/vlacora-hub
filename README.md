@@ -230,3 +230,9 @@ For extra protection with a fixed IP, configure:
 RADIO_API_ALLOWED_HOSTS=YOUR_FIXED_IP
 
 Important: plain HTTP itself is not encrypted. Use long random API secrets, keep write access disabled until read-only tests are correct, expose only required ports/endpoints, and apply firewall restrictions where possible.
+
+## 0.7.1 — Vercel build fix
+- Fixed TypeScript error in `app/api/radio/rotation/playlist/route.ts`.
+- Removed direct iteration of `URLSearchParams` under the old ES5 target.
+- TypeScript target changed from `es5` to `es2017` to avoid similar iterable API build errors.
+- Package version updated to 0.7.1.
