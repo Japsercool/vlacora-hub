@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { MusicSong } from "@/components/modules/music-library-module";
 import { useHubStation } from "@/lib/radio/hub-stations";
 import { pathFor,radioRead,readIntegration,readMappings,readStationCache,saveMappings,type RadioMappingStore,type RadioStation } from "@/lib/radio/client-config";
+import { emitActivity } from "@/lib/collaboration/activity";
 
 type EditorialType = "music" | "talk" | "imaging" | "promo" | "weather" | "traffic" | "news" | "commercial";
 type EditorialItem = {
@@ -135,6 +136,8 @@ export default function EditorialModule({stationSlug}:{stationSlug:string}) {
   function setMapping(patch:Partial<typeof mapping>){const next={...mappings,[station.slug]:{...mapping,...patch}};setMappingsState(next);saveMappings(next)}
 
   const selected = playlist.find(i=>i.id===selectedId) || playlist[0];
+  useEffect(()=>{emitActivity({detail:selected?`Redactie • ${date} ${hour} • ${selected.artist?`${selected.artist} – `:""}${selected.title}`:`Redactie • ${date} ${hour}`,entityType:"playlist-item",entityId:selected?.id})},[selected?.id,selected?.artist,selected?.title,date,hour]);
+
   const linkedTemplate = templates.find(t=>t.id===links.find(l=>l.program===program)?.templateId);
   const programs = Array.from(new Set([...programmingPrograms.map(s=>s.name),...templates.map(t=>t.program)]));
 

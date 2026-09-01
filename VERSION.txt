@@ -1,2 +1,2 @@
-VLACORA HUB 0.11.0
-Volledige hitlijsteditor met meerdere edities, trends, Rotation One/VLACORA songkeuze, PDF/CSV en Supabase teamsync.
+VLACORA HUB 0.13.1
+Playout One 0.11.19 integration defaults: Hub 5099, health/stations/status endpoints preconfigured.

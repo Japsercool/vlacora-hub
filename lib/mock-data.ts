@@ -6,7 +6,8 @@ export const stations = [
 ];
 
 export const navItems = [
-  ["dashboard", "⌂", "Dashboard"],
+  ["dashboard", "⌂", "TODAY"],
+  ["meldingen", "🔔", "Meldingen"],
   ["stations", "◉", "Stations"],
   ["taken", "✓", "Taken"],
   ["meldpunt", "!", "Meldpunt"],

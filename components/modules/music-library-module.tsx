@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { emitActivity } from "@/lib/collaboration/activity";
 
 export type MusicSong = {
   id: string;
@@ -52,6 +53,8 @@ export default function MusicLibraryModule({stationSlug}:{stationSlug:string}) {
   useEffect(()=>{ if(!songs.some(s=>s.id===selectedId) && songs[0]) setSelectedId(songs[0].id); },[songs,selectedId]);
 
   const selected = songs.find(s=>s.id===selectedId) || songs[0];
+  useEffect(()=>{emitActivity({detail:selected?`Muziek • ${selected.artist} – ${selected.title}`:"Muziekbibliotheek",entityType:"song",entityId:selected?.id})},[selected?.id,selected?.artist,selected?.title]);
+
   const maps = useMemo(()=>Array.from(new Set(["A-ROTATIE","B-ROTATIE","C-ROTATIE","RECURRENTS","GOLD","SPECIALS",...songs.map(s=>s.rotationMap).filter(Boolean)])),[songs]);
   const categories = ["Alle",...Array.from(new Set(songs.map(s=>s.category)))];
   const visible = songs.filter(s => {

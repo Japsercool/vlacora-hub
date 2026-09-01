@@ -22,6 +22,12 @@ type PublicConfig = {
   nowPath?: string;
   musicFoldersPath?: string;
   musicFolderItemsPath?: string;
+  chartListPath?: string;
+  chartEditionsPath?: string;
+  chartEditionPath?: string;
+  chartRevisionPath?: string;
+  chartWritePath?: string;
+  chartWriteEnabled?: boolean;
   readOnly: boolean;
   lastOk?: string;
   lastError?: string;
@@ -33,12 +39,13 @@ const seed:Store = {
   rotation:{
     enabled:false, protocol:"http", host:"", port:"5090", basePath:"",
     stationPath:"/api/v1/stations", statusPath:"/api/v1/health",
-    playlistPath:"/api/v1/stations/{stationId}/schedule", coveragePath:"/api/v1/stations/{stationId}/schedule/coverage", revisionPath:"/api/v1/stations/{stationId}/schedule/revision", musicFoldersPath:"", musicFolderItemsPath:"", readOnly:true
+    playlistPath:"/api/v1/stations/{stationId}/schedule", coveragePath:"/api/v1/stations/{stationId}/schedule/coverage", revisionPath:"/api/v1/stations/{stationId}/schedule/revision", musicFoldersPath:"", musicFolderItemsPath:"",
+    chartListPath:"/api/v1/stations/{stationId}/charts", chartEditionsPath:"/api/v1/stations/{stationId}/charts/{chartId}/editions", chartEditionPath:"/api/v1/stations/{stationId}/charts/{chartId}/editions/{editionId}", chartRevisionPath:"/api/v1/stations/{stationId}/charts/revision", chartWritePath:"/api/v1/stations/{stationId}/charts/{chartId}/editions/{editionId}", chartWriteEnabled:false, readOnly:true
   },
   playout:{
-    enabled:false, protocol:"http", host:"", port:"5190", basePath:"",
-    stationPath:"/api/stations", statusPath:"/health",
-    nowPath:"", readOnly:true
+    enabled:false, protocol:"http", host:"", port:"5099", basePath:"",
+    stationPath:"/api/v1/integration/stations", statusPath:"/api/v1/integration/health",
+    nowPath:"/api/v1/integration/stations/{stationId}/status", readOnly:true
   },
   shoutcast:{
     enabled:false, protocol:"http", host:"", port:"8000", basePath:"",
@@ -231,14 +238,22 @@ export default function AdminIntegrationsModule({stationName}:{stationName:strin
             <div className="api-subsection-title"><strong>Muziekdatabase → PDF</strong><span>Deze twee paden zijn optioneel. We vullen ze niet met gok-endpoints.</span></div>
             <label className="field">Muziekmappen endpoint<input className="input" value={cfg.musicFoldersPath||""} onChange={e=>update(selected,{musicFoldersPath:e.target.value})} placeholder="bv. een bevestigd endpoint met {stationId}"/></label>
             <label className="field">Songs-in-map endpoint<input className="input" value={cfg.musicFolderItemsPath||""} onChange={e=>update(selected,{musicFolderItemsPath:e.target.value})} placeholder="bevestigd endpoint met {stationId} en {folderId}"/></label>
+            <div className="api-subsection-title"><strong>Hitlijsten uit Rotation One</strong><span>VLACORA haalt de index pas op wanneer je synchroniseert. Geen zware continue polling.</span></div>
+            <label className="field">Hitlijsten endpoint<input className="input" value={cfg.chartListPath||""} onChange={e=>update(selected,{chartListPath:e.target.value})}/></label>
+            <label className="field">Edities endpoint<input className="input" value={cfg.chartEditionsPath||""} onChange={e=>update(selected,{chartEditionsPath:e.target.value})}/></label>
+            <label className="field">Editie-detail endpoint<input className="input" value={cfg.chartEditionPath||""} onChange={e=>update(selected,{chartEditionPath:e.target.value})}/></label>
+            <label className="field">Hitlijst revision endpoint<input className="input" value={cfg.chartRevisionPath||""} onChange={e=>update(selected,{chartRevisionPath:e.target.value})}/></label>
+            <label className="field">Write endpoint<input className="input" value={cfg.chartWritePath||""} onChange={e=>update(selected,{chartWritePath:e.target.value})}/></label>
+            <label className="toggle-row chart-write-toggle"><div><strong>Hitlijsten terugschrijven</strong><small>{supabaseConfigured?"Alleen ingelogde VLACORA-gebruikers kunnen remote schrijven.":"Eerst echte Supabase-login activeren."}</small></div><input type="checkbox" checked={Boolean(cfg.chartWriteEnabled)} disabled={!supabaseConfigured} onChange={e=>update(selected,{chartWriteEnabled:e.target.checked})}/></label>
           </>}
-          {selected==="playout"&&<label className="field">Now-playing/snapshot endpoint<input className="input" value={cfg.nowPath||""} onChange={e=>update(selected,{nowPath:e.target.value})} placeholder="Vul in zodra Playout One endpoint bevestigd is"/></label>}
+          {selected==="playout"&&<label className="field">Now-playing/snapshot endpoint<input className="input" value={cfg.nowPath||""} onChange={e=>update(selected,{nowPath:e.target.value})} placeholder="/api/v1/integration/stations/{stationId}/status"/></label>}
+          {selected==="playout"&&<div className="secret-explainer"><strong>Playout One 0.11.19</strong><span>Gebruik Hub-poort 5099. Health, stations en live status komen uit de zuinige VLACORA Integration API; status/NOW/NEXT lezen de bestaande heartbeat in geheugen en veroorzaken geen extra stationpolling.</span></div>}
         </div>
 
         <div className="settings-section">
           <h4>Veiligheidsmodus</h4>
           <div className="read-only-lock">
-            <div><strong>Alleen lezen</strong><span>Deze versie laat via dit eenvoudige configuratiescherm alleen veilige GET/test-calls toe. Playlist schrijven zetten we pas aan zodra echte gebruikerslogin en server-side rechten klaar zijn.</span></div>
+            <div><strong>Alleen lezen</strong><span>De algemene radio-koppeling blijft read-only. Alleen hitlijsten kunnen afzonderlijk worden teruggeschreven wanneer echte login actief is én je de write-schakelaar bewust aanzet.</span></div>
             <input type="checkbox" checked readOnly/>
           </div>
           {cfg.protocol==="http"&&<div className="http-warning"><strong>HTTP actief</strong><span>Dat werkt met jouw vaste IP, maar verkeer tussen Vercel en de radioserver is niet versleuteld. Gebruik daarom een lange API-key en open alleen de strikt nodige poort(en).</span></div>}

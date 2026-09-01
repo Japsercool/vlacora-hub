@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { isSupabaseBrowserConfigured } from "@/lib/supabase/client";
 import { loadSharedProgramming,syncSharedProgramming } from "@/lib/supabase/hub-data";
+import { emitActivity } from "@/lib/collaboration/activity";
 
 type ProgramBlock={
   id:string; day:number; start:string; end:string; name:string; host:string; format:string; notes:string; active:boolean;
@@ -25,6 +26,8 @@ export default function ProgrammingModule({stationSlug,stationName}:{stationSlug
   const[syncing,setSyncing]=useState(false);
   const current=useMemo(()=>blocks.filter(x=>x.day===day).sort((a,b)=>a.start.localeCompare(b.start)),[blocks,day]);
   const selected=blocks.find(x=>x.id===selectedId)||null;
+  useEffect(()=>{emitActivity({detail:selected?`Programmering • ${selected.name} (${selected.start}–${selected.end})`:`Programmering • ${DAYS[day]}`,entityType:"program",entityId:selected?.id})},[selected?.id,selected?.name,selected?.start,selected?.end,day]);
+
   useEffect(()=>{
     let alive=true;setCloudReady(false);
     if(!isSupabaseBrowserConfigured()){setCloudActive(false);setCloudReady(true);return()=>{alive=false}}

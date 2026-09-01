@@ -135,3 +135,111 @@ export function normalizeMusicSongs(body:unknown):NormalizedMusicSong[]{
     return {id,artist,title,category,year,raw:value};
   });
 }
+
+
+export type NormalizedChart={
+  id:string;
+  name:string;
+  size?:number;
+  currentEditionId?:string;
+  revision?:string;
+  raw?:unknown;
+};
+export type NormalizedChartEntry={
+  id:string;
+  position:number;
+  previousPosition:number|null;
+  songId?:string;
+  artist:string;
+  title:string;
+  weeks:number;
+  peak:number;
+  notes:string;
+  raw?:unknown;
+};
+export type NormalizedChartEdition={
+  id:string;
+  chartId?:string;
+  label:string;
+  publishDate:string;
+  validFrom:string;
+  validTo:string;
+  status:"draft"|"published"|"archived";
+  programName:string;
+  notes:string;
+  size:number;
+  revision?:string;
+  entries:NormalizedChartEntry[];
+  raw?:unknown;
+};
+
+export function normalizeCharts(body:unknown):NormalizedChart[]{
+  return arrayCandidate(body,["charts","Charts","hitlists","Hitlists","rankedLists","RankedLists","lists","Lists","items","Items","data","Data","results","Results"]).map((value,index)=>{
+    const obj=rec(value);
+    const id=String(first(obj,["id","Id","chartId","ChartId","listId","ListId","rankedListId","RankedListId","key","Key","name","Name"],index));
+    const name=String(first(obj,["name","Name","title","Title","displayName","DisplayName","listName","ListName"],id));
+    const n=Number(first(obj,["size","Size","count","Count","maxPosition","MaxPosition","length","Length"],NaN));
+    const currentEditionId=first(obj,["currentEditionId","CurrentEditionId","activeEditionId","ActiveEditionId","editionId","EditionId"],undefined);
+    const revision=first(obj,["revision","Revision","version","Version","etag","ETag"],undefined);
+    return {id,name,size:Number.isFinite(n)?n:undefined,currentEditionId:currentEditionId==null?undefined:String(currentEditionId),revision:revision==null?undefined:String(revision),raw:value};
+  });
+}
+
+export function normalizeChartEditions(body:unknown):NormalizedChartEdition[]{
+  const arr=arrayCandidate(body,["editions","Editions","chartEditions","ChartEditions","items","Items","data","Data","results","Results"]);
+  return arr.map((value,index)=>normalizeChartEdition(value,index));
+}
+
+export function normalizeChartEdition(body:unknown,index=0):NormalizedChartEdition{
+  const obj=rec(body);
+  const entriesRaw=arrayCandidate(first(obj,["entries","Entries","positions","Positions","songs","Songs","ranking","Ranking"],[]),["entries","Entries","positions","Positions","songs","Songs","items","Items","data","Data"]);
+  const entries=entriesRaw.map((value,i)=>{
+    const e=rec(value);
+    const posNum=Number(first(e,["position","Position","rank","Rank","number","Number"],i+1));
+    const prevRaw=first(e,["previousPosition","PreviousPosition","previous","Previous","lastPosition","LastPosition"],null);
+    const prevNum=prevRaw==null||String(prevRaw).toUpperCase()==="NEW"?null:Number(prevRaw);
+    const weeks=Number(first(e,["weeks","Weeks","weeksOnChart","WeeksOnChart"],1));
+    const peak=Number(first(e,["peak","Peak","peakPosition","PeakPosition"],Number.isFinite(posNum)?posNum:i+1));
+    const artist=String(first(e,["artist","Artist","artistName","ArtistName","performer","Performer"],""));
+    const title=String(first(e,["title","Title","name","Name","trackTitle","TrackTitle"],artist?"Onbekende titel":"Item"));
+    const songId=first(e,["songId","SongId","trackId","TrackId","databaseId","DatabaseId"],undefined);
+    return {
+      id:String(first(e,["id","Id","entryId","EntryId","positionId","PositionId"],`entry-${i}`)),
+      position:Number.isFinite(posNum)?posNum:i+1,
+      previousPosition:Number.isFinite(prevNum as number)?prevNum as number:null,
+      songId:songId==null?undefined:String(songId),
+      artist,title,
+      weeks:Number.isFinite(weeks)?Math.max(1,weeks):1,
+      peak:Number.isFinite(peak)?Math.max(1,peak):i+1,
+      notes:String(first(e,["notes","Notes","comment","Comment"],"")),
+      raw:value
+    };
+  }).sort((a,b)=>a.position-b.position);
+
+  const statusRaw=String(first(obj,["status","Status","state","State"],"draft")).toLowerCase();
+  const status=statusRaw.includes("publish")||statusRaw==="live"||statusRaw==="active"?"published":statusRaw.includes("arch")?"archived":"draft";
+  const sizeRaw=Number(first(obj,["size","Size","count","Count","maxPosition","MaxPosition"],entries.length||50));
+  const id=String(first(obj,["id","Id","editionId","EditionId","key","Key"],index));
+  const chartId=first(obj,["chartId","ChartId","listId","ListId","rankedListId","RankedListId"],undefined);
+  const label=String(first(obj,["label","Label","editionLabel","EditionLabel","name","Name","title","Title","weekLabel","WeekLabel"],`Editie ${id}`));
+  const publishDate=String(first(obj,["publishDate","PublishDate","broadcastDate","BroadcastDate","date","Date"],"")).slice(0,10);
+  const validFrom=String(first(obj,["validFrom","ValidFrom","broadcastDate","BroadcastDate","startDate","StartDate"],publishDate)).slice(0,10);
+  const validTo=String(first(obj,["validTo","ValidTo","broadcastEndDate","BroadcastEndDate","endDate","EndDate"],validFrom)).slice(0,10);
+  const revision=first(obj,["revision","Revision","version","Version","etag","ETag"],undefined);
+  return {
+    id,chartId:chartId==null?undefined:String(chartId),label,publishDate,validFrom,validTo,status,
+    programName:String(first(obj,["programName","ProgramName","showName","ShowName"],"")),
+    notes:String(first(obj,["notes","Notes","comment","Comment"],"")),
+    size:Number.isFinite(sizeRaw)?Math.max(1,sizeRaw):Math.max(entries.length,50),
+    revision:revision==null?undefined:String(revision),
+    entries,
+    raw:body
+  };
+}
+
+export function normalizeRevision(body:unknown){
+  if(typeof body==="string"||typeof body==="number")return String(body);
+  const obj=rec(body);
+  const value=first(obj,["revision","Revision","version","Version","etag","ETag","value","Value"],"");
+  return String(value||"");
+}

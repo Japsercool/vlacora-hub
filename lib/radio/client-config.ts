@@ -15,6 +15,12 @@ export type ClientIntegrationConfig = {
   nowPath?:string;
   musicFoldersPath?:string;
   musicFolderItemsPath?:string;
+  chartListPath?:string;
+  chartEditionsPath?:string;
+  chartEditionPath?:string;
+  chartRevisionPath?:string;
+  chartWritePath?:string;
+  chartWriteEnabled?:boolean;
   readOnly:boolean;
   lastOk?:string;
   lastError?:string;
@@ -54,7 +60,7 @@ export function readStationCache(kind:IntegrationKind):RadioStation[]{
 }
 export function saveStationCache(kind:IntegrationKind,value:RadioStation[]){if(typeof window!=="undefined"){localStorage.setItem(stationCacheKey(kind),JSON.stringify(value));window.dispatchEvent(new CustomEvent("vlacora:hub-stations-changed",{detail:{kind}}))}}
 
-export async function radioRead(kind:IntegrationKind,path:string,action:"raw"|"stations"|"playlist"|"now"|"folders"|"songs"="raw"){
+export async function radioRead(kind:IntegrationKind,path:string,action:"raw"|"stations"|"playlist"|"now"|"folders"|"songs"|"charts"|"chartEditions"|"chartEdition"|"revision"="raw"){
   const config=readIntegration(kind);
   if(!config?.host)throw new Error(`${kind==="rotation"?"Rotation One":"Playout One"} is nog niet ingesteld in Beheer → Integraties.`);
   const secret=readSecret(kind);
@@ -74,4 +80,32 @@ export function pathFor(template:string|undefined,stationId:string){
 export function pathForFolder(template:string|undefined,stationId:string,folderId:string){
   if(!template)return "";
   return template.replaceAll("{stationId}",encodeURIComponent(stationId)).replaceAll("{folderId}",encodeURIComponent(folderId));
+}
+
+
+export function pathForChart(template:string|undefined,stationId:string,chartId:string,editionId=""){
+  if(!template)return "";
+  return template
+    .replaceAll("{stationId}",encodeURIComponent(stationId))
+    .replaceAll("{chartId}",encodeURIComponent(chartId))
+    .replaceAll("{editionId}",encodeURIComponent(editionId));
+}
+
+export async function radioWrite(
+  kind:IntegrationKind,
+  path:string,
+  method:"POST"|"PUT"|"PATCH",
+  payload:unknown
+){
+  const config=readIntegration(kind);
+  if(!config?.host)throw new Error(`${kind==="rotation"?"Rotation One":"Playout One"} is nog niet ingesteld in Beheer → Integraties.`);
+  const secret=readSecret(kind);
+  const res=await fetch("/api/radio/manual/write",{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({kind,path,method,payload,config,...secret})
+  });
+  const data=await res.json();
+  if(!res.ok)throw new Error(data?.error||data?.message||`HTTP ${res.status}`);
+  return data;
 }

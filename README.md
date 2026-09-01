@@ -354,3 +354,93 @@ Functies:
 
 ### Supabase
 Als Supabase al actief is, voer ook `supabase/migrations/011_hitlists.sql` uit. Zonder Supabase blijft de editor lokaal bruikbaar.
+
+
+## 0.12.0 — Rotation One Chart Bridge
+
+Hitlijsten kunnen nu uit Rotation One komen in plaats van uit demo/lokale brondata.
+
+Workflow:
+- Hitlijsten → `↻ Rotation One`
+- één chart kiezen
+- alleen edities van die chart ophalen
+- één editie openen in de bestaande VLACORA editor
+- lokale wijzigingen krijgen een duidelijke `LOKAAL GEWIJZIGD` status
+- terugschrijven is alleen mogelijk als:
+  1. Supabase-login echt actief is;
+  2. de gebruiker ingelogd is;
+  3. `Hitlijsten terugschrijven` expliciet is ingeschakeld;
+  4. Rotation One het write-endpoint ondersteunt.
+
+Resource policy:
+- no continuous chart polling
+- optional lightweight revision check
+- lazy loading of editions/details
+- no full Top 500 download until the operator opens that edition
+
+Rotation One server contract:
+`docs/ROTATION_ONE_CHART_API_CONTRACT.md`
+
+
+## 0.13.0 — Live Collaboration & Required Notifications
+
+This release turns the old decorative bell into a real collaboration layer.
+
+### Live presence — who is doing what
+- one Supabase Realtime Presence channel per open HUB session
+- shows user, station, module and selected work item
+- instrumented editors:
+  - Programmering: selected program + time
+  - Hitlijsten: chart + edition
+  - Muziek: selected song
+  - Redactie/Playlists: selected playlist item + hour
+- presence is ephemeral: it is NOT written to Postgres on every click
+- local BroadcastChannel fallback in setup mode
+
+### Real notifications
+- notification drawer behind the bell
+- dedicated `Meldingen` page
+- unread count is real, not a hard-coded badge
+- read state is personal per logged-in user
+- realtime inserts/receipt updates through the same collaboration channel
+- official communication can create a notification
+- high-severity incident automatically creates a critical notification
+
+### "Moet je zien"
+Official communication can be marked **Moet iedereen gezien hebben**.
+Such a notification:
+- opens as a blocking required-notification dialog
+- cannot be dismissed with X/backdrop
+- disappears only after `Ik heb dit gezien & bevestigd`
+- stores acknowledgement per user
+
+### TODAY
+Dashboard navigation is now labelled `TODAY` and includes:
+- personal important/unread notifications
+- required acknowledgement count
+- live team activity / who is working on what
+
+### Resource policy
+Designed specifically to stay light on free-tier limits:
+- no presence database writes
+- no notification polling loop
+- one realtime channel per open HUB session
+- maximum 100 recent notifications loaded
+- realtime refresh only when a notification or receipt actually changes
+
+### Supabase
+Run:
+`supabase/migrations/013_collaboration_notifications.sql`
+
+This creates:
+- `station_memberships`
+- `hub_notifications`
+- `hub_notification_receipts`
+- RLS policies
+- Realtime publication for the two small notification tables
+
+Without Supabase the UI still works in local/setup mode, but cross-device presence and team-wide notifications require Supabase Auth + this migration.
+
+
+## 0.13.1 — Playout One 0.11.19 defaults
+Nieuwe Playout One-koppelingen gebruiken standaard Hub-poort `5099` met `/api/v1/integration/health`, `/api/v1/integration/stations` en `/api/v1/integration/stations/{stationId}/status`. Hierdoor werkt Test verbinding / Stations ophalen / NOW-NEXT direct met Playout One 0.11.19.
