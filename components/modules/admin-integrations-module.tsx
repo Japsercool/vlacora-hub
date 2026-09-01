@@ -110,7 +110,7 @@ export default function AdminIntegrationsModule({stationName}:{stationName:strin
       setDiagnostic(data);
 
       if(!response.ok){
-        const code=data?.tcp?.error?.code||data?.fetchError?.code||data?.fetchError?.cause?.code||"";
+        const code=data?.httpError?.code||data?.tcp?.error?.code||data?.fetchError?.code||data?.fetchError?.cause?.code||"";
         const phase=data?.phase||"verbinding";
         throw new Error(`${phase}${code?` • ${code}`:""}: ${data?.message||data?.error||"verbinding mislukt"}`);
       }
@@ -241,13 +241,15 @@ export default function AdminIntegrationsModule({stationName}:{stationName:strin
           <div className="diagnostic-grid">
             <span>Fase</span><strong>{diagnostic.phase||"—"}</strong>
             <span>Doel</span><strong>{diagnostic.target||"—"}</strong>
-            <span>TCP</span><strong>{diagnostic.tcp?.ok?"Verbonden":diagnostic.tcp?.error?.code||"Mislukt"}</strong>
+            <span>Transport</span><strong>{diagnostic.transport||"—"}</strong>
+            <span>TCP</span><strong>{diagnostic.tcp?.ok?"Verbonden":diagnostic.tcp?.error?.code||(!diagnostic.tcp?"Niet apart getest":"Mislukt")}</strong>
             <span>TCP tijd</span><strong>{diagnostic.tcp?.durationMs!=null?`${diagnostic.tcp.durationMs} ms`:"—"}</strong>
-            <span>HTTP</span><strong>{diagnostic.status||diagnostic.fetchError?.code||diagnostic.fetchError?.cause?.code||"—"}</strong>
+            <span>HTTP</span><strong>{diagnostic.status||diagnostic.httpError?.code||diagnostic.fetchError?.code||diagnostic.fetchError?.cause?.code||"—"}</strong>
+            <span>HTTP tijd</span><strong>{diagnostic.httpDurationMs!=null?`${diagnostic.httpDurationMs} ms`:"—"}</strong>
             <span>Vercel regio</span><strong>{diagnostic.runtime?.vercelRegion||"onbekend"}</strong>
             <span>Node</span><strong>{diagnostic.runtime?.node||"—"}</strong>
           </div>
-          {(diagnostic.message||diagnostic.fetchError?.message||diagnostic.tcp?.error?.message)&&<code className="diagnostic-error-text">{diagnostic.message||diagnostic.fetchError?.message||diagnostic.tcp?.error?.message}</code>}
+          {(diagnostic.message||diagnostic.httpError?.message||diagnostic.fetchError?.message||diagnostic.tcp?.error?.message)&&<code className="diagnostic-error-text">{diagnostic.message||diagnostic.httpError?.message||diagnostic.fetchError?.message||diagnostic.tcp?.error?.message}</code>}
         </div>}
 
         <div className="drawer-actions">

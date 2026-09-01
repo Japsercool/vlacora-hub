@@ -4,7 +4,8 @@ export const revalidate = 0;
 
 import { NextRequest,NextResponse } from "next/server";
 import { normalizeNow,normalizePlaylist,normalizeStations } from "@/lib/radio/normalize";
-import { describeError,runtimeInfo,tcpProbe } from "@/lib/radio/diagnostics";
+import { runtimeInfo,tcpProbe } from "@/lib/radio/diagnostics";
+import { nativeError,nativeHttpGet } from "@/lib/radio/native-http";
 
 function isPublicIpv4(host:string){
   const p=host.split(".").map(Number);if(p.length!==4||p.some(n=>!Number.isInteger(n)||n<0||n>255))return false;
@@ -15,6 +16,7 @@ function safePath(path:string){
   if(path.includes("\\")||path.includes("..")||path.includes("://"))throw new Error("Ongeldig endpoint.");
   return path;
 }
+
 export async function POST(request:NextRequest){
   const started=Date.now();let body:any;try{body=await request.json()}catch{return NextResponse.json({error:"Ongeldige aanvraag"},{status:400})}
   const cfg=body.config||{};const kind=String(body.kind||"");const action=String(body.action||"raw");
@@ -26,17 +28,20 @@ export async function POST(request:NextRequest){
   let path:string;try{path=safePath(String(body.path||"/"))}catch(e){return NextResponse.json({error:e instanceof Error?e.message:"Ongeldig endpoint"},{status:400})}
   const basePath=String(cfg.basePath||"").trim();if(basePath&&(!basePath.startsWith("/")||basePath.includes("..")||basePath.includes("://")))return NextResponse.json({error:"Ongeldig basis-pad"},{status:400});
   const target=`${cfg.protocol}://${cfg.host}:${port}${basePath}${path}`;
-  const headers=new Headers({Accept:"application/json"});
   const apiKey=String(body.apiKey||"");const apiKeyHeader=String(body.apiKeyHeader||"Authorization").trim();const apiKeyPrefix=String(body.apiKeyPrefix||"Bearer").trim();
-  if(apiKey){if(!/^[A-Za-z0-9-]{1,64}$/.test(apiKeyHeader))return NextResponse.json({error:"Ongeldige API-key headernaam"},{status:400});headers.set(apiKeyHeader,apiKeyPrefix?`${apiKeyPrefix} ${apiKey}`:apiKey)}
-  const tcp=await tcpProbe(String(cfg.host),port,7000);if(!tcp.ok)return NextResponse.json({ok:false,error:`TCP ${tcp?.error?.code||"mislukt"}`,phase:"tcp",target,tcp,runtime:runtimeInfo()},{status:502});
-  const controller=new AbortController();const timer=setTimeout(()=>controller.abort(),12000);
+  const headers:Record<string,string>={Accept:"application/json"};
+  if(apiKey){if(!/^[A-Za-z0-9-]{1,64}$/.test(apiKeyHeader))return NextResponse.json({error:"Ongeldige API-key headernaam"},{status:400});headers[apiKeyHeader]=apiKeyPrefix?`${apiKeyPrefix} ${apiKey}`:apiKey}
+
   try{
-    const res=await fetch(target,{method:"GET",headers,cache:"no-store",redirect:"error",signal:controller.signal});
-    const text=await res.text();let raw:any=text;try{raw=JSON.parse(text)}catch{}
-    if(!res.ok)return NextResponse.json({ok:false,error:typeof raw==="object"?(raw?.error||raw?.message||`HTTP ${res.status}`):`HTTP ${res.status}`,status:res.status,target,raw},{status:res.status});
+    const result=await nativeHttpGet(target,headers,25000);
+    let raw:any=result.text;try{raw=JSON.parse(result.text)}catch{}
+    if(result.status<200||result.status>=300){
+      return NextResponse.json({ok:false,error:typeof raw==="object"?(raw?.error||raw?.message||`HTTP ${result.status}`):`HTTP ${result.status}`,status:result.status,target,raw,transport:result.transport},{status:result.status||502});
+    }
     const normalized=action==="stations"?{stations:normalizeStations(raw)}:action==="playlist"?normalizePlaylist(raw):action==="now"?normalizeNow(raw):{};
-    return NextResponse.json({ok:true,status:res.status,target,raw,...normalized,durationMs:Date.now()-started,runtime:runtimeInfo()});
-  }catch(e){return NextResponse.json({ok:false,error:describeError(e)?.code||describeError(e)?.message||"fetch failed",target,detail:describeError(e),runtime:runtimeInfo()},{status:502})}
-  finally{clearTimeout(timer)}
+    return NextResponse.json({ok:true,status:result.status,target,raw,...normalized,durationMs:Date.now()-started,httpDurationMs:result.durationMs,transport:result.transport,runtime:runtimeInfo()});
+  }catch(e){
+    const detail=nativeError(e);const tcp=await tcpProbe(String(cfg.host),port,5000);
+    return NextResponse.json({ok:false,error:detail.code==="ETIMEDOUT"?"HTTP timeout":detail.code||detail.message,target,detail,tcp,phase:detail.code==="ETIMEDOUT"?"http-timeout":"http-native",runtime:runtimeInfo()},{status:502});
+  }
 }

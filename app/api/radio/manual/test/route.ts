@@ -3,7 +3,8 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 import { NextRequest, NextResponse } from "next/server";
-import { describeError, runtimeInfo, tcpProbe } from "@/lib/radio/diagnostics";
+import { runtimeInfo, tcpProbe } from "@/lib/radio/diagnostics";
+import { nativeError, nativeHttpGet } from "@/lib/radio/native-http";
 
 type BodyConfig = {
   protocol:"http"|"https";
@@ -44,99 +45,67 @@ export async function POST(request:NextRequest) {
   const kind=String(body.kind||"");
   const action=String(body.action||"status");
 
-  if(!["rotation","playout","shoutcast"].includes(kind))
-    return NextResponse.json({error:"Onbekende integratie"},{status:400});
-  if(!["status","stations"].includes(action))
-    return NextResponse.json({error:"Alleen read-only tests zijn toegestaan"},{status:405});
-  if(!["http","https"].includes(cfg.protocol))
-    return NextResponse.json({error:"Protocol moet http of https zijn"},{status:400});
-  if(!isPublicIpv4(String(cfg.host||"")))
-    return NextResponse.json({error:"Gebruik alleen een geldig openbaar IPv4-adres."},{status:400});
+  if(!["rotation","playout","shoutcast"].includes(kind))return NextResponse.json({error:"Onbekende integratie"},{status:400});
+  if(!["status","stations"].includes(action))return NextResponse.json({error:"Alleen read-only tests zijn toegestaan"},{status:405});
+  if(!["http","https"].includes(cfg.protocol))return NextResponse.json({error:"Protocol moet http of https zijn"},{status:400});
+  if(!isPublicIpv4(String(cfg.host||"")))return NextResponse.json({error:"Gebruik alleen een geldig openbaar IPv4-adres."},{status:400});
 
   const port=Number(cfg.port||0);
-  if(!Number.isInteger(port)||port<1||port>65535)
-    return NextResponse.json({error:"Ongeldige poort"},{status:400});
+  if(!Number.isInteger(port)||port<1||port>65535)return NextResponse.json({error:"Ongeldige poort"},{status:400});
 
   let path:string;
   try{
-    path=safePath(action==="stations"
-      ?String(cfg.stationPath||"/api/v1/stations")
-      :String(cfg.statusPath||"/api/v1/status"));
+    path=safePath(action==="stations"?String(cfg.stationPath||"/api/v1/stations"):String(cfg.statusPath||"/api/v1/status"));
   }catch(e){
     return NextResponse.json({error:e instanceof Error?e.message:"Ongeldig endpoint"},{status:400});
   }
 
   const basePath=String(cfg.basePath||"").trim();
-  if(basePath && (!basePath.startsWith("/")||basePath.includes("..")||basePath.includes("://")))
-    return NextResponse.json({error:"Ongeldig basis-pad"},{status:400});
+  if(basePath && (!basePath.startsWith("/")||basePath.includes("..")||basePath.includes("://")))return NextResponse.json({error:"Ongeldig basis-pad"},{status:400});
 
   const target=`${cfg.protocol}://${cfg.host}:${port}${basePath}${path}`;
-  const headers=new Headers({"Accept":"application/json"});
   const apiKey=String(body.apiKey||"");
   const apiKeyHeader=String(body.apiKeyHeader||"Authorization").trim();
   const apiKeyPrefix=String(body.apiKeyPrefix||"Bearer").trim();
+  const headers:Record<string,string>={Accept:"application/json"};
 
   if(apiKey){
-    if(!/^[A-Za-z0-9-]{1,64}$/.test(apiKeyHeader))
-      return NextResponse.json({error:"Ongeldige API-key headernaam"},{status:400});
-    headers.set(apiKeyHeader,apiKeyPrefix?`${apiKeyPrefix} ${apiKey}`:apiKey);
+    if(!/^[A-Za-z0-9-]{1,64}$/.test(apiKeyHeader))return NextResponse.json({error:"Ongeldige API-key headernaam"},{status:400});
+    headers[apiKeyHeader]=apiKeyPrefix?`${apiKeyPrefix} ${apiKey}`:apiKey;
   }
-
-  const tcp = await tcpProbe(String(cfg.host), port, 7000);
-
-  if(!tcp.ok) {
-    return NextResponse.json({
-      ok:false,
-      phase:"tcp",
-      target,
-      message:"Vercel kon geen TCP-verbinding opbouwen met de radio-API.",
-      tcp,
-      runtime:runtimeInfo(),
-      durationMs:Date.now()-started
-    },{status:502});
-  }
-
-  const controller=new AbortController();
-  const timer=setTimeout(()=>controller.abort(),10000);
 
   try{
-    const httpStarted=Date.now();
-    const res=await fetch(target,{
-      method:"GET",
-      headers,
-      cache:"no-store",
-      redirect:"error",
-      signal:controller.signal
-    });
-
-    const text=await res.text();
-    let preview:any=text.slice(0,3000);
-    try{preview=JSON.parse(text)}catch{}
+    const result=await nativeHttpGet(target,headers,20000);
+    let preview:any=result.text.slice(0,3000);
+    try{preview=JSON.parse(result.text)}catch{}
 
     return NextResponse.json({
-      ok:res.ok,
+      ok:result.status>=200&&result.status<300,
       phase:"http",
-      status:res.status,
-      statusText:res.statusText,
+      status:result.status,
+      statusText:result.statusText,
       target,
-      tcp,
-      httpDurationMs:Date.now()-httpStarted,
+      transport:result.transport,
+      httpDurationMs:result.durationMs,
       totalDurationMs:Date.now()-started,
       runtime:runtimeInfo(),
       preview
-    },{status:res.ok?200:res.status});
+    },{status:result.status>=200&&result.status<300?200:result.status||502});
   }catch(e){
+    const detail=nativeError(e);
+    const tcp=await tcpProbe(String(cfg.host),port,5000);
     return NextResponse.json({
       ok:false,
-      phase:"http-fetch",
+      phase: detail.code==="ETIMEDOUT" ? "http-timeout" : "http-native",
       target,
-      message:"TCP werkte, maar de HTTP fetch mislukte.",
+      message: detail.code==="ETIMEDOUT"
+        ? "Rotation One is bereikbaar, maar gaf niet tijdig een volledige HTTP-response terug."
+        : "De native Node HTTP-aanvraag naar de radio-API mislukte.",
+      transport:cfg.protocol==="https"?"node:https":"node:http",
+      httpError:detail,
       tcp,
-      fetchError:describeError(e),
       runtime:runtimeInfo(),
       durationMs:Date.now()-started
     },{status:502});
-  }finally{
-    clearTimeout(timer);
   }
 }

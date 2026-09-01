@@ -1,2 +1,2 @@
-VLACORA HUB 0.9.0
-Live Radio Data: demo radio data removed; Rotation One schedule uses configured API. Playout prepared for live Hub/API endpoints.
+VLACORA HUB 0.9.1
+Native Node HTTP radio transport + timeout fix.

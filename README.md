@@ -282,3 +282,12 @@ This is intentionally a safe testing bridge. Persistent shared secrets and real 
 - Generic read-only Vercel Node proxy added for real configured endpoints.
 - Playout One is prepared for the same flow, but its exact public Hub/API endpoints must be confirmed per build. No fake Playout data is shown.
 - Remote writes remain disabled until the read path and production authentication are fully validated.
+
+
+## 0.9.1 — Native HTTP transport fix
+- Replaces Node/undici `fetch()` for browser-configured radio reads with native `node:http` / `node:https`.
+- Sends `Connection: close` for compatibility with self-hosted Rotation One APIs.
+- Removes the extra TCP preflight before a normal successful request; TCP is only probed after an HTTP failure.
+- Increases read timeout to 20–25 seconds.
+- Error code `20` is no longer shown as if it were an HTTP status; timeouts are reported as `ETIMEDOUT` / `HTTP timeout`.
+- Live station and schedule reads use the same native transport.
