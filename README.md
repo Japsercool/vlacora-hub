@@ -131,3 +131,9 @@ The new `Muziekmappen PDF` module lets you maintain folders/categories and songs
 
 ### Backend preparation
 `supabase/migrations/002_editorial_extensions.sql` contains the proposed production tables for these new modules.
+
+## 0.4.0
+- Messenger: station/user dropdowns + refresh users.
+- Music: searchable real song library, artwork, metadata, map and per-song presentation text.
+- Music folders: dropdown to move songs between maps + refresh library.
+- Social Studio: no prompt dialogs; upload background/logo/artwork and edit all visible text, colors, positions and sizes.

@@ -1,13 +1,2 @@
-VLACORA HUB DEMO 0.3.0
-
-Major editorial expansion:
-- Messenger now has separate messages per private/group/station channel.
-- Create new chat channels and members.
-- Presentation text per song.
-- Program-specific text templates with ordered editorial items.
-- Editable social post templates and draft posts.
-- Music folder/category administration.
-- Branded downloadable music-folder PDF for internal communication.
-- Example PDF included in docs.
-
-Demo data still uses browser localStorage until Supabase is connected.
+VLACORA HUB 0.4.0
+Editable social templates, music browser, refreshed messenger dropdowns and map assignment.
