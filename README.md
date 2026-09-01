@@ -592,3 +592,16 @@ De bedoelde vorm is nu correct:
 `onClick={async()=>{ ... }}`
 
 De refresh-functionaliteit uit 0.14.3 blijft ongewijzigd.
+
+
+## 0.14.5 — CSS build fix
+
+Vercel compileerde de TypeScript nu correct, maar de CSS-loader faalde op `app/globals.css`.
+
+Oorzaak:
+de 0.14.2 station-mapping styles waren per ongeluk toegevoegd met letterlijke `\n`
+tokens in het CSS-bestand in plaats van echte regeleinden.
+
+Fix:
+- alle letterlijke `\n` tokens in `app/globals.css` vervangen door echte newlines
+- alle 0.14.2/0.14.3/0.14.4 functionaliteit blijft behouden

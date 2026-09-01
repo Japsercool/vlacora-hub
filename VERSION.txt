@@ -1,2 +1,2 @@
-VLACORA HUB 0.14.4
-Vercel syntax fix for the Playout station refresh button in Radio API Control.
+VLACORA HUB 0.14.5
+Vercel CSS build fix: removes literal escaped newline tokens from globals.css.
