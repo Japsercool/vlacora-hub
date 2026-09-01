@@ -1,2 +1,2 @@
-VLACORA HUB 0.14.0
-Persistent Supabase settings + real team/RBAC + incident workflow + flexible templates + SHOUTcast listener stats.
+VLACORA HUB 0.14.1
+Vercel/Next.js build fix: Supabase Deno Edge Functions excluded from Next TypeScript type checking.

@@ -1,0 +1,9 @@
+VLACORA HUB 0.14.1 static build-fix validation
+[PASS] version is 0.14.1
+[PASS] node_modules excluded
+[PASS] Supabase Edge Functions excluded
+[PASS] Edge Function still included
+
+Root cause from Vercel:
+Next.js type checker included supabase/functions/vlacora-admin-users/index.ts.
+That file belongs to the Supabase Deno runtime, not the Next.js runtime.

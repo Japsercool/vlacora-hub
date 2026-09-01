@@ -542,3 +542,15 @@ Productiemigraties voor deze release:
 - `017_function_acl_hardening.sql`
 
 Voor het gekoppelde VLACORA-project zijn deze migrations al toegepast.
+
+
+## 0.14.1 — Vercel build fix
+
+Vercel/Next.js type-checkte per ongeluk ook `supabase/functions/**/*.ts`.
+Die bestanden draaien in de Supabase Deno runtime en gebruiken geldige Deno/npm-specifiers
+zoals `npm:@supabase/supabase-js@2`, maar Next.js hoort ze niet te compileren.
+
+Fix:
+- `supabase/functions/**/*` toegevoegd aan `tsconfig.json -> exclude`
+- de Edge Function blijft gewoon in de repository en blijft deploybaar naar Supabase
+- geen wijziging aan de werkende Supabase functie of database
