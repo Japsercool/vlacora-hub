@@ -12,6 +12,7 @@ export const navItems = [
   ["meldpunt", "!", "Meldpunt"],
   ["messenger", "✉", "Messenger"],
   ["communicatie", "▣", "Communicatie"],
+  ["muziekmappen", "▦", "Muziekmappen PDF"],
   ["kalender", "□", "Kalender"],
   ["programmering", "◫", "Programmering"],
   ["muziek", "♫", "Muziek"],

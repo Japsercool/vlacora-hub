@@ -4,6 +4,10 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { chart, initialPlaylist, navItems, shows, stations } from "@/lib/mock-data";
+import MessengerModule from "@/components/modules/messenger-module";
+import PresentationModule from "@/components/modules/presentation-module";
+import SocialStudioModule from "@/components/modules/social-studio-module";
+import MusicFoldersModule from "@/components/modules/music-folders-module";
 
 type Props = { stationSlug: string; moduleSlug: string };
 type Tone = "blue" | "red" | "green" | "orange" | "gray";
@@ -248,14 +252,15 @@ export default function HubApp({ stationSlug, moduleSlug }: Props) {
               <Card><h3>Afgehandeld</h3>{incidents.filter(i=>i.status!=="Open").map(i=><div className="incident" key={i.id}><Badge tone="green">Opgelost</Badge><strong>{i.title}</strong><button className="ghost" onClick={()=>setIncidents(incidents.map(x=>x.id===i.id?{...x,status:"Open"}:x))}>Heropen</button></div>)}</Card></div>
           </>}
 
-          {moduleSlug === "messenger" && <div className="messenger"><div className="channels"><h3>Messenger</h3><input className="input" placeholder="Zoeken..."/>{[["muziekredactie","♫","Muziekredactie"],["techniek","⚙","Techniek"],["versuz-team","◉","Versuz Team"],["drive","◫","Drive"],["tibo","T","Tibo"]].map(([id,icon,name])=><button onClick={()=>setSelectedChannel(id)} className={`channel ${selectedChannel===id?"selected":""}`} key={id}><span className="channel-avatar">{icon}</span><div><strong>{name}</strong><small>Klik om chat te openen</small></div></button>)}</div>
-            <div className="chat"><div className="chat-head"><div><strong>#{selectedChannel}</strong><small>demo-kanaal</small></div><button className="ghost" onClick={()=>notify("Kanaalinstellingen komen in de backendfase")}>⋯</button></div><div className="messages">{messages.map(m=><div className={`message ${m.who==="Jasper"?"mine":""}`} key={m.id}><div className="avatar small">{m.who.split(" ").map(x=>x[0]).slice(0,2).join("")}</div><div><div className="message-meta"><strong>{m.who}</strong><span>{m.time}</span></div><p>{m.text}</p></div></div>)}</div><div className="composer"><button className="ghost" onClick={()=>notify("Bijlagen worden toegevoegd met Supabase Storage")}>＋</button><input className="input grow" value={msgDraft} onChange={e=>setMsgDraft(e.target.value)} onKeyDown={e=>e.key==="Enter"&&sendMessage()} placeholder="Schrijf een bericht..."/><button className="primary" onClick={sendMessage}>Verstuur</button></div></div>
-          </div>}
+          {moduleSlug === "messenger" && <MessengerModule stationSlug={station.slug} />}
 
           {moduleSlug === "communicatie" && <>
-            <div className="page-intro"><div><h2>Officiële communicatie</h2><p>Publiceer berichten en markeer ze als gelezen.</p></div><button className="primary" onClick={()=>setModal("announcement")}>+ Bericht publiceren</button></div>
+            <div className="page-intro"><div><h2>Officiële communicatie</h2><p>Publiceer berichten en deel ook vaste interne documenten met het zenderteam.</p></div><div className="button-row"><button className="ghost" onClick={()=>router.push(`/hub/${station.slug}/muziekmappen`)}>Muziekmappen PDF</button><button className="primary" onClick={()=>setModal("announcement")}>+ Bericht publiceren</button></div></div>
+            <Card className="internal-doc-banner"><div><Badge tone="blue">INTERN DOCUMENT</Badge><h3>Muziekmappen / rotation overzicht</h3><p>Maak een gebrande PDF met per map alle songs en deel die als officiële interne communicatie.</p></div><button className="primary" onClick={()=>router.push(`/hub/${station.slug}/muziekmappen`)}>Open PDF-maker →</button></Card>
             {announcements.map(a=><Card className={`announcement ${a.importance==="Belangrijk"?"important":""}`} key={a.id}><div className="announcement-head"><div><Badge tone={a.importance==="Belangrijk"?"red":"blue"}>{a.importance.toUpperCase()}</Badge><span>{a.category}</span></div><span>VLACORA</span></div><h2>{a.title}</h2><p>{a.body}</p><div className="readline"><strong>{a.read?"Gelezen":"Nog niet gelezen"}</strong><button className="ghost" onClick={()=>setAnnouncements(announcements.map(x=>x.id===a.id?{...x,read:!x.read}:x))}>{a.read?"Markeer ongelezen":"Markeer gelezen"}</button><button className="mini-btn danger" onClick={()=>setAnnouncements(announcements.filter(x=>x.id!==a.id))}>×</button></div></Card>)}
           </>}
+
+          {moduleSlug === "muziekmappen" && <MusicFoldersModule stationSlug={station.slug} />}
 
           {moduleSlug === "kalender" && <>
             <div className="calendar-head"><div><button className="ghost" onClick={()=>notify("Vorige week")}>‹</button><button className="ghost" onClick={()=>notify("Volgende week")}>›</button><button className="primary soft" onClick={()=>notify("Terug naar deze week")}>Vandaag</button><h2>31 aug – 6 september 2026</h2></div><div><button className="primary" onClick={()=>setModal("event")}>+ Item</button></div></div>
@@ -289,16 +294,9 @@ export default function HubApp({ stationSlug, moduleSlug }: Props) {
             <Card className="table-card"><table><thead><tr><th>#</th><th>Vorige</th><th>Artiest</th><th>Titel</th><th>Trend</th><th>Weken</th><th>Peak</th></tr></thead><tbody>{chart.map((r,i)=><tr key={i}>{r.map((c,j)=><td key={j} className={j===4?(String(c).includes("▲")?"positive":String(c).includes("▼")?"negative":""):""}>{c}</td>)}</tr>)}</tbody></table></Card>
           </>}
 
-          {moduleSlug === "presentatie" && <div className="presenter-layout"><Card><div className="cover big cover-3">♫</div><Badge tone="blue">TUNE OF THE WEEK</Badge><h2>Joel Corry</h2><p className="song-title">Whisper</p><div className="song-meta"><span>BPM 126</span><span>Dance</span><span>Release 28/08</span></div><button className="primary wide" onClick={()=>notify("Audiopreview volgt via VLACORA Agent")}>▶ Beluister fragment</button></Card>
-            <Card><div className="section-head"><div><h3>Presentatietekst</h3><p>Wordt lokaal automatisch bewaard.</p></div><button className="ghost" onClick={()=>setPresenterText("Nieuwe muziek op Versuz Radio: Joel Corry met Whisper, onze Tune of the Week.")}>✨ AI-variant</button></div><textarea className="input presenter-editor" value={presenterText} onChange={e=>setPresenterText(e.target.value)}/><div className="editor-actions"><span className="muted">{presenterText.length} tekens</span><button className="primary" onClick={()=>notify("Presentatietekst opgeslagen")}>Opslaan</button></div><hr/><h3>Redactienotities</h3><p className="note">Niet benoemen als zijn eerste samenwerking. De track gaat maandag naar A-rotatie.</p></Card>
-          </div>}
+          {moduleSlug === "presentatie" && <PresentationModule stationSlug={station.slug} />}
 
-          {moduleSlug === "social" && <>
-            <div className="page-intro"><div><h2>Social Studio</h2><p>Wijzig artiest/titel en download een echte demo-PNG.</p></div><Badge tone="green">INTERACTIEF</Badge></div>
-            <div className="social-layout"><Card className="social-form"><label className="field">Template<select className="select" onChange={()=>notify("Template gewijzigd")}><option>Tune of the Week</option><option>Nieuwe #1</option><option>Grootste stijger</option><option>Now On Air</option></select></label><label className="field">Artiest<input className="input" value={socialArtist} onChange={e=>setSocialArtist(e.target.value)}/></label><label className="field">Titel<input className="input" value={socialTitle} onChange={e=>setSocialTitle(e.target.value)}/></label><label className="field">Formaat<select className="select"><option>Instagram 1080×1350</option><option>Story 1080×1920</option><option>Facebook post</option></select></label><button className="primary wide" onClick={()=>notify("Visual opnieuw opgebouwd")}>✦ Visual genereren</button></Card>
-              <div className="social-preview-wrap"><div className="social-preview"><div className="social-brand">VLACORA<span>radio</span></div><div className="social-label">TUNE OF THE WEEK</div><div className="social-art">♫</div><h2>{socialArtist}</h2><h3>{socialTitle}</h3><div className="social-bottom">THIS WEEK • ON AIR</div></div><div className="button-row center"><button className="ghost" onClick={downloadSocialPng}>Download PNG</button><button className="primary" onClick={()=>notify("Social Planner-item aangemaakt (demo)")}>Naar Social Planner</button></div></div>
-            </div>
-          </>}
+          {moduleSlug === "social" && <SocialStudioModule stationSlug={station.slug} />}
 
           {moduleSlug === "statistieken" && <>
             <div className="page-intro"><div><h2>Luistercijfers</h2><p>Laatste refresh: {lastRefresh}</p></div><button className="ghost" onClick={()=>{setLastRefresh(new Date().toLocaleTimeString("nl-BE",{hour:"2-digit",minute:"2-digit",second:"2-digit"}));notify("Statistieken vernieuwd")}}>↻ Vernieuwen</button></div>

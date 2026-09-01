@@ -103,3 +103,31 @@ Working in the browser:
 Data is stored in browser `localStorage`, so it survives a refresh on the same browser/device.
 
 Real shared multi-user data still requires Supabase, which is the next phase.
+
+## 0.3.0 - Editorial expansion
+
+This version focuses on the daily editorial radio workflow.
+
+### Messenger fix
+Messenger channels now have their **own message history**. Switching from Music to Technology or a direct chat no longer shows the same messages. You can also create new group, station and private chats in the demo.
+
+### Presentation text per song
+`Presentatie` now contains a station-specific song library. Each song has:
+- presenter text
+- internal editorial notes
+- tags
+- a generated text variant
+
+### Program text templates
+Programs such as Morning Club and Drive can have an ordered rundown of text items. Items can be moved, added, removed and configured as fixed text, editorial item, song text, playlist item, news/info or promo.
+
+### Social templates
+Social Studio now has an editable template library. Create new templates, change layout/label/background/caption patterns, preview variables and store draft posts.
+
+### Music folders PDF
+The new `Muziekmappen PDF` module lets you maintain folders/categories and songs, then generate a branded internal VLACORA PDF. The browser generator uses jsPDF. An example output is included at:
+
+`docs/VLACORA_Muziekmappen_Voorbeeld.pdf`
+
+### Backend preparation
+`supabase/migrations/002_editorial_extensions.sql` contains the proposed production tables for these new modules.

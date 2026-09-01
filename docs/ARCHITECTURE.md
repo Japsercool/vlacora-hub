@@ -37,3 +37,14 @@ Rotation One and Playout One remain source-of-truth for radio-engine data.
 
 ## Security
 Never commit `.env.local`, service-role keys, database passwords or radio API secrets.
+
+## Editorial layer (0.3 design)
+
+New station-scoped entities:
+- song presentation texts
+- program text templates + ordered template items
+- social templates + social drafts
+- music folders + folder tracks
+- internal generated documents
+
+Messenger must store messages by `channel_id`; a message is never a global timeline item. Realtime subscriptions in Supabase should therefore subscribe with a `channel_id` filter and Row Level Security should verify membership in `chat_members`.
