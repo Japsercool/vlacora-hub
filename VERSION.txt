@@ -1,2 +1,2 @@
-VLACORA HUB 0.7.1
-Vercel build fix: URLSearchParams iteration + ES2017 TypeScript target.
+VLACORA HUB 0.8.0
+Easy integration configuration from Beheer; no Vercel environment setup required for read-only testing.

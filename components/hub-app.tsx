@@ -11,6 +11,7 @@ import MusicLibraryModule from "@/components/modules/music-library-module";
 import EditorialModule from "@/components/modules/editorial-module";
 import RadioApiModule from "@/components/modules/radio-api-module";
 import TeamRightsModule from "@/components/modules/team-rights-module";
+import AdminIntegrationsModule from "@/components/modules/admin-integrations-module";
 import MusicFoldersModule from "@/components/modules/music-folders-module";
 
 type Props = { stationSlug: string; moduleSlug: string };
@@ -316,10 +317,7 @@ export default function HubApp({ stationSlug, moduleSlug }: Props) {
 
           {moduleSlug === "team" && <TeamRightsModule stationSlug={station.slug} />}
 
-          {moduleSlug === "beheer" && <div className="settings-grid"><Card><h3>Stationinstellingen</h3><label className="field">Naam<input className="input" value={stationSettings.name} onChange={e=>setStationSettings({...stationSettings,name:e.target.value})}/></label><label className="field">Tijdzone<select className="select" value={stationSettings.timezone} onChange={e=>setStationSettings({...stationSettings,timezone:e.target.value})}><option>Europe/Brussels</option><option>Europe/Amsterdam</option></select></label><label className="toggle-row"><div><strong>Actief station</strong><small>Toon in VLACORA</small></div><input type="checkbox" checked={stationSettings.active} onChange={e=>setStationSettings({...stationSettings,active:e.target.checked})}/></label><button className="primary" onClick={()=>notify("Stationinstellingen opgeslagen")}>Opslaan</button></Card>
-            <Card><h3>Integraties</h3>{[["Rotation One","Nog niet gekoppeld"],["Playout One","Nog niet gekoppeld"],["SHOUTcast","Nog niet gekoppeld"],["Supabase","Nog niet verbonden"]].map(([x,s])=><div className="integration" key={x}><div><strong>{x}</strong><small>{s}</small></div><button className="ghost" onClick={()=>notify(`${x}: configuratiescherm komt bij echte API-koppeling`)}>Instellen</button></div>)}</Card>
-            <Card><h3>Automatisering</h3>{[["playlistWarnings","Playlistwaarschuwingen"],["newsCheck","Nieuwscontrole"],["socialReminders","Social reminders"]].map(([key,label])=><label className="toggle-row" key={key}><div><strong>{label}</strong><small>Demo-instelling</small></div><input type="checkbox" checked={Boolean((stationSettings as any)[key])} onChange={e=>setStationSettings({...stationSettings,[key]:e.target.checked})}/></label>)}</Card>
-          </div>}
+          {moduleSlug === "beheer" && <AdminIntegrationsModule stationName={station.name} />}
         </div>
       </main>
 

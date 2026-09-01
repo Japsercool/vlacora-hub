@@ -236,3 +236,31 @@ Important: plain HTTP itself is not encrypted. Use long random API secrets, keep
 - Removed direct iteration of `URLSearchParams` under the old ES5 target.
 - TypeScript target changed from `es5` to `es2017` to avoid similar iterable API build errors.
 - Package version updated to 0.7.1.
+
+
+## 0.8.0 — Integration setup directly in Beheer
+
+The user no longer needs to configure Vercel Environment Variables just to test Rotation One / Playout One.
+
+In Beheer → Integraties → Instellen:
+- choose HTTP or HTTPS
+- enter fixed public IPv4
+- enter port
+- optional base path
+- optional API key/shared secret
+- change API header/prefix
+- configure status/station/playlist/nowplaying paths
+- test connection
+- fetch stations
+
+Security model for this prototype:
+- public URL/port/path settings are stored in browser localStorage
+- the API key is NOT stored in localStorage
+- the API key is kept only in sessionStorage for the current browser session
+- the Vercel manual proxy allows GET/read-only tests only
+- private/local IP ranges are blocked server-side to reduce SSRF risk
+- redirects are blocked
+- requests have a short timeout
+- playlist writes are not exposed through this easy setup yet
+
+This is intentionally a safe testing bridge. Persistent shared secrets and real production RBAC will move to Supabase/Auth or another secured backend later.
