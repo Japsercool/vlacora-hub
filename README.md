@@ -80,3 +80,26 @@ Those are the next development phase.
 - In Vercel select **Next.js** as the framework preset.
 - If `package.json` is visible in the root of your GitHub repository, leave **Root Directory** on `./`.
 - No Environment Variables are required for this demo version.
+
+
+## 0.2.0 interactive demo
+
+This version is intentionally interactive before Supabase is connected.
+
+Working in the browser:
+- create/update/delete tasks
+- submit/resolve incidents
+- send Messenger messages
+- publish/read/delete official announcements
+- add/delete calendar events
+- score and add music tracks
+- run music meeting decisions
+- reorder/edit/add/delete playlist items
+- edit presenter text
+- generate and download a demo social PNG
+- add/edit team members
+- save station settings
+
+Data is stored in browser `localStorage`, so it survives a refresh on the same browser/device.
+
+Real shared multi-user data still requires Supabase, which is the next phase.

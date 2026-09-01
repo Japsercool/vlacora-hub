@@ -69,3 +69,17 @@ hr{border:0;border-top:1px solid var(--border);margin:22px 0}
 @media(max-width:800px){
   .hub-shell{display:block}.sidebar{display:none}.main{grid-column:auto}.topbar{padding:0 14px}.content{padding:14px}.topbar .eyebrow{display:none}.select{max-width:145px}.hero{align-items:flex-start;gap:20px;flex-direction:column}.hero-now{min-width:0;width:100%}.metric-grid,.two-col,.station-grid,.kanban,.music-grid,.meeting-layout,.playlist-layout,.presenter-layout,.social-layout,.team-grid,.settings-grid{grid-template-columns:1fr}.report-grid{grid-template-columns:1fr 1fr}.show-row{grid-template-columns:1fr}.messenger{grid-template-columns:1fr}.channels{display:none}.calendar-card{overflow:auto}.week-head,.week-body{min-width:900px}.social-preview{width:min(100%,430px)}.page-intro,.toolbar,.calendar-head{align-items:flex-start;flex-direction:column}
 }
+
+
+/* VLACORA 0.2 interactive additions */
+.modal-backdrop{position:fixed;inset:0;background:rgba(17,19,38,.5);display:grid;place-items:center;z-index:100;padding:20px;backdrop-filter:blur(4px)}
+.modal-card{width:min(560px,100%);max-height:90vh;overflow:auto;background:white;border-radius:20px;border:1px solid var(--border);box-shadow:0 30px 90px rgba(16,20,55,.22);padding:22px}
+.modal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px}.modal-head h2{margin:0}.modal-form{display:grid;gap:10px}
+.toast{position:fixed;right:24px;bottom:24px;z-index:120;background:#171926;color:#fff;border-radius:14px;padding:13px 17px;box-shadow:0 15px 45px rgba(0,0,0,.22);font-weight:700;animation:toastin .18s ease-out}
+@keyframes toastin{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+.status-button{width:100%;border:0;background:transparent;text-align:left;cursor:pointer}.status-button:hover{background:#f7f8fb}
+.task-actions{display:flex;gap:7px;margin-top:12px;align-items:center}.compact-select{padding:6px 8px;border-radius:8px;font-size:11px}
+.playlist-edit-text{border:0;background:transparent;text-align:left;padding:0;color:inherit;cursor:pointer}.playlist-edit-text:hover strong{color:var(--primary)}
+.spaced{margin-top:8px}.history-card{margin-bottom:16px}.selected-decision{border-color:var(--primary)!important;background:#efefff!important;color:var(--primary)!important}
+.cal-event{border:0;text-align:left;cursor:pointer}.cal-event:hover{filter:brightness(.97);transform:translateY(-1px)}
+.integration .ghost{padding:7px 9px}
