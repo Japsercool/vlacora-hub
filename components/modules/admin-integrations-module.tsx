@@ -1,6 +1,9 @@
 "use client";
+import { syncSharedRotationStations } from "@/lib/supabase/hub-data";
+import { isSupabaseBrowserConfigured } from "@/lib/supabase/client";
 
 import { useEffect, useState } from "react";
+import { saveStationCache } from "@/lib/radio/client-config";
 
 type Protocol = "http" | "https";
 type IntegrationKind = "rotation" | "playout" | "shoutcast";
@@ -17,6 +20,8 @@ type PublicConfig = {
   coveragePath?: string;
   revisionPath?: string;
   nowPath?: string;
+  musicFoldersPath?: string;
+  musicFolderItemsPath?: string;
   readOnly: boolean;
   lastOk?: string;
   lastError?: string;
@@ -28,7 +33,7 @@ const seed:Store = {
   rotation:{
     enabled:false, protocol:"http", host:"", port:"5090", basePath:"",
     stationPath:"/api/v1/stations", statusPath:"/api/v1/health",
-    playlistPath:"/api/v1/stations/{stationId}/schedule", coveragePath:"/api/v1/stations/{stationId}/schedule/coverage", revisionPath:"/api/v1/stations/{stationId}/schedule/revision", readOnly:true
+    playlistPath:"/api/v1/stations/{stationId}/schedule", coveragePath:"/api/v1/stations/{stationId}/schedule/coverage", revisionPath:"/api/v1/stations/{stationId}/schedule/revision", musicFoldersPath:"", musicFolderItemsPath:"", readOnly:true
   },
   playout:{
     enabled:false, protocol:"http", host:"", port:"5190", basePath:"",
@@ -61,6 +66,8 @@ export default function AdminIntegrationsModule({stationName}:{stationName:strin
   const[diagnostic,setDiagnostic]=useState<any>(null);
 
   const cfg = selected ? configs[selected] : null;
+  const[supabaseConfigured,setSupabaseConfigured]=useState(false);
+  useEffect(()=>setSupabaseConfigured(isSupabaseBrowserConfigured()),[]);
 
   useEffect(()=>{
     if(selected){
@@ -119,7 +126,8 @@ export default function AdminIntegrationsModule({stationName}:{stationName:strin
         const read=await fetch("/api/radio/manual/read",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({kind,action:"stations",path:c.stationPath,config:c,apiKey:secret,apiKeyHeader:header,apiKeyPrefix:prefix})});
         const list=await read.json();
         if(!read.ok)throw new Error(list.error||"Stations ophalen mislukt");
-        localStorage.setItem(`vlacora:integration:stations:${kind}:v9`,JSON.stringify(list.stations||[]));
+        saveStationCache(kind,list.stations||[]);
+        if(kind==="rotation")await syncSharedRotationStations(list.stations||[]).catch(()=>{});
         flash(`${(list.stations||[]).length} echte station(s) opgehaald`);
       }
 
@@ -169,9 +177,9 @@ export default function AdminIntegrationsModule({stationName}:{stationName:strin
           </div>
         })}
         <div className="integration-v8">
-          <div className="integration-status-dot"/>
-          <div className="integration-v8-info"><strong>Supabase</strong><span>Nog niet verbonden</span><small>Gebruikers, gedeelde data en veilige productie-auth</small></div>
-          <button className="ghost" onClick={()=>flash("Supabase komt in de volgende backendfase.")}>Later</button>
+          <div className={`integration-status-dot ${supabaseConfigured?"online":""}`}/>
+          <div className="integration-v8-info"><strong>Supabase Auth</strong><span>{supabaseConfigured?"Echte login actief":"Nog niet geconfigureerd"}</span><small>Cookie-based login voor VLACORA teamaccounts</small></div>
+          <button className="ghost" onClick={()=>{window.location.href="/login"}}>{supabaseConfigured?"Login":"Instellen"}</button>
         </div>
       </div>
 
@@ -220,6 +228,9 @@ export default function AdminIntegrationsModule({stationName}:{stationName:strin
             <label className="field">Schedule endpoint<input className="input" value={cfg.playlistPath||""} onChange={e=>update(selected,{playlistPath:e.target.value})}/></label>
             <label className="field">Coverage endpoint<input className="input" value={cfg.coveragePath||""} onChange={e=>update(selected,{coveragePath:e.target.value})}/></label>
             <label className="field">Revision endpoint<input className="input" value={cfg.revisionPath||""} onChange={e=>update(selected,{revisionPath:e.target.value})}/></label>
+            <div className="api-subsection-title"><strong>Muziekdatabase → PDF</strong><span>Deze twee paden zijn optioneel. We vullen ze niet met gok-endpoints.</span></div>
+            <label className="field">Muziekmappen endpoint<input className="input" value={cfg.musicFoldersPath||""} onChange={e=>update(selected,{musicFoldersPath:e.target.value})} placeholder="bv. een bevestigd endpoint met {stationId}"/></label>
+            <label className="field">Songs-in-map endpoint<input className="input" value={cfg.musicFolderItemsPath||""} onChange={e=>update(selected,{musicFolderItemsPath:e.target.value})} placeholder="bevestigd endpoint met {stationId} en {folderId}"/></label>
           </>}
           {selected==="playout"&&<label className="field">Now-playing/snapshot endpoint<input className="input" value={cfg.nowPath||""} onChange={e=>update(selected,{nowPath:e.target.value})} placeholder="Vul in zodra Playout One endpoint bevestigd is"/></label>}
         </div>

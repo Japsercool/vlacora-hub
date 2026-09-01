@@ -13,6 +13,8 @@ export type ClientIntegrationConfig = {
   coveragePath?:string;
   revisionPath?:string;
   nowPath?:string;
+  musicFoldersPath?:string;
+  musicFolderItemsPath?:string;
   readOnly:boolean;
   lastOk?:string;
   lastError?:string;
@@ -50,9 +52,9 @@ export function readStationCache(kind:IntegrationKind):RadioStation[]{
   if(typeof window==="undefined")return [];
   try{const x=JSON.parse(localStorage.getItem(stationCacheKey(kind))||"[]");return Array.isArray(x)?x:[]}catch{return []}
 }
-export function saveStationCache(kind:IntegrationKind,value:RadioStation[]){if(typeof window!=="undefined")localStorage.setItem(stationCacheKey(kind),JSON.stringify(value))}
+export function saveStationCache(kind:IntegrationKind,value:RadioStation[]){if(typeof window!=="undefined"){localStorage.setItem(stationCacheKey(kind),JSON.stringify(value));window.dispatchEvent(new CustomEvent("vlacora:hub-stations-changed",{detail:{kind}}))}}
 
-export async function radioRead(kind:IntegrationKind,path:string,action:"raw"|"stations"|"playlist"|"now"="raw"){
+export async function radioRead(kind:IntegrationKind,path:string,action:"raw"|"stations"|"playlist"|"now"|"folders"|"songs"="raw"){
   const config=readIntegration(kind);
   if(!config?.host)throw new Error(`${kind==="rotation"?"Rotation One":"Playout One"} is nog niet ingesteld in Beheer → Integraties.`);
   const secret=readSecret(kind);
@@ -67,5 +69,9 @@ export async function radioRead(kind:IntegrationKind,path:string,action:"raw"|"s
 
 export function pathFor(template:string|undefined,stationId:string){
   if(!template)return "";
-  return template.replace("{stationId}",encodeURIComponent(stationId));
+  return template.replaceAll("{stationId}",encodeURIComponent(stationId));
+}
+export function pathForFolder(template:string|undefined,stationId:string,folderId:string){
+  if(!template)return "";
+  return template.replaceAll("{stationId}",encodeURIComponent(stationId)).replaceAll("{folderId}",encodeURIComponent(folderId));
 }

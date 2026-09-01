@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { MusicSong } from "@/components/modules/music-library-module";
-import { shows, stations } from "@/lib/mock-data";
+import { useHubStation } from "@/lib/radio/hub-stations";
 import { pathFor,radioRead,readIntegration,readMappings,readStationCache,saveMappings,type RadioMappingStore,type RadioStation } from "@/lib/radio/client-config";
 
 type EditorialType = "music" | "talk" | "imaging" | "promo" | "weather" | "traffic" | "news" | "commercial";
@@ -44,7 +44,7 @@ const uid = () => Math.random().toString(36).slice(2) + Date.now().toString(36);
 
 const seedTemplates: ProgramTemplate[] = [
   {
-    id:"tpl-drive",name:"Drive standaard",program:"Drive",station:"versuz",
+    id:"tpl-drive",name:"Drive standaard",program:"Drive",station:"all",
     opening:"Welkom bij Drive op {station}. {presenter} is er tot {end}.",
     closing:"Dit was Drive. Straks hoor je {next_program}.",
     blocks:[
@@ -57,7 +57,7 @@ const seedTemplates: ProgramTemplate[] = [
     ]
   },
   {
-    id:"tpl-morning",name:"Morning Club",program:"Morning Club",station:"versuz",
+    id:"tpl-morning",name:"Morning Club",program:"Morning Club",station:"all",
     opening:"Goedemorgen! Dit is Morning Club op {station}.",
     closing:"Morning Club zit erop. Straks is {next_program} er voor je.",
     blocks:[
@@ -108,7 +108,7 @@ function substitute(text:string, values:Record<string,string>) {
 }
 
 export default function EditorialModule({stationSlug}:{stationSlug:string}) {
-  const station = stations.find(s=>s.slug===stationSlug) || stations[1];
+  const station = useHubStation(stationSlug);
   const [tab,setTab] = useState<"playlist"|"templates"|"koppeling">("playlist");
   const [date,setDate] = useState("2026-09-01");
   const [hour,setHour] = useState("16:00");
@@ -125,13 +125,18 @@ export default function EditorialModule({stationSlug}:{stationSlug:string}) {
   const [lastPull,setLastPull] = useState("nog niet");
   const [lastStatus,setLastStatus] = useState("Nog niet getest");
   const [playlistVersion,setPlaylistVersion] = useState<string>("—");
-  useEffect(()=>{setMappingsState(readMappings());setRotationStations(readStationCache("rotation"));setPlayoutStations(readStationCache("playout"))},[]);
-  const mapping=mappings[station.slug]||{rotationId:"",rotationName:"",playoutId:"",playoutName:""};
+  const [programmingPrograms,setProgrammingPrograms] = useState<{name:string;host:string}[]>([]);
+  useEffect(()=>{
+    setMappingsState(readMappings());setRotationStations(readStationCache("rotation"));setPlayoutStations(readStationCache("playout"));
+    const loadPrograms=()=>{try{const raw=localStorage.getItem(`vlacora:${station.slug}:programming:v10`);const items=raw?JSON.parse(raw):[];setProgrammingPrograms(Array.isArray(items)?items.filter((x:any)=>x?.active!==false).map((x:any)=>({name:String(x.name||"Programma"),host:String(x.host||"")})):[])}catch{setProgrammingPrograms([])}};
+    loadPrograms();window.addEventListener("vlacora:programming-changed",loadPrograms as EventListener);return()=>window.removeEventListener("vlacora:programming-changed",loadPrograms as EventListener);
+  },[station.slug]);
+  const mapping=mappings[station.slug]||{rotationId:station.rotationId||"",rotationName:station.rotationId?station.name:"",playoutId:"",playoutName:""};
   function setMapping(patch:Partial<typeof mapping>){const next={...mappings,[station.slug]:{...mapping,...patch}};setMappingsState(next);saveMappings(next)}
 
   const selected = playlist.find(i=>i.id===selectedId) || playlist[0];
   const linkedTemplate = templates.find(t=>t.id===links.find(l=>l.program===program)?.templateId);
-  const programs = Array.from(new Set([...shows.map(s=>s.name),...templates.map(t=>t.program)]));
+  const programs = Array.from(new Set([...programmingPrograms.map(s=>s.name),...templates.map(t=>t.program)]));
 
   function flash(text:string){setNotice(text);setTimeout(()=>setNotice(""),2600)}
   function updateSelected(patch:Partial<EditorialItem>){if(!selected)return;setPlaylist(playlist.map(i=>i.id===selected.id?{...i,...patch}:i))}
@@ -245,7 +250,7 @@ async function testConnections(){
         <div className="module-title-row"><div><h3>Programma → sjabloon</h3><small>Per programma automatisch het juiste redactiesjabloon.</small></div></div>
         {programs.map(p=>{
           const link=links.find(l=>l.program===p);
-          return <div className="program-link-row" key={p}><div><strong>{p}</strong><small>{shows.find(s=>s.name===p)?.host||"Programma"}</small></div><select className="select" value={link?.templateId||""} onChange={e=>setLinks([...links.filter(l=>l.program!==p),{program:p,templateId:e.target.value}])}><option value="">Geen sjabloon</option>{templates.filter(t=>t.station==="all"||t.station===station.slug).map(t=><option value={t.id} key={t.id}>{t.name}</option>)}</select></div>
+          return <div className="program-link-row" key={p}><div><strong>{p}</strong><small>{programmingPrograms.find(s=>s.name===p)?.host||"Programma"}</small></div><select className="select" value={link?.templateId||""} onChange={e=>setLinks([...links.filter(l=>l.program!==p),{program:p,templateId:e.target.value}])}><option value="">Geen sjabloon</option>{templates.filter(t=>t.station==="all"||t.station===station.slug).map(t=><option value={t.id} key={t.id}>{t.name}</option>)}</select></div>
         })}
       </div>
       <div className="card template-editor">

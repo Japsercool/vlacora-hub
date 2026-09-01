@@ -1,0 +1,35 @@
+VLACORA HUB 0.10.0 STATIC VALIDATION
+
+[PASS] package version 0.10.0
+[PASS] Supabase SSR dependency
+[PASS] Supabase JS dependency
+[PASS] real auth middleware
+[PASS] auth SQL migration
+[PASS] shared station table
+[PASS] shared programming table
+[PASS] live Rotation station registry
+[PASS] Hub selector uses live stations
+[PASS] programming editor module
+[PASS] programming cloud sync
+[PASS] music folder live dropdown
+[PASS] music folder normalizers
+[PASS] read proxy supports folders
+[PASS] proposed Rotation folder contract
+[PASS] native Node HTTP remains active
+[PASS] no service-role key required
+[PASS] file exists: components/modules/programming-module.tsx
+[PASS] file exists: components/modules/music-folders-module.tsx
+[PASS] file exists: components/modules/radio-api-module.tsx
+[PASS] file exists: components/modules/admin-integrations-module.tsx
+[PASS] file exists: components/hub-app.tsx
+[PASS] file exists: components/auth/login-form.tsx
+[PASS] file exists: components/auth/account-widget.tsx
+[PASS] file exists: app/login/page.tsx
+[PASS] file exists: middleware.ts
+[PASS] file exists: lib/radio/hub-stations.ts
+[PASS] file exists: lib/supabase/client.ts
+[PASS] file exists: lib/supabase/server.ts
+[PASS] file exists: lib/supabase/hub-data.ts
+
+TypeScript parser check: tsc reported no TS1xxx parser/syntax errors.
+A complete npm/Next build was not executed in this container; Vercel should perform the dependency install and production build after push.

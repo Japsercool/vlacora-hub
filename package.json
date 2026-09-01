@@ -1,6 +1,6 @@
 {
   "name": "vlacora-hub",
-  "version": "0.9.1",
+  "version": "0.10.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -12,7 +12,9 @@
     "next": "14.2.35",
     "react": "18.3.1",
     "react-dom": "18.3.1",
-    "jspdf": "^2.5.2"
+    "jspdf": "^2.5.2",
+    "@supabase/ssr": "^0.12.5",
+    "@supabase/supabase-js": "^2.112.4"
   },
   "devDependencies": {
     "@types/node": "22.10.2",

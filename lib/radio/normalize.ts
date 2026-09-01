@@ -109,3 +109,29 @@ export function normalizeNow(body: unknown) {
   });
   return {now:one(current),next:Object.keys(next).length?one(next):null,raw:body};
 }
+
+export type NormalizedMusicFolder={id:string;name:string;description:string;count?:number;raw?:unknown};
+export type NormalizedMusicSong={id:string;artist:string;title:string;category?:string;year?:string;raw?:unknown};
+
+export function normalizeMusicFolders(body:unknown):NormalizedMusicFolder[]{
+  return arrayCandidate(body,["folders","Folders","musicFolders","MusicFolders","items","Items","data","Data","results","Results"]).map((value,index)=>{
+    const obj=rec(value);
+    const id=String(first(obj,["id","Id","folderId","FolderId","key","Key","path","Path","name","Name"],index));
+    const name=String(first(obj,["name","Name","title","Title","displayName","DisplayName","folderName","FolderName"],id));
+    const description=String(first(obj,["description","Description","notes","Notes","path","Path"],""));
+    const c=Number(first(obj,["count","Count","songCount","SongCount","trackCount","TrackCount"],NaN));
+    return {id,name,description,count:Number.isFinite(c)?c:undefined,raw:value};
+  });
+}
+
+export function normalizeMusicSongs(body:unknown):NormalizedMusicSong[]{
+  return arrayCandidate(body,["songs","Songs","tracks","Tracks","items","Items","data","Data","results","Results"]).map((value,index)=>{
+    const obj=rec(value);
+    const id=String(first(obj,["id","Id","songId","SongId","trackId","TrackId","databaseId","DatabaseId","guid","Guid"],index));
+    const artist=String(first(obj,["artist","Artist","artistName","ArtistName","performer","Performer"],""));
+    const title=String(first(obj,["title","Title","name","Name","trackTitle","TrackTitle"],artist?"Onbekende titel":"Item"));
+    const category=String(first(obj,["category","Category","categoryName","CategoryName","rotation","Rotation","folder","Folder"],""))||undefined;
+    const year=String(first(obj,["year","Year","releaseYear","ReleaseYear"],""))||undefined;
+    return {id,artist,title,category,year,raw:value};
+  });
+}

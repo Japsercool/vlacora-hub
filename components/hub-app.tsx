@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { chart, initialPlaylist, navItems, shows, stations } from "@/lib/mock-data";
+import { chart, initialPlaylist, navItems } from "@/lib/mock-data";
 import MessengerModule from "@/components/modules/messenger-module";
 import PresentationModule from "@/components/modules/presentation-module";
 import SocialStudioModule from "@/components/modules/social-studio-module";
@@ -13,6 +13,11 @@ import RadioApiModule from "@/components/modules/radio-api-module";
 import TeamRightsModule from "@/components/modules/team-rights-module";
 import AdminIntegrationsModule from "@/components/modules/admin-integrations-module";
 import MusicFoldersModule from "@/components/modules/music-folders-module";
+import ProgrammingModule from "@/components/modules/programming-module";
+import { HUB_STATIONS_EVENT, allHubStation, readHubStations, type HubStation } from "@/lib/radio/hub-stations";
+import AccountWidget from "@/components/auth/account-widget";
+import { loadSharedRotationStations } from "@/lib/supabase/hub-data";
+import { saveStationCache } from "@/lib/radio/client-config";
 
 type Props = { stationSlug: string; moduleSlug: string };
 type Tone = "blue" | "red" | "green" | "orange" | "gray";
@@ -69,8 +74,18 @@ function Modal({
 
 export default function HubApp({ stationSlug, moduleSlug }: Props) {
   const router = useRouter();
-  const station = stations.find((s) => s.slug === stationSlug) || stations[0];
-  const storagePrefix = `vlacora:${station.slug}`;
+  const [hubStations,setHubStations] = useState<HubStation[]>([allHubStation()]);
+  useEffect(()=>{
+    let alive=true;
+    const refresh=()=>setHubStations(readHubStations());
+    refresh();
+    loadSharedRotationStations().then(stations=>{if(alive&&stations.length){saveStationCache("rotation",stations);refresh()}}).catch(()=>{});
+    window.addEventListener(HUB_STATIONS_EVENT,refresh as EventListener);
+    window.addEventListener("storage",refresh);
+    return()=>{alive=false;window.removeEventListener(HUB_STATIONS_EVENT,refresh as EventListener);window.removeEventListener("storage",refresh)};
+  },[]);
+  const station = hubStations.find((s) => s.slug === stationSlug) || (stationSlug==="all"?allHubStation():{slug:stationSlug,name:"Station laden…",short:"…",accent:"#26269f",source:"rotation" as const});
+  const storagePrefix = `vlacora:${stationSlug}`;
 
   const [tasks, setTasks] = useLocalState<Task[]>(`${storagePrefix}:tasks`, [
     { id: "t1", title: "Playlist woensdag controleren", owner: "Jasper", due: "Vandaag 17:30", status: "Bezig", priority: "Hoog" },
@@ -198,7 +213,7 @@ export default function HubApp({ stationSlug, moduleSlug }: Props) {
             </Link>
           ))}
         </nav>
-        <div className="sidebar-user"><div className="avatar">JC</div><div><strong>Jasper</strong><small>Superadmin</small></div></div>
+        <AccountWidget />
       </aside>
 
       <main className="main">
@@ -206,7 +221,7 @@ export default function HubApp({ stationSlug, moduleSlug }: Props) {
           <div><div className="eyebrow">VLACORA / {station.name}</div><h1>{moduleName}</h1></div>
           <div className="top-actions">
             <select className="select" value={station.slug} onChange={(e) => router.push(`/hub/${e.target.value}/${moduleSlug}`)}>
-              {stations.map((s) => <option key={s.slug} value={s.slug}>{s.name}</option>)}
+              {hubStations.map((s) => <option key={s.slug} value={s.slug}>{s.name}</option>)}
             </select>
             <button className="icon-button" onClick={()=>notify("Open meldingen en updates")}>🔔<span className="ping">3</span></button>
             <div className="live-pill"><span /> LIVE</div>
@@ -217,11 +232,11 @@ export default function HubApp({ stationSlug, moduleSlug }: Props) {
           {moduleSlug === "dashboard" && <>
             <section className="hero">
               <div><div className="hero-kicker">DINSDAG 1 SEPTEMBER 2026</div><h2>Goedemorgen, Jasper.</h2><p>Dit vraagt vandaag aandacht binnen {station.name}.</p></div>
-              <div className="hero-now"><span className="tiny">NU ON AIR</span><strong>HUGEL – Movin&apos; To The Sun</strong><span>184 luisteraars • Playout online</span></div>
+              <div className="hero-now"><span className="tiny">LIVE RADIO</span><strong>Rotation One + Playout One</strong><span>Open Radio API voor echte now/next en status.</span></div>
             </section>
             <div className="metric-grid">
-              <Card><span className="metric-label">Luisteraars nu</span><strong className="metric">184</strong><span className="positive">+12% vs. gisteren</span></Card>
-              <Card><span className="metric-label">Playlistdekking</span><strong className="metric">8 sep</strong><span className="muted">7 dagen vooruit</span></Card>
+              <Card><span className="metric-label">Luisteraars nu</span><strong className="metric">—</strong><span className="muted">Via SHOUTcast zodra gekoppeld</span></Card>
+              <Card><span className="metric-label">Playlistdekking</span><strong className="metric">LIVE</strong><span className="muted">Via Rotation One coverage</span></Card>
               <Card><span className="metric-label">Open taken</span><strong className="metric">{tasks.filter(t=>t.status!=="Klaar").length}</strong><span className="muted">VLACORA werkdata</span></Card>
               <Card><span className="metric-label">Nieuwe muziek</span><strong className="metric">{allTracks.length}</strong><span className="muted">te beoordelen</span></Card>
             </div>
@@ -237,12 +252,10 @@ export default function HubApp({ stationSlug, moduleSlug }: Props) {
                 <button className="primary wide" onClick={()=>router.push(`/hub/${station.slug}/radio-api`)}>Open live Radio API →</button>
               </Card>
             </div>
-            <Card><div className="section-head"><div><h3>Uitzendschema</h3><p>Vandaag • {station.name}</p></div><button className="ghost" onClick={()=>router.push(`/hub/${station.slug}/programmering`)}>Volledig schema →</button></div>
-              <div className="show-row">{shows.slice(2).map(show=><div className={`show-card ${show.live?"on-air":""}`} key={show.time}><span className="show-time">{show.time}</span><div className="show-avatar">{show.host.split(" ").map(x=>x[0]).slice(0,2).join("")}</div><div><strong>{show.name}</strong><small>{show.host}</small></div>{show.live&&<Badge tone="red">ON AIR</Badge>}</div>)}</div>
-            </Card>
+            <Card><div className="section-head"><div><h3>Uitzendschema</h3><p>Vandaag • {station.name}</p></div><button className="ghost" onClick={()=>router.push(`/hub/${station.slug}/programmering`)}>Open programmering →</button></div><div className="empty-live-state compact"><strong>Bewerkbare programmering</strong><span>Programma&apos;s worden niet meer uit een vaste demo geladen. Beheer ze in Programmering.</span></div></Card>
           </>}
 
-          {moduleSlug === "stations" && <div className="station-grid">{stations.filter(s=>s.slug!=="all").map(s=><Card key={s.slug} className="station-card"><div className="station-card-head"><div className="station-logo" style={{background:s.accent}}>{s.short}</div><div><h3>{s.name}</h3><span className="muted">Live status via API</span></div></div><div className="station-stat"><span>Radio-data</span><strong>Geen fallback/demo</strong></div><Link className="primary wide" href={`/hub/${s.slug}/radio-api`}>Open live status</Link></Card>)}</div>}
+          {moduleSlug === "stations" && <><div className="page-intro"><div><h2>Stations uit Rotation One</h2><p>Deze lijst wordt rechtstreeks opgebouwd uit de laatst opgehaalde Rotation One-stations.</p></div><button className="primary" onClick={()=>router.push(`/hub/${station.slug}/radio-api`)}>↻ Stations beheren</button></div>{hubStations.filter(s=>s.slug!=="all").length===0?<Card><div className="empty-live-state"><strong>Nog geen Rotation One-stations opgehaald</strong><span>Ga naar Radio API of Beheer → Integraties en klik op Stations ophalen.</span></div></Card>:<div className="station-grid">{hubStations.filter(s=>s.slug!=="all").map(s=><Card key={s.slug} className="station-card"><div className="station-card-head"><div className="station-logo" style={{background:s.accent}}>{s.short}</div><div><h3>{s.name}</h3><span className="muted">Rotation One • {s.rotationId}</span></div></div><div className="station-stat"><span>Bron</span><strong>Live Rotation One</strong></div><Link className="primary wide" href={`/hub/${s.slug}/dashboard`}>Open station</Link></Card>)}</div>}</>}
 
           {moduleSlug === "taken" && <>
             <div className="toolbar"><input className="input grow" placeholder="Nieuwe taak..." value={taskDraft} onChange={e=>setTaskDraft(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addTaskQuick()}/><button className="primary" onClick={addTaskQuick}>+ Snel toevoegen</button><button className="ghost" onClick={()=>setModal("task")}>Uitgebreid</button></div>
@@ -273,10 +286,7 @@ export default function HubApp({ stationSlug, moduleSlug }: Props) {
             <Card className="calendar-card"><div className="week-head"><div></div>{["ma 31","di 1","wo 2","do 3","vr 4","za 5","zo 6"].map(d=><div key={d}>{d}</div>)}</div><div className="week-body"><div className="hours">{["08:00","10:00","12:00","14:00","16:00","18:00","20:00"].map(x=><span key={x}>{x}</span>)}</div><div className="week-grid">{events.map(e=><button title="Klik om te verwijderen" className={`cal-event ${e.type}`} style={{gridColumn:String(e.day),gridRow:String(e.row)}} key={e.id} onClick={()=>{if(confirm(`"${e.title}" verwijderen?`))setEvents(events.filter(x=>x.id!==e.id))}}><strong>{e.title}</strong><small>{e.time}</small></button>)}</div></div></Card>
           </>}
 
-          {moduleSlug === "programmering" && <>
-            <div className="day-tabs">{["Ma 31","Di 1","Wo 2","Do 3","Vr 4","Za 5","Zo 6"].map((d,i)=><button className={i===0?"active":""} key={d} onClick={()=>notify(`Schema ${d} geselecteerd`)}>{d}</button>)}<button onClick={()=>notify("Schema-editor wordt later gekoppeld aan echte programmadatabase")}>+ Programma</button></div>
-            <div className="schedule-list">{shows.map(show=><Card className={`schedule-item ${show.live?"live-item":""}`} key={show.time}><div className="time-line"><strong>{show.time}</strong><span/></div><div className="show-avatar large">{show.host.split(" ").map(x=>x[0]).slice(0,2).join("")}</div><div className="schedule-info"><h3>{show.name} {show.live&&<Badge tone="red">ON AIR</Badge>}</h3><p>{show.host}</p></div><span className="muted">{show.time} – {show.end}</span><button className="ghost" onClick={()=>notify(`${show.name}: editor geopend`) }>Bewerk</button></Card>)}</div>
-          </>}
+          {moduleSlug === "programmering" && <ProgrammingModule stationSlug={station.slug} stationName={station.name} />}
 
           {moduleSlug === "muziek" && <MusicLibraryModule stationSlug={station.slug} />}
 
@@ -305,10 +315,7 @@ export default function HubApp({ stationSlug, moduleSlug }: Props) {
             <Card><div className="section-head"><div><h3>Listeners vandaag</h3><p>Per uur</p></div><select className="select" onChange={()=>notify("Periode gewijzigd")}><option>Vandaag</option><option>7 dagen</option><option>30 dagen</option></select></div><div className="bar-chart">{[48,55,62,76,74,90,88,98,83,71,92,100,84,67].map((h,i)=><div className="bar-wrap" key={i}><div className="bar" style={{height:`${h}%`}}/><span>{i+7}</span></div>)}</div></Card>
           </>}
 
-          {moduleSlug === "control" && <>
-            <div className="page-intro"><div><h2>On-Air Control Center</h2><p>Laatste refresh: {lastRefresh}</p></div><button className="ghost" onClick={()=>{setLastRefresh(new Date().toLocaleTimeString("nl-BE"));notify("Alle stations vernieuwd")}}>↻ Alles verversen</button></div>
-            <Card className="table-card"><table><thead><tr><th>Station</th><th>Playout</th><th>Rotation</th><th>Stream</th><th>Playlists</th><th>Nieuws</th><th>Listeners</th></tr></thead><tbody><tr><td><b>Versuz Radio</b></td><td><Badge tone="green">Online</Badge></td><td><Badge tone="green">Online</Badge></td><td><Badge tone="green">Online</Badge></td><td>8 sep</td><td>✓ 08:00</td><td><b>184</b></td></tr><tr><td><b>Club FM</b></td><td><Badge tone="green">Online</Badge></td><td><Badge tone="green">Online</Badge></td><td><Badge tone="green">Online</Badge></td><td>7 sep</td><td>✓ 08:00</td><td><b>137</b></td></tr><tr><td><b>Vlacora One</b></td><td><Badge tone="red">Offline</Badge></td><td><Badge tone="green">Online</Badge></td><td><Badge tone="red">Offline</Badge></td><td>5 sep</td><td>⚠ ontbreekt</td><td><b>0</b></td></tr></tbody></table></Card>
-          </>}
+          {moduleSlug === "control" && <><div className="page-intro"><div><h2>On-Air Control Center</h2><p>Geen vaste demo-statussen: open per station de echte API-status.</p></div><button className="ghost" onClick={()=>router.push(`/hub/${station.slug}/radio-api`)}>↻ Live API</button></div><div className="station-grid">{hubStations.filter(s=>s.slug!=="all").map(s=><Card key={s.slug} className="station-card"><div className="station-card-head"><div className="station-logo" style={{background:s.accent}}>{s.short}</div><div><h3>{s.name}</h3><span className="muted">Rotation ID: {s.rotationId}</span></div></div><Link className="primary wide" href={`/hub/${s.slug}/radio-api`}>Bekijk Rotation + Playout status</Link></Card>)}</div></>}
 
           {moduleSlug === "radio-api" && <RadioApiModule stationSlug={station.slug} />}
 

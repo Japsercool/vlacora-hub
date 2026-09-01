@@ -1,2 +1,2 @@
-VLACORA HUB 0.9.1
-Native Node HTTP radio transport + timeout fix.
+VLACORA HUB 0.10.0
+Live Rotation One station registry + editable/shared programming + music-folder PDF bridge + real Supabase team login.

@@ -291,3 +291,44 @@ This is intentionally a safe testing bridge. Persistent shared secrets and real 
 - Increases read timeout to 20–25 seconds.
 - Error code `20` is no longer shown as if it were an HTTP status; timeouts are reported as `ETIMEDOUT` / `HTTP timeout`.
 - Live station and schedule reads use the same native transport.
+
+## 0.10.0 — Live Stations, Programmering, Music Folder PDF & Login
+
+### Rotation One becomes the HUB station registry
+- `GET /api/v1/stations` is now the canonical source for the station selector.
+- After **Stations ophalen**, every real Rotation One station becomes a VLACORA station option.
+- No static Versuz/Club FM demo station list is required for the radio modules.
+- If Supabase is active, the discovered Rotation One station registry is also synchronized to the team cloud so another logged-in browser can load the same station list.
+
+### Programmering
+- New station-specific editable weekly programming screen.
+- Add, edit, duplicate and remove programs.
+- Set start/end, presenter/team, format, notes and active state.
+- Copy a complete day to another weekday.
+- Works locally without Supabase.
+- When real login/Supabase is active, programming is synchronized to `station_programs` for the logged-in team.
+- This is the VLACORA editorial/program schedule. It does **not** invent a Rotation One write endpoint; sending programming changes back into Rotation One must wait for a confirmed writable API contract.
+
+### Rotation One music folder -> PDF
+- Music-folder PDF has a **Rotation One live** source.
+- It can request a real folder list, show the folders in a dropdown, request the real songs for the selected folder and generate the branded PDF from those songs.
+- The public Rotation One endpoints confirmed so far expose stations/schedules, but no confirmed database-folder REST route is included in the available integration evidence.
+- Therefore VLACORA deliberately leaves these two paths configurable instead of guessing them:
+  - Music folders path
+  - Songs in folder path (`{folderId}` supported)
+- Once Rotation One exposes those two read endpoints, the HUB flow is already prepared.
+
+### Real team login — Supabase Auth
+- Cookie-based Supabase Auth protects `/hub/*` once configured.
+- Open signup is not exposed; create team accounts in Supabase Auth.
+- No service-role secret is needed in this build.
+- The Supabase project must be fixed globally for the deployment; otherwise a fresh browser could bypass a cookie-only setup.
+- Configure it with either:
+  - Vercel: `NEXT_PUBLIC_SUPABASE_URL` + `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, or
+  - edit the public values in `lib/supabase/public-config.ts` before pushing.
+- These are public client values; never put a service-role key there.
+- Run `supabase/migrations/010_vlacora_hub_core.sql` once in the Supabase SQL Editor. It creates profiles, the shared Rotation station registry and shared programming tables with authenticated-team RLS policies.
+
+### Playout One
+- Playout One remains a separate station mapping per HUB station for actual on-air state (now/next, engine/player/stream status).
+- No guessed Playout endpoints are added. Configure the exact public endpoints from the actual Playout One build when confirmed.
