@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { MusicSong } from "@/components/modules/music-library-module";
 import { shows, stations } from "@/lib/mock-data";
+import { pathFor,radioRead,readIntegration,readMappings,readStationCache,saveMappings,type RadioMappingStore,type RadioStation } from "@/lib/radio/client-config";
 
 type EditorialType = "music" | "talk" | "imaging" | "promo" | "weather" | "traffic" | "news" | "commercial";
 type EditorialItem = {
@@ -38,32 +39,8 @@ type TemplateLink = {
   program: string;
   templateId: string;
 };
-type IntegrationState = {
-  mode: "demo" | "api";
-  rotationStationId: string;
-  playoutStationId: string;
-  rotationStationName: string;
-  playoutStationName: string;
-  lastPull: string;
-  lastPush: string;
-  lastStatus: string;
-  playlistVersion: number;
-};
 
 const uid = () => Math.random().toString(36).slice(2) + Date.now().toString(36);
-
-const seedPlaylist: EditorialItem[] = [
-  {id:"e1",time:"16:00:00",type:"imaging",title:"TOTH - Versuz Radio",duration:"00:08",presenterText:"",notes:"Station imaging",source:"Rotation One",locked:true},
-  {id:"e2",time:"16:00:08",type:"music",artist:"HUGEL",title:"Movin' To The Sun",duration:"02:57",presenterText:"Nieuwe muziek van HUGEL. Dit is Movin' To The Sun.",notes:"A-rotatie",source:"Rotation One",musicId:"ms3"},
-  {id:"e3",time:"16:03:05",type:"talk",title:"Presenter break",duration:"00:35",presenterText:"Straks hoor je de nieuwe Bebe Rexha. Eerst even dit...",notes:"Vrije break",source:"VLACORA"},
-  {id:"e4",time:"16:03:40",type:"music",artist:"Bebe Rexha",title:"New Religion",duration:"03:01",presenterText:"Bebe Rexha met New Religion. Een van de nieuwe platen deze week.",notes:"B-rotatie",source:"Rotation One",musicId:"ms5"},
-  {id:"e5",time:"16:06:41",type:"promo",title:"Weekend promo",duration:"00:20",presenterText:"Dit weekend hoor je onze nieuwe weekendprogrammering.",notes:"Promo",source:"VLACORA"},
-  {id:"e6",time:"16:07:01",type:"commercial",title:"Commercial block",duration:"02:30",presenterText:"",notes:"Traffic block",source:"Rotation One",locked:true},
-  {id:"e7",time:"16:09:31",type:"music",artist:"Topic & Becky G",title:"Sorry Papi",duration:"02:49",presenterText:"Topic en Becky G samen op Sorry Papi.",notes:"B-rotatie",source:"Rotation One",musicId:"ms4"},
-  {id:"e8",time:"16:12:20",type:"weather",title:"Weer",duration:"00:25",presenterText:"Vandaag zacht en wisselend bewolkt. Later meer opklaringen.",notes:"Update voor uitzending",source:"VLACORA"},
-  {id:"e9",time:"16:12:45",type:"music",artist:"Joel Corry",title:"Whisper",duration:"03:05",presenterText:"Joel Corry is deze week onze Tune of the Week. Dit is Whisper.",notes:"Tune of the Week",source:"Rotation One",musicId:"ms1"},
-  {id:"e10",time:"16:15:50",type:"news",title:"Nieuws 16:00",duration:"02:00",presenterText:"",notes:"Extern nieuwsitem",source:"Playout One",locked:true}
-];
 
 const seedTemplates: ProgramTemplate[] = [
   {
@@ -136,17 +113,21 @@ export default function EditorialModule({stationSlug}:{stationSlug:string}) {
   const [date,setDate] = useState("2026-09-01");
   const [hour,setHour] = useState("16:00");
   const [program,setProgram] = useState("Drive");
-  const [playlist,setPlaylist] = useStored<EditorialItem[]>(`vlacora:${station.slug}:editorial:playlist:${date}:${hour}`,seedPlaylist);
+  const [playlist,setPlaylist] = useStored<EditorialItem[]>(`vlacora:${station.slug}:editorial:playlist:${date}:${hour}`,[]);
   const [templates,setTemplates] = useStored<ProgramTemplate[]>(`vlacora:${station.slug}:editorial:templates`,seedTemplates);
   const [links,setLinks] = useStored<TemplateLink[]>(`vlacora:${station.slug}:editorial:links`,seedLinks);
   const [music,setMusic] = useStored<MusicSong[]>(`vlacora:${station.slug}:music:catalog`,musicSeed);
-  const [selectedId,setSelectedId] = useState(seedPlaylist[1].id);
+  const [selectedId,setSelectedId] = useState("");
   const [notice,setNotice] = useState("");
-  const [integration,setIntegration] = useStored<IntegrationState>(`vlacora:${station.slug}:editorial:integration`,{
-    mode:"demo",rotationStationId:"rotation-versuz",playoutStationId:"playout-versuz",
-    rotationStationName:"Versuz Radio",playoutStationName:"Versuz Radio",
-    lastPull:"nog niet",lastPush:"nog niet",lastStatus:"Nog niet getest",playlistVersion:24
-  });
+  const [mappings,setMappingsState] = useState<RadioMappingStore>({});
+  const [rotationStations,setRotationStations] = useState<RadioStation[]>([]);
+  const [playoutStations,setPlayoutStations] = useState<RadioStation[]>([]);
+  const [lastPull,setLastPull] = useState("nog niet");
+  const [lastStatus,setLastStatus] = useState("Nog niet getest");
+  const [playlistVersion,setPlaylistVersion] = useState<string>("—");
+  useEffect(()=>{setMappingsState(readMappings());setRotationStations(readStationCache("rotation"));setPlayoutStations(readStationCache("playout"))},[]);
+  const mapping=mappings[station.slug]||{rotationId:"",rotationName:"",playoutId:"",playoutName:""};
+  function setMapping(patch:Partial<typeof mapping>){const next={...mappings,[station.slug]:{...mapping,...patch}};setMappingsState(next);saveMappings(next)}
 
   const selected = playlist.find(i=>i.id===selectedId) || playlist[0];
   const linkedTemplate = templates.find(t=>t.id===links.find(l=>l.program===program)?.templateId);
@@ -177,42 +158,29 @@ export default function EditorialModule({stationSlug}:{stationSlug:string}) {
     }));
     setPlaylist([...playlist,...items]);flash(`${items.length} sjabloonitems toegevoegd`);
   }
-  async function pullRotation(){
-    if(integration.mode==="demo"){setIntegration({...integration,lastPull:new Date().toLocaleTimeString("nl-BE"),playlistVersion:integration.playlistVersion+1,lastStatus:"Demo pull geslaagd"});flash("Demo: Rotation One playlist vernieuwd");return}
-    try{
-      const q=new URLSearchParams({stationId:integration.rotationStationId,date,hour});
-      const res=await fetch(`/api/radio/rotation/playlist?${q.toString()}`);
-      if(!res.ok)throw new Error(await res.text());
-      const data=await res.json();
-      if(Array.isArray(data.items)) setPlaylist(data.items);
-      setIntegration({...integration,lastPull:new Date().toLocaleTimeString("nl-BE"),playlistVersion:Number(data.version||integration.playlistVersion),lastStatus:"Rotation One verbonden"});
-      flash("Playlist uit Rotation One geladen");
-    }catch(e){setIntegration({...integration,lastStatus:"Rotation One fout"});flash("Rotation One kon niet worden bereikt");}
-  }
-  async function pushRotation(){
-    if(integration.mode==="demo"){setIntegration({...integration,lastPush:new Date().toLocaleTimeString("nl-BE"),playlistVersion:integration.playlistVersion+1,lastStatus:"Demo push geslaagd"});flash("Demo: wijzigingen naar Rotation One verzonden");return}
-    try{
-      const res=await fetch("/api/radio/rotation/playlist",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({stationId:integration.rotationStationId,date,hour,items:playlist})});
-      if(!res.ok)throw new Error(await res.text());
-      const data=await res.json();
-      setIntegration({...integration,lastPush:new Date().toLocaleTimeString("nl-BE"),playlistVersion:Number(data.version||integration.playlistVersion+1),lastStatus:"Wijzigingen verzonden"});
-      flash("Rotation One bijgewerkt");
-    }catch(e){setIntegration({...integration,lastStatus:"Push mislukt"});flash("Wijzigingen konden niet naar Rotation One");}
-  }
-  async function testConnections(){
-    if(integration.mode==="demo"){setIntegration({...integration,lastStatus:"Demo: Rotation One + Playout One online"});flash("Demo verbindingen zijn online");return}
-    try{
-      const res=await fetch(`/api/radio/status?rotationStationId=${encodeURIComponent(integration.rotationStationId)}&playoutStationId=${encodeURIComponent(integration.playoutStationId)}`);
-      const data=await res.json();
-      setIntegration({...integration,lastStatus:`Rotation ${data.rotation?.online?"online":"offline"} • Playout ${data.playout?.online?"online":"offline"}`});
-      flash("Verbindingsstatus vernieuwd");
-    }catch{setIntegration({...integration,lastStatus:"Statuscontrole mislukt"});flash("Statuscontrole mislukt");}
-  }
+
+async function pullRotation(){
+  const cfg=readIntegration("rotation");if(!cfg?.host)return flash("Stel Rotation One eerst in via Beheer → Integraties.");
+  if(!mapping.rotationId)return flash("Koppel eerst dit VLACORA-station aan een echt Rotation One-station.");
+  try{
+    const start=new Date(`${date}T${hour}:00`);const end=new Date(start.getTime()+60*60*1000);
+    let path=pathFor(cfg.playlistPath||"/api/v1/stations/{stationId}/schedule",mapping.rotationId);
+    const q=new URLSearchParams({from:start.toISOString(),to:end.toISOString()});path+=`${path.includes("?")?"&":"?"}${q.toString()}`;
+    const data=await radioRead("rotation",path,"playlist");
+    const previous=new Map<string,EditorialItem>(playlist.map(i=>[i.id,i]));
+    const incoming:EditorialItem[]=(data.items||[]).map((i:any)=>({...i,presenterText:previous.get(i.id)?.presenterText||i.presenterText||"",notes:previous.get(i.id)?.notes||i.notes||""}));
+    setPlaylist(incoming);setSelectedId(incoming[0]?.id||"");setLastPull(new Date().toLocaleTimeString("nl-BE"));setPlaylistVersion(String(data.version||"—"));setLastStatus(`Rotation One: ${incoming.length} items geladen`);flash(`${incoming.length} echte Rotation One-items geladen`);
+  }catch(e){setLastStatus(e instanceof Error?e.message:"Rotation One fout");flash(e instanceof Error?e.message:"Rotation One kon niet worden bereikt")}
+}
+async function pushRotation(){flash("Schrijven naar Rotation One staat bewust nog uit. Eerst lezen en mapping volledig valideren.")}
+async function testConnections(){
+  try{const rc=readIntegration("rotation"),pc=readIntegration("playout");const parts:string[]=[];if(rc?.host){await radioRead("rotation",rc.statusPath,"raw");parts.push("Rotation online")}else parts.push("Rotation niet ingesteld");if(pc?.host){await radioRead("playout",pc.statusPath,"raw");parts.push("Playout online")}else parts.push("Playout niet ingesteld");setLastStatus(parts.join(" • "));flash(parts.join(" • "))}catch(e){setLastStatus(e instanceof Error?e.message:"Statuscontrole mislukt");flash(e instanceof Error?e.message:"Statuscontrole mislukt")}
+}
 
   return <div>
     <div className="page-intro">
       <div><h2>Redactie & uitzending</h2><p>Bewerk de Rotation One-playlist, schrijf teksten bij ieder item en koppel redactiesjablonen aan programma&apos;s.</p></div>
-      <div className="button-row"><button className="ghost" onClick={pullRotation}>↻ Playlist ophalen</button><button className="primary" onClick={pushRotation}>Wijzigingen publiceren</button></div>
+      <div className="button-row"><button className="primary" onClick={pullRotation}>↻ Echte playlist ophalen</button><button className="ghost" onClick={pushRotation}>Publiceren (nog uit)</button></div>
     </div>
 
     <div className="editorial-tabs">
@@ -233,8 +201,9 @@ export default function EditorialModule({stationSlug}:{stationSlug:string}) {
 
       <div className="editorial-layout">
         <div className="card editorial-playlist">
-          <div className="playlist-editor-head"><div><span className="eyebrow">PLAYLIST</span><h3>{station.name} • {date} • {hour}</h3></div><span className="version-badge">v{integration.playlistVersion}</span></div>
+          <div className="playlist-editor-head"><div><span className="eyebrow">PLAYLIST</span><h3>{station.name} • {date} • {hour}</h3></div><span className="version-badge">rev {playlistVersion}</span></div>
           <div className="editorial-columns"><span></span><span>Tijd</span><span>Item</span><span>Bron</span><span></span></div>
+          {playlist.length===0&&<div className="empty-live-state"><strong>Nog geen playlist geladen</strong><span>Koppel een Rotation One-station en klik op “Echte playlist ophalen”. Er wordt geen demo-playlist meer getoond.</span></div>}
           {playlist.map((item,index)=><button key={item.id} className={`editorial-row ${selected?.id===item.id?"selected":""} type-${item.type}`} onClick={()=>setSelectedId(item.id)}>
             <span className="drag-mark">{item.locked?"🔒":"⋮⋮"}</span><span>{item.time}</span>
             <div><strong>{item.artist?`${item.artist} — ${item.title}`:item.title}</strong><small>{item.type} • {item.duration}{item.presenterText?" • tekst aanwezig":""}</small></div>
@@ -295,18 +264,14 @@ export default function EditorialModule({stationSlug}:{stationSlug:string}) {
       <div className="card">
         <h3>Architectuur</h3>
         <div className="architecture-flow"><span>VLACORA browser</span><b>→</b><span>Vercel API proxy</span><b>→</b><span>Vast openbaar IP</span><b>→</b><span>Rotation One / Playout One</span></div>
-        <p className="muted">Ook met een openbaar vast IP laat VLACORA de browser niet rechtstreeks met je radio-API praten. De Vercel server-route bewaart secrets aan de serverkant en voorkomt CORS- en beveiligingsproblemen.</p>
+        <p className="muted">Ook met een openbaar vast IP laat VLACORA de browser niet rechtstreeks met je radio-API praten. De browser stuurt de tijdelijke sessiesleutel via HTTPS naar de Vercel Node-proxy. De key wordt niet permanent in localStorage of GitHub opgeslagen.</p>
       </div>
       <div className="card">
         <div className="module-title-row"><div><h3>Station mapping</h3><small>VLACORA herkent welk station bij welke API-station-ID hoort.</small></div></div>
-        <label className="field">Modus<select className="select" value={integration.mode} onChange={e=>setIntegration({...integration,mode:e.target.value as "demo"|"api"})}><option value="demo">Demo</option><option value="api">Echte API via Vercel proxy</option></select></label>
         <label className="field">VLACORA station<input className="input" value={station.name} disabled/></label>
-        <div className="two-form-cols">
-          <label className="field">Rotation One Station ID<input className="input" value={integration.rotationStationId} onChange={e=>setIntegration({...integration,rotationStationId:e.target.value})}/></label>
-          <label className="field">Rotation One naam<input className="input" value={integration.rotationStationName} onChange={e=>setIntegration({...integration,rotationStationName:e.target.value})}/></label>
-          <label className="field">Playout One Station ID<input className="input" value={integration.playoutStationId} onChange={e=>setIntegration({...integration,playoutStationId:e.target.value})}/></label>
-          <label className="field">Playout One naam<input className="input" value={integration.playoutStationName} onChange={e=>setIntegration({...integration,playoutStationName:e.target.value})}/></label>
-        </div>
+        <label className="field">Rotation One station<select className="select" value={mapping.rotationId} onChange={e=>{const x=rotationStations.find(s=>s.id===e.target.value);setMapping({rotationId:e.target.value,rotationName:x?.name||""})}}><option value="">Niet gekoppeld</option>{rotationStations.map(s=><option key={s.id} value={s.id}>{s.name} • {s.id}</option>)}</select></label>
+        <label className="field">Playout One station<select className="select" value={mapping.playoutId} onChange={e=>{const x=playoutStations.find(s=>s.id===e.target.value);setMapping({playoutId:e.target.value,playoutName:x?.name||""})}}><option value="">Niet gekoppeld</option>{playoutStations.map(s=><option key={s.id} value={s.id}>{s.name} • {s.id}</option>)}</select></label>
+        {rotationStations.length===0&&<p className="muted">Geen Rotation One-stations in cache. Ga naar Beheer → Integraties → Rotation One → Stations ophalen.</p>}
         <button className="primary" onClick={testConnections}>Test verbindingen</button>
       </div>
       <div className="card">
@@ -317,10 +282,9 @@ export default function EditorialModule({stationSlug}:{stationSlug:string}) {
       </div>
       <div className="card">
         <h3>Status</h3>
-        <div className="integration-status"><span>Laatste status</span><strong>{integration.lastStatus}</strong></div>
-        <div className="integration-status"><span>Rotation pull</span><strong>{integration.lastPull}</strong></div>
-        <div className="integration-status"><span>Rotation push</span><strong>{integration.lastPush}</strong></div>
-        <div className="integration-status"><span>Playlistversie</span><strong>{integration.playlistVersion}</strong></div>
+        <div className="integration-status"><span>Laatste status</span><strong>{lastStatus}</strong></div>
+        <div className="integration-status"><span>Rotation pull</span><strong>{lastPull}</strong></div>
+        <div className="integration-status"><span>Schedule revision</span><strong>{playlistVersion}</strong></div>
       </div>
     </div>}
   </div>

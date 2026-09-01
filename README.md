@@ -271,3 +271,14 @@ This is intentionally a safe testing bridge. Persistent shared secrets and real 
 - Adds a raw TCP connection test before HTTP fetch.
 - Shows TCP timeout/refused vs HTTP/auth/API errors separately.
 - Shows target URL, phase, TCP duration, error code, Node version and Vercel region.
+
+
+## 0.9.0 — Live Radio Data
+- Radio API module no longer has demo mode or fake stations/now-playing.
+- Rotation One station discovery is cached from the real `/api/v1/stations` response.
+- Redactie starts with an empty playlist and loads the real Rotation One schedule for the selected hour.
+- Rotation schedule defaults now match the verified API: `/api/v1/health`, `/api/v1/stations`, `/api/v1/stations/{stationId}/schedule`, coverage and revision.
+- Real station mapping is shared between Radio API and Redactie.
+- Generic read-only Vercel Node proxy added for real configured endpoints.
+- Playout One is prepared for the same flow, but its exact public Hub/API endpoints must be confirmed per build. No fake Playout data is shown.
+- Remote writes remain disabled until the read path and production authentication are fully validated.

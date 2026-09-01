@@ -138,3 +138,5 @@ hr{border:0;border-top:1px solid var(--border);margin:22px 0}
 
 /* VLACORA 0.8.1 - Vercel Node radio diagnostics */
 .connection-diagnostic{margin-top:14px;border:1px solid #d4d8e7;background:#f7f8fc;border-radius:13px;padding:13px}.connection-diagnostic h3{margin:0}.diagnostic-grid{display:grid;grid-template-columns:110px 1fr;gap:7px 10px;margin-top:10px}.diagnostic-grid span{font-size:10px;text-transform:uppercase;color:var(--muted)}.diagnostic-grid strong{font-size:11px;word-break:break-all}.diagnostic-error-text{display:block;margin-top:10px;padding:9px 10px;border-radius:9px;background:#fff0f1;color:#9c293c;font-size:10px;white-space:pre-wrap;word-break:break-word}
+
+.empty-live-state{padding:28px 18px;text-align:center;display:flex;flex-direction:column;gap:6px;color:var(--muted);border:1px dashed var(--border);border-radius:12px;margin:10px}.empty-live-state strong{color:var(--text)}

@@ -208,7 +208,7 @@ export default function HubApp({ stationSlug, moduleSlug }: Props) {
             <select className="select" value={station.slug} onChange={(e) => router.push(`/hub/${e.target.value}/${moduleSlug}`)}>
               {stations.map((s) => <option key={s.slug} value={s.slug}>{s.name}</option>)}
             </select>
-            <button className="icon-button" onClick={()=>notify("3 demo-notificaties: playlist, meeting en stream")}>🔔<span className="ping">3</span></button>
+            <button className="icon-button" onClick={()=>notify("Open meldingen en updates")}>🔔<span className="ping">3</span></button>
             <div className="live-pill"><span /> LIVE</div>
           </div>
         </header>
@@ -222,7 +222,7 @@ export default function HubApp({ stationSlug, moduleSlug }: Props) {
             <div className="metric-grid">
               <Card><span className="metric-label">Luisteraars nu</span><strong className="metric">184</strong><span className="positive">+12% vs. gisteren</span></Card>
               <Card><span className="metric-label">Playlistdekking</span><strong className="metric">8 sep</strong><span className="muted">7 dagen vooruit</span></Card>
-              <Card><span className="metric-label">Open taken</span><strong className="metric">{tasks.filter(t=>t.status!=="Klaar").length}</strong><span className="warning">live uit demo-data</span></Card>
+              <Card><span className="metric-label">Open taken</span><strong className="metric">{tasks.filter(t=>t.status!=="Klaar").length}</strong><span className="muted">VLACORA werkdata</span></Card>
               <Card><span className="metric-label">Nieuwe muziek</span><strong className="metric">{allTracks.length}</strong><span className="muted">te beoordelen</span></Card>
             </div>
             <div className="two-col">
@@ -232,8 +232,9 @@ export default function HubApp({ stationSlug, moduleSlug }: Props) {
                   <div className="attention blue"><span>♫</span><div><strong>{allTracks.length} tracks in muziekinbox</strong><small>Muziekmeeting morgen 10:00</small></div></div>
                 </div>
               </Card>
-              <Card><div className="section-head"><div><h3>Systeemstatus</h3><p>Demo realtime overzicht</p></div><Badge tone="green">Gezond</Badge></div>
-                <div className="status-grid">{["Rotation One","Playout One","SHOUTcast","Nieuws","Reclame","VLACORA Agent"].map((x,i)=><button className="status-row status-button" key={x} onClick={()=>notify(`${x}: demo-status geopend`)}><span className={`status-light ${i===4?"orange-light":""}`}/><strong>{x}</strong><span>{i===4?"Controle":"Online"}</span></button>)}</div>
+              <Card><div className="section-head"><div><h3>Systeemstatus</h3><p>Radio-status komt uitsluitend uit de echte API-koppelingen.</p></div><Badge tone="blue">LIVE API</Badge></div>
+                <div className="attention-list"><div className="attention blue"><span>↻</span><div><strong>Rotation One / Playout One</strong><small>Open Radio API voor live health, stationmapping en now/next.</small></div></div></div>
+                <button className="primary wide" onClick={()=>router.push(`/hub/${station.slug}/radio-api`)}>Open live Radio API →</button>
               </Card>
             </div>
             <Card><div className="section-head"><div><h3>Uitzendschema</h3><p>Vandaag • {station.name}</p></div><button className="ghost" onClick={()=>router.push(`/hub/${station.slug}/programmering`)}>Volledig schema →</button></div>
@@ -241,7 +242,7 @@ export default function HubApp({ stationSlug, moduleSlug }: Props) {
             </Card>
           </>}
 
-          {moduleSlug === "stations" && <div className="station-grid">{stations.filter(s=>s.slug!=="all").map((s,idx)=><Card key={s.slug} className="station-card"><div className="station-card-head"><div className="station-logo" style={{background:s.accent}}>{s.short}</div><div><h3>{s.name}</h3><span className="positive">● ONLINE</span></div></div><div className="station-stat"><span>Now playing</span><strong>{idx===0?"HUGEL – Movin' To The Sun":idx===1?"Calvin Harris – Satisfy":"Joel Corry – Whisper"}</strong></div><div className="station-kpis"><span><b>{184-idx*47}</b> luisteraars</span><span><b>{idx===2?"6 sep":"8 sep"}</b> playlists</span></div><Link className="primary wide" href={`/hub/${s.slug}/dashboard`}>Open station</Link></Card>)}</div>}
+          {moduleSlug === "stations" && <div className="station-grid">{stations.filter(s=>s.slug!=="all").map(s=><Card key={s.slug} className="station-card"><div className="station-card-head"><div className="station-logo" style={{background:s.accent}}>{s.short}</div><div><h3>{s.name}</h3><span className="muted">Live status via API</span></div></div><div className="station-stat"><span>Radio-data</span><strong>Geen fallback/demo</strong></div><Link className="primary wide" href={`/hub/${s.slug}/radio-api`}>Open live status</Link></Card>)}</div>}
 
           {moduleSlug === "taken" && <>
             <div className="toolbar"><input className="input grow" placeholder="Nieuwe taak..." value={taskDraft} onChange={e=>setTaskDraft(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addTaskQuick()}/><button className="primary" onClick={addTaskQuick}>+ Snel toevoegen</button><button className="ghost" onClick={()=>setModal("task")}>Uitgebreid</button></div>
@@ -251,7 +252,7 @@ export default function HubApp({ stationSlug, moduleSlug }: Props) {
           </>}
 
           {moduleSlug === "meldpunt" && <>
-            <div className="page-intro"><div><h2>Waar gaat je melding over?</h2><p>Klik een categorie om meteen een echte demo-melding te registreren.</p></div><button className="primary" onClick={()=>{setIncidentCategory("Technisch");setModal("incident")}}>+ Nieuwe melding</button></div>
+            <div className="page-intro"><div><h2>Waar gaat je melding over?</h2><p>Klik een categorie om meteen een nieuwe melding te registreren.</p></div><button className="primary" onClick={()=>{setIncidentCategory("Technisch");setModal("incident")}}>+ Nieuwe melding</button></div>
             <div className="report-grid">{["Programmering","Muziek","Technisch","Vormgeving","Facilities","Afwezigheid","Website / socials","Nieuws","Reclame","Rotation One","Tip redactie","Ander"].map((x,i)=><button className="report-card" key={x} onClick={()=>{setIncidentCategory(x);setModal("incident")}}><span>{["◫","♫","⚙","✦","⌂","♙","◎","▣","▤","⌁","☆","?"][i]}</span><strong>{x}</strong></button>)}</div>
             <div className="two-col"><Card><h3>Open meldingen</h3>{incidents.filter(i=>i.status==="Open").map(i=><div className="incident" key={i.id}><Badge tone={i.severity==="Hoog"?"red":"orange"}>{i.severity}</Badge><strong>{i.title}</strong><span>{i.category}</span><button className="ghost" onClick={()=>setIncidents(incidents.map(x=>x.id===i.id?{...x,status:"Opgelost"}:x))}>Oplossen</button></div>)}{!incidents.some(i=>i.status==="Open")&&<p className="positive">Geen open meldingen.</p>}</Card>
               <Card><h3>Afgehandeld</h3>{incidents.filter(i=>i.status!=="Open").map(i=><div className="incident" key={i.id}><Badge tone="green">Opgelost</Badge><strong>{i.title}</strong><button className="ghost" onClick={()=>setIncidents(incidents.map(x=>x.id===i.id?{...x,status:"Open"}:x))}>Heropen</button></div>)}</Card></div>
@@ -274,7 +275,7 @@ export default function HubApp({ stationSlug, moduleSlug }: Props) {
 
           {moduleSlug === "programmering" && <>
             <div className="day-tabs">{["Ma 31","Di 1","Wo 2","Do 3","Vr 4","Za 5","Zo 6"].map((d,i)=><button className={i===0?"active":""} key={d} onClick={()=>notify(`Schema ${d} geselecteerd`)}>{d}</button>)}<button onClick={()=>notify("Schema-editor wordt later gekoppeld aan echte programmadatabase")}>+ Programma</button></div>
-            <div className="schedule-list">{shows.map(show=><Card className={`schedule-item ${show.live?"live-item":""}`} key={show.time}><div className="time-line"><strong>{show.time}</strong><span/></div><div className="show-avatar large">{show.host.split(" ").map(x=>x[0]).slice(0,2).join("")}</div><div className="schedule-info"><h3>{show.name} {show.live&&<Badge tone="red">ON AIR</Badge>}</h3><p>{show.host}</p></div><span className="muted">{show.time} – {show.end}</span><button className="ghost" onClick={()=>notify(`${show.name}: editor geopend (demo)`) }>Bewerk</button></Card>)}</div>
+            <div className="schedule-list">{shows.map(show=><Card className={`schedule-item ${show.live?"live-item":""}`} key={show.time}><div className="time-line"><strong>{show.time}</strong><span/></div><div className="show-avatar large">{show.host.split(" ").map(x=>x[0]).slice(0,2).join("")}</div><div className="schedule-info"><h3>{show.name} {show.live&&<Badge tone="red">ON AIR</Badge>}</h3><p>{show.host}</p></div><span className="muted">{show.time} – {show.end}</span><button className="ghost" onClick={()=>notify(`${show.name}: editor geopend`) }>Bewerk</button></Card>)}</div>
           </>}
 
           {moduleSlug === "muziek" && <MusicLibraryModule stationSlug={station.slug} />}
@@ -283,11 +284,7 @@ export default function HubApp({ stationSlug, moduleSlug }: Props) {
             <Card className="meeting-main"><div className="section-head"><div><span className="eyebrow">{String(meetingIndex).padStart(2,"0")} / 18</span><h2>ANOTR & 54 Ultra – Talk To You</h2></div><button className="primary soft" onClick={()=>notify("Preview gestart (demo)")}>▶ Beluister</button></div><div className="score-big">8,2<small>/10 teamgemiddelde</small></div><div className="decision-grid">{["A-hit","B-hit","C-hit","Testen","Later","Afwijzen"].map((x,i)=><button className={`decision d${i} ${meetingDecision===x?"selected-decision":""}`} onClick={()=>setMeetingDecision(x)} key={x}>{x}</button>)}</div><label className="field">Notitie<textarea className="input textarea" defaultValue="Sterke opener, goede daytime fit. Testen op A-rotatie vanaf maandag."/></label><button className="primary" onClick={()=>{if(!meetingDecision){notify("Kies eerst een beslissing");return;}setMeetingIndex(Math.min(18,meetingIndex+1));notify(`${meetingDecision} opgeslagen • volgende track`)}}>Beslissing opslaan & volgende →</button></Card>
           </div>}
 
-          {moduleSlug === "playlists" && <>
-            <div className="page-intro"><div><h2>Rotation One playlists</h2><p>Interactieve browserdemo: wijzigingen blijven na refresh bewaard.</p></div><div className="button-row"><button className="ghost" onClick={()=>notify("Synchronisatie met Rotation One gesimuleerd")}>↻ Synchroniseer</button><button className="primary" onClick={()=>notify("Playlist lokaal opgeslagen")}>Opslaan</button></div></div>
-            <div className="playlist-layout"><Card className="playlist-timeline"><div className="playlist-head"><div><h3>Dinsdag 1 september • 16:00</h3><span className="positive">● Demo lokaal</span></div><Badge tone="green">Versie 20</Badge></div>{playlist.map((item,i)=><div className={`playlist-item ${item.includes("Commercial")||item.includes("News")?"special":""}`} key={`${item}-${i}`}><span className="drag">⋮⋮</span><span className="playlist-time">{`16:${String(i*4).padStart(2,"0")}`}</span><button className="playlist-edit-text" onClick={()=>editPlaylistItem(i)}><strong>{item}</strong><small>Klik om tekst te wijzigen</small></button><div className="item-actions"><button onClick={()=>movePlaylist(i,-1)} className="mini-btn">↑</button><button onClick={()=>movePlaylist(i,1)} className="mini-btn">↓</button><button onClick={()=>{setPlaylist(playlist.filter((_,x)=>x!==i));notify("Item verwijderd")}} className="mini-btn danger">×</button></div></div>)}</Card>
-              <Card className="inspector"><h3>Playlist inspector</h3><p className="muted">Items kun je nu wijzigen, verplaatsen en verwijderen.</p><div className="inspector-box"><span>Rotation One</span><strong>nog niet gekoppeld</strong><Badge tone="orange">DEMO</Badge></div><button className="primary wide" onClick={()=>setModal("playlist")}>+ Item toevoegen</button><button className="ghost wide spaced" onClick={()=>{setPlaylist(initialPlaylist);notify("Demo-playlist hersteld")}}>Reset demo</button></Card></div>
-          </>}
+          {moduleSlug === "playlists" && <EditorialModule stationSlug={station.slug} /> }
 
           {moduleSlug === "redactie" && <EditorialModule stationSlug={station.slug} />}
 

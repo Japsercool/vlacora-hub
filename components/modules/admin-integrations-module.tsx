@@ -14,6 +14,8 @@ type PublicConfig = {
   stationPath: string;
   statusPath: string;
   playlistPath?: string;
+  coveragePath?: string;
+  revisionPath?: string;
   nowPath?: string;
   readOnly: boolean;
   lastOk?: string;
@@ -25,13 +27,13 @@ type Store = Record<IntegrationKind,PublicConfig>;
 const seed:Store = {
   rotation:{
     enabled:false, protocol:"http", host:"", port:"5090", basePath:"",
-    stationPath:"/api/v1/stations", statusPath:"/api/v1/status",
-    playlistPath:"/api/v1/stations/{stationId}/playlists", readOnly:true
+    stationPath:"/api/v1/stations", statusPath:"/api/v1/health",
+    playlistPath:"/api/v1/stations/{stationId}/schedule", coveragePath:"/api/v1/stations/{stationId}/schedule/coverage", revisionPath:"/api/v1/stations/{stationId}/schedule/revision", readOnly:true
   },
   playout:{
     enabled:false, protocol:"http", host:"", port:"5190", basePath:"",
-    stationPath:"/api/v1/stations", statusPath:"/api/v1/status",
-    nowPath:"/api/v1/stations/{stationId}/nowplaying", readOnly:true
+    stationPath:"/api/stations", statusPath:"/health",
+    nowPath:"", readOnly:true
   },
   shoutcast:{
     enabled:false, protocol:"http", host:"", port:"8000", basePath:"",
@@ -111,6 +113,14 @@ export default function AdminIntegrationsModule({stationName}:{stationName:strin
         const code=data?.tcp?.error?.code||data?.fetchError?.code||data?.fetchError?.cause?.code||"";
         const phase=data?.phase||"verbinding";
         throw new Error(`${phase}${code?` • ${code}`:""}: ${data?.message||data?.error||"verbinding mislukt"}`);
+      }
+
+      if(action==="stations"){
+        const read=await fetch("/api/radio/manual/read",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({kind,action:"stations",path:c.stationPath,config:c,apiKey:secret,apiKeyHeader:header,apiKeyPrefix:prefix})});
+        const list=await read.json();
+        if(!read.ok)throw new Error(list.error||"Stations ophalen mislukt");
+        localStorage.setItem(`vlacora:integration:stations:${kind}:v9`,JSON.stringify(list.stations||[]));
+        flash(`${(list.stations||[]).length} echte station(s) opgehaald`);
       }
 
       update(kind,{lastOk:new Date().toLocaleString("nl-BE"),lastError:"",enabled:true});
@@ -203,11 +213,15 @@ export default function AdminIntegrationsModule({stationName}:{stationName:strin
         </div>
 
         <div className="settings-section">
-          <h4>Endpoints</h4>
+          <h4>Endpoints</h4>{selected==="playout"&&<div className="http-warning"><strong>Playout One Hub</strong><span>Gebruik bij voorkeur de centrale Hub/API. De standaardpaden kunnen per Playout One-build verschillen; test Status en Stations eerst voordat je Now Playing invult.</span></div>}
           <label className="field">Status endpoint<input className="input" value={cfg.statusPath} onChange={e=>update(selected,{statusPath:e.target.value})}/></label>
           <label className="field">Stations endpoint<input className="input" value={cfg.stationPath} onChange={e=>update(selected,{stationPath:e.target.value})}/></label>
-          {selected==="rotation"&&<label className="field">Playlist endpoint<input className="input" value={cfg.playlistPath||""} onChange={e=>update(selected,{playlistPath:e.target.value})}/></label>}
-          {selected==="playout"&&<label className="field">Now-playing endpoint<input className="input" value={cfg.nowPath||""} onChange={e=>update(selected,{nowPath:e.target.value})}/></label>}
+          {selected==="rotation"&&<>
+            <label className="field">Schedule endpoint<input className="input" value={cfg.playlistPath||""} onChange={e=>update(selected,{playlistPath:e.target.value})}/></label>
+            <label className="field">Coverage endpoint<input className="input" value={cfg.coveragePath||""} onChange={e=>update(selected,{coveragePath:e.target.value})}/></label>
+            <label className="field">Revision endpoint<input className="input" value={cfg.revisionPath||""} onChange={e=>update(selected,{revisionPath:e.target.value})}/></label>
+          </>}
+          {selected==="playout"&&<label className="field">Now-playing/snapshot endpoint<input className="input" value={cfg.nowPath||""} onChange={e=>update(selected,{nowPath:e.target.value})} placeholder="Vul in zodra Playout One endpoint bevestigd is"/></label>}
         </div>
 
         <div className="settings-section">
