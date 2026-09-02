@@ -10,7 +10,7 @@ import {
 import {
   loadSharedIntegrationStore,loadSharedSetting,saveSharedIntegrationStore,saveSharedSetting
 } from "@/lib/supabase/settings";
-import { deletePersistedIntegrationSecret,hydrateIntegrationSecret,migrateSessionSecretToVault,savePersistedIntegrationSecret } from "@/lib/supabase/secrets";
+import { deletePersistedIntegrationSecret,hydrateIntegrationSecret,migrateSessionSecretToVault,normalizeIntegrationSecret,savePersistedIntegrationSecret } from "@/lib/supabase/secrets";
 import { readStationAliases,saveStationAlias } from "@/lib/radio/hub-stations";
 
 type StationSettings={timezone:string;active:boolean;playlistWarnings:boolean;newsCheck:boolean;socialReminders:boolean};
@@ -134,9 +134,11 @@ export default function AdminIntegrationsModule({stationName,stationSlug}:{stati
     update("shoutcast",{statusPath:`/stats?sid=${sid}`,stationPath:`/stats?sid=${sid}`});
   }
   function saveSessionSecret(kind:IntegrationKind){
-    if(keyInput)sessionStorage.setItem(sessionKey(kind),keyInput);else sessionStorage.removeItem(sessionKey(kind));
-    sessionStorage.setItem(`${sessionKey(kind)}:header`,keyHeader);
-    sessionStorage.setItem(`${sessionKey(kind)}:prefix`,keyPrefix);
+    const normalized=normalizeIntegrationSecret({apiKey:keyInput,apiKeyHeader:keyHeader,apiKeyPrefix:keyPrefix});
+    if(normalized.apiKey)sessionStorage.setItem(sessionKey(kind),normalized.apiKey);else sessionStorage.removeItem(sessionKey(kind));
+    sessionStorage.setItem(`${sessionKey(kind)}:header`,normalized.apiKeyHeader);
+    sessionStorage.setItem(`${sessionKey(kind)}:prefix`,normalized.apiKeyPrefix);
+    setKeyInput(normalized.apiKey);setKeyHeader(normalized.apiKeyHeader);setKeyPrefix(normalized.apiKeyPrefix);
   }
   async function saveIntegration(){
     if(!selected)return;
@@ -147,7 +149,8 @@ export default function AdminIntegrationsModule({stationName,stationSlug}:{stati
       if(supabaseConfigured){
         await saveSharedIntegrationStore(configs,stationSlug);
         if(selected!=="shoutcast"&&keyInput.trim()){
-          await savePersistedIntegrationSecret(selected,{apiKey:keyInput,apiKeyHeader:keyHeader,apiKeyPrefix:keyPrefix});
+          const normalized=normalizeIntegrationSecret({apiKey:keyInput,apiKeyHeader:keyHeader,apiKeyPrefix:keyPrefix});
+          await savePersistedIntegrationSecret(selected,normalized);
           setSecretState("stored");
           flash("Instellingen én API-sleutel veilig centraal opgeslagen. Ze blijven behouden na updates en browserherstarts.");
         }else if(selected==="shoutcast"){
@@ -286,7 +289,7 @@ export default function AdminIntegrationsModule({stationName,stationSlug}:{stati
           <label className="field">Queue endpoint<input className="input" value={cfg.playoutQueuePath||"/api/v1/integration/stations/{stationId}/queue?limit=20"} onChange={e=>update(selected,{playoutQueuePath:e.target.value})}/></label>
           <label className="field">Revisions endpoint<input className="input" value={cfg.playoutRevisionsPath||"/api/v1/integration/revisions"} onChange={e=>update(selected,{playoutRevisionsPath:e.target.value})}/></label>
           <div className="playout-capability-box"><strong>Nieuwe aparte pagina in het menu: Playout One</strong><div><span>● heartbeat/online</span><span>♫ NOW + voortgang</span><span>→ NEXT</span><span>⚙ engine/machine</span><span>◉ AUTO/LIVE</span><span>⌁ queue</span><span>◌ encoder/bitrate</span><span>◈ DSP/Stereo Tool</span><span>↻ Rotation schedule</span><span>! fouten</span></div><button className="primary soft" type="button" onClick={()=>location.href=`/hub/${stationSlug}/playout`}>Open Playout One →</button></div>
-          <div className="secret-explainer"><strong>Zuinig</strong><span>Status komt uit de heartbeat die Playout One toch al naar Hub :5099 stuurt. De wachtrij wordt alleen geladen wanneer jij ze opent.</span></div>
+          <div className="secret-explainer"><strong>Zuinig</strong><span>Status komt uit de heartbeat die Playout One toch al naar Hub :5099 stuurt. De wachtrij wordt alleen geladen wanneer jij ze opent.</span></div><div className="public-api-note playout-auth-note"><strong>Playout authenticatie</strong><span>VLACORA normaliseert automatisch <code>po1_…</code>, <code>Bearer po1_…</code> en <code>Authorization: Bearer po1_…</code>. Naar Playout One probeert het altijd eerst de officiële <code>Authorization: Bearer</code>-vorm en bij een 401 éénmalig <code>X-Playout-Api-Key</code>.</span></div>
         </>}
       </div>
 

@@ -17,6 +17,27 @@ function safePath(path:string){
   return path;
 }
 
+function normalizeApiKey(value:string){
+  return String(value||"").trim()
+    .replace(/^Authorization\s*:\s*Bearer\s+/i,"")
+    .replace(/^X-Playout-Api-Key\s*:\s*/i,"")
+    .replace(/^Bearer\s+/i,"")
+    .trim();
+}
+function baseHeaders(kind:string){return{Accept:kind==="shoutcast"?"application/xml,text/xml,application/json;q=0.9,*/*;q=0.8":"application/json"} as Record<string,string>}
+function authHeaders(kind:string,apiKey:string,apiKeyHeader:string,apiKeyPrefix:string,mode:"configured"|"bearer"|"x-key"){
+  const headers=baseHeaders(kind);
+  if(!apiKey)return headers;
+  if(kind==="playout"){
+    if(mode==="x-key")headers["X-Playout-Api-Key"]=apiKey;
+    else headers["Authorization"]=`Bearer ${apiKey}`;
+    return headers;
+  }
+  if(!/^[A-Za-z0-9-]{1,64}$/.test(apiKeyHeader))throw new Error("Ongeldige API-key headernaam");
+  headers[apiKeyHeader]=apiKeyPrefix?`${apiKeyPrefix} ${apiKey}`:apiKey;
+  return headers;
+}
+
 export async function POST(request:NextRequest){
   const started=Date.now();let body:any;try{body=await request.json()}catch{return NextResponse.json({error:"Ongeldige aanvraag"},{status:400})}
   const cfg=body.config||{};const kind=String(body.kind||"");const action=String(body.action||"raw");
@@ -28,18 +49,28 @@ export async function POST(request:NextRequest){
   let path:string;try{path=safePath(String(body.path||"/"))}catch(e){return NextResponse.json({error:e instanceof Error?e.message:"Ongeldig endpoint"},{status:400})}
   const basePath=String(cfg.basePath||"").trim();if(basePath&&(!basePath.startsWith("/")||basePath.includes("..")||basePath.includes("://")))return NextResponse.json({error:"Ongeldig basis-pad"},{status:400});
   const target=`${cfg.protocol}://${cfg.host}:${port}${basePath}${path}`;
-  const apiKey=String(body.apiKey||"");const apiKeyHeader=String(body.apiKeyHeader||"Authorization").trim();const apiKeyPrefix=String(body.apiKeyPrefix||"Bearer").trim();
-  const headers:Record<string,string>={Accept:kind==="shoutcast"?"application/xml,text/xml,application/json;q=0.9,*/*;q=0.8":"application/json"};
-  if(apiKey){if(!/^[A-Za-z0-9-]{1,64}$/.test(apiKeyHeader))return NextResponse.json({error:"Ongeldige API-key headernaam"},{status:400});headers[apiKeyHeader]=apiKeyPrefix?`${apiKeyPrefix} ${apiKey}`:apiKey}
+  const apiKey=normalizeApiKey(String(body.apiKey||""));const apiKeyHeader=String(body.apiKeyHeader||"Authorization").trim();const apiKeyPrefix=String(body.apiKeyPrefix||"Bearer").trim();
 
   try{
-    const result=await nativeHttpGet(target,headers,25000);
+    let authMode:"configured"|"bearer"|"x-key"=kind==="playout"?"bearer":"configured";
+    let result=await nativeHttpGet(target,authHeaders(kind,apiKey,apiKeyHeader,apiKeyPrefix,authMode),25000);
+    const authAttempts:string[]=[authMode];
+    if(kind==="playout"&&apiKey&&result.status===401){
+      authMode="x-key";
+      result=await nativeHttpGet(target,authHeaders(kind,apiKey,apiKeyHeader,apiKeyPrefix,authMode),25000);
+      authAttempts.push(authMode);
+    }
     let raw:any=result.text;try{raw=JSON.parse(result.text)}catch{}
     if(result.status<200||result.status>=300){
-      return NextResponse.json({ok:false,error:typeof raw==="object"?(raw?.error||raw?.message||`HTTP ${result.status}`):`HTTP ${result.status}`,status:result.status,target,raw,transport:result.transport},{status:result.status||502});
+      const requiredScope=typeof raw==="object"?String(raw?.requiredScope||""):"";
+      const baseError=typeof raw==="object"?(raw?.error||raw?.message||`HTTP ${result.status}`):`HTTP ${result.status}`;
+      const error=kind==="playout"&&result.status===401&&apiKey
+        ?`De Playout One API-sleutel is in VLACORA geladen, maar Hub :5099 weigert hem${requiredScope?` voor scope ${requiredScope}`:""}. Controleer of dit de actuele po1_-sleutel van deze Hub is, niet ingetrokken/verlopen is en de vereiste read-scopes heeft.`
+        :baseError;
+      return NextResponse.json({ok:false,error,status:result.status,target,raw,requiredScope,authKeyPresent:Boolean(apiKey),authKeyLooksLikePlayout:apiKey.startsWith("po1_"),authAttempts,transport:result.transport},{status:result.status||502});
     }
     const normalized=action==="stations"?{stations:normalizeStations(raw)}:action==="playlist"?normalizePlaylist(raw):action==="now"?normalizeNow(raw):action==="folders"?{folders:normalizeMusicFolders(raw)}:action==="songs"?{songs:normalizeMusicSongs(raw)}:action==="charts"?{charts:normalizeCharts(raw)}:action==="chartEditions"?{editions:normalizeChartEditions(raw)}:action==="chartEdition"?{edition:normalizeChartEdition(raw)}:action==="revision"?{revision:normalizeRevision(raw)}:action==="shoutcast"?{shoutcast:normalizeShoutcastStats(raw)}:{};
-    return NextResponse.json({ok:true,status:result.status,target,raw,...normalized,durationMs:Date.now()-started,httpDurationMs:result.durationMs,transport:result.transport,runtime:runtimeInfo()});
+    return NextResponse.json({ok:true,status:result.status,target,raw,...normalized,durationMs:Date.now()-started,httpDurationMs:result.durationMs,transport:result.transport,runtime:runtimeInfo(),auth:{keyPresent:Boolean(apiKey),playoutKeyFormat:kind==="playout"?apiKey.startsWith("po1_"):undefined,mode:authMode}});
   }catch(e){
     const detail=nativeError(e);const tcp=await tcpProbe(String(cfg.host),port,5000);
     return NextResponse.json({ok:false,error:detail.code==="ETIMEDOUT"?"HTTP timeout":detail.code||detail.message,target,detail,tcp,phase:detail.code==="ETIMEDOUT"?"http-timeout":"http-native",runtime:runtimeInfo()},{status:502});

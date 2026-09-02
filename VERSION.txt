@@ -1,2 +1,2 @@
-VLACORA HUB 0.18.3
-Build fix: Playout One imports loadSharedRadioMapping from lib/supabase/settings, where it is actually exported.
+VLACORA HUB 0.18.4
+Playout One authentication repair: stored keys are normalized, canonical Bearer auth is enforced, X-Playout-Api-Key is retried once on 401, and 401 diagnostics distinguish a loaded-but-rejected key.

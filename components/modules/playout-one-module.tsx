@@ -59,6 +59,7 @@ export default function PlayoutOneModule({stationSlug}:{stationSlug:string}){
   const[error,setError]=useState("");
   const[busy,setBusy]=useState(false);
   const[queueBusy,setQueueBusy]=useState(false);
+  const[authState,setAuthState]=useState<{present:boolean;looksValid:boolean}>({present:false,looksValid:false});
   const revisionRef=useRef("");
 
   function flash(message:string){setNotice(message);window.setTimeout(()=>setNotice(""),3000)}
@@ -78,6 +79,8 @@ export default function PlayoutOneModule({stationSlug}:{stationSlug:string}){
     try{
       await hydrateSharedIntegrationSettings(stationSlug).catch(()=>false);
       if(!readSecret("playout").apiKey)await hydrateIntegrationSecret("playout").catch(()=>null);
+      const loadedSecret=readSecret("playout");
+      setAuthState({present:Boolean(loadedSecret.apiKey),looksValid:loadedSecret.apiKey.trim().replace(/^Bearer\s+/i,"").startsWith("po1_")});
       const id=await resolveMapping();
       if(!id)throw new Error("Dit VLACORA-station is nog niet aan een Playout One station gekoppeld.");
       const cfg=readIntegration("playout");
@@ -132,7 +135,7 @@ export default function PlayoutOneModule({stationSlug}:{stationSlug:string}){
       <div className="button-row"><button className="ghost" onClick={()=>location.href=`/hub/${stationSlug}/radio-api`}>Station mapping</button><button className="primary" disabled={busy} onClick={()=>void loadStatus(false)}>↻ Vernieuw</button></div>
     </div>
     {notice&&<div className="inline-notice standalone">{notice}</div>}
-    {error&&<div className="config-error standalone"><strong>Playout One</strong><span>{error}</span><button className="ghost" onClick={()=>location.href=`/hub/${stationSlug}/radio-api`}>Open mapping →</button></div>}
+    {error&&<div className="config-error standalone playout-auth-error"><strong>Playout One</strong><span>{error}</span><div className="playout-auth-state"><b>{authState.present?"✓ Sleutel geladen":"✕ Geen sleutel geladen"}</b>{authState.present&&<small>{authState.looksValid?"po1_-formaat herkend":"onbekend sleutelformaat"}</small>}</div><button className="ghost" onClick={()=>location.href=`/hub/${stationSlug}/beheer`}>Open integraties →</button></div>}
     {!status&&!error&&<div className="card empty-live-state"><strong>Playout One-status laden…</strong></div>}
 
     {status&&<>

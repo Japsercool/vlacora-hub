@@ -1,0 +1,13 @@
+VLACORA HUB 0.18.4 validation
+[PASS] version 0.18.4
+[PASS] secret normalization
+[PASS] Bearer pasted value stripped
+[PASS] manual read canonical bearer
+[PASS] manual read X key fallback
+[PASS] 401 scope diagnostic
+[PASS] test route fallback
+[PASS] UI says key loaded
+[PASS] 0.18.3 features retained
+[PASS] touched TypeScript/TSX files contain no parser/name errors
+[INFO] no Supabase migration required
+[INFO] Playout auth contract verified against Playout One 0.11.19 source: Authorization Bearer and X-Playout-Api-Key are both supported

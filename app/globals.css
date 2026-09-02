@@ -299,3 +299,8 @@ hr{border:0;border-top:1px solid var(--border);margin:22px 0}
 .meeting-main-v182{min-height:500px}.meeting-main-v182 .section-head h2{font-size:22px}.meeting-score-row{display:grid;grid-template-columns:1fr 170px;gap:16px;align-items:end}.meeting-own-score input{font-size:20px;font-weight:900;text-align:center}.meeting-review-meta{display:flex;justify-content:space-between;border-top:1px solid var(--border);padding-top:10px;margin-top:10px;font-size:8px;color:var(--muted)}.meeting-save-row{justify-content:space-between;margin-top:12px}
 @media(max-width:1100px){.playout-detail-grid{grid-template-columns:1fr 1fr}.playout-top-status{grid-template-columns:1fr 1fr}.playout-online-card{grid-column:1/-1}.meeting-workspace-v182{grid-template-columns:1fr}.meeting-sidebar-v182{position:static}.meeting-manual-add{grid-template-columns:1fr 1fr}.meeting-song-picker{grid-template-columns:1fr}}
 @media(max-width:760px){.playout-now-grid,.playout-detail-grid,.playout-top-status{grid-template-columns:1fr}.playout-online-card{grid-column:auto}.playout-capability-box>div{grid-template-columns:1fr}.meeting-create-grid,.meeting-manual-add,.meeting-folder-picker,.meeting-score-row{grid-template-columns:1fr}.meeting-selector-bar{align-items:stretch;flex-direction:column}.meeting-selector-bar label{min-width:0;width:100%}}
+
+
+/* VLACORA 0.18.4 — Playout authentication diagnostics */
+.playout-auth-state{display:flex;flex-direction:column;gap:2px;min-width:135px}.playout-auth-state b{font-size:9px;color:#4f566d}.playout-auth-state small{font-size:8px;color:#8a8fa1}.playout-auth-note code{font-weight:850}
+.playout-auth-error{flex-wrap:wrap}.playout-auth-error>span{min-width:280px}

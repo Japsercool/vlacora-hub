@@ -36,6 +36,26 @@ function safePath(path:string) {
   return path;
 }
 
+function normalizeApiKey(value:string){
+  return String(value||"").trim()
+    .replace(/^Authorization\s*:\s*Bearer\s+/i,"")
+    .replace(/^X-Playout-Api-Key\s*:\s*/i,"")
+    .replace(/^Bearer\s+/i,"")
+    .trim();
+}
+function makeHeaders(kind:string,apiKey:string,apiKeyHeader:string,apiKeyPrefix:string,mode:"configured"|"bearer"|"x-key"){
+  const headers:Record<string,string>={Accept:kind==="shoutcast"?"application/xml,text/xml,application/json;q=0.9,*/*;q=0.8":"application/json"};
+  if(!apiKey)return headers;
+  if(kind==="playout"){
+    if(mode==="x-key")headers["X-Playout-Api-Key"]=apiKey;
+    else headers["Authorization"]=`Bearer ${apiKey}`;
+    return headers;
+  }
+  if(!/^[A-Za-z0-9-]{1,64}$/.test(apiKeyHeader))throw new Error("Ongeldige API-key headernaam");
+  headers[apiKeyHeader]=apiKeyPrefix?`${apiKeyPrefix} ${apiKey}`:apiKey;
+  return headers;
+}
+
 export async function POST(request:NextRequest) {
   const started=Date.now();
   let body:any;
@@ -64,20 +84,23 @@ export async function POST(request:NextRequest) {
   if(basePath && (!basePath.startsWith("/")||basePath.includes("..")||basePath.includes("://")))return NextResponse.json({error:"Ongeldig basis-pad"},{status:400});
 
   const target=`${cfg.protocol}://${cfg.host}:${port}${basePath}${path}`;
-  const apiKey=String(body.apiKey||"");
+  const apiKey=normalizeApiKey(String(body.apiKey||""));
   const apiKeyHeader=String(body.apiKeyHeader||"Authorization").trim();
   const apiKeyPrefix=String(body.apiKeyPrefix||"Bearer").trim();
-  const headers:Record<string,string>={Accept:kind==="shoutcast"?"application/xml,text/xml,application/json;q=0.9,*/*;q=0.8":"application/json"};
-
-  if(apiKey){
-    if(!/^[A-Za-z0-9-]{1,64}$/.test(apiKeyHeader))return NextResponse.json({error:"Ongeldige API-key headernaam"},{status:400});
-    headers[apiKeyHeader]=apiKeyPrefix?`${apiKeyPrefix} ${apiKey}`:apiKey;
-  }
 
   try{
-    const result=await nativeHttpGet(target,headers,20000);
+    let authMode:"configured"|"bearer"|"x-key"=kind==="playout"?"bearer":"configured";
+    let result=await nativeHttpGet(target,makeHeaders(kind,apiKey,apiKeyHeader,apiKeyPrefix,authMode),20000);
+    const authAttempts:string[]=[authMode];
+    if(kind==="playout"&&apiKey&&result.status===401){
+      authMode="x-key";
+      result=await nativeHttpGet(target,makeHeaders(kind,apiKey,apiKeyHeader,apiKeyPrefix,authMode),20000);
+      authAttempts.push(authMode);
+    }
     let preview:any=result.text.slice(0,3000);
     try{preview=JSON.parse(result.text)}catch{}
+    const requiredScope=preview&&typeof preview==="object"?String(preview.requiredScope||""):"";
+    const rejected=kind==="playout"&&result.status===401&&Boolean(apiKey);
 
     return NextResponse.json({
       ok:result.status>=200&&result.status<300,
@@ -89,7 +112,10 @@ export async function POST(request:NextRequest) {
       httpDurationMs:result.durationMs,
       totalDurationMs:Date.now()-started,
       runtime:runtimeInfo(),
-      preview
+      preview,
+      requiredScope,
+      auth:{keyPresent:Boolean(apiKey),playoutKeyFormat:kind==="playout"?apiKey.startsWith("po1_"):undefined,attempts:authAttempts,mode:authMode},
+      message:rejected?`De opgeslagen Playout One sleutel wordt door Hub :5099 geweigerd${requiredScope?` voor scope ${requiredScope}`:""}.`:undefined
     },{status:result.status>=200&&result.status<300?200:result.status||502});
   }catch(e){
     const detail=nativeError(e);

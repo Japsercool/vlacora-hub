@@ -11,13 +11,28 @@ export type PersistedIntegrationSecret={
 
 const secretKey=(kind:IntegrationKind)=>`vlacora:integration:key:${kind}`;
 
+export function normalizeIntegrationSecret(secret:PersistedIntegrationSecret):PersistedIntegrationSecret{
+  let apiKey=String(secret.apiKey||"").trim();
+  apiKey=apiKey
+    .replace(/^Authorization\s*:\s*Bearer\s+/i,"")
+    .replace(/^X-Playout-Api-Key\s*:\s*/i,"")
+    .replace(/^Bearer\s+/i,"")
+    .trim();
+  let apiKeyHeader=String(secret.apiKeyHeader||"Authorization").trim()||"Authorization";
+  let apiKeyPrefix=String(secret.apiKeyPrefix??"Bearer").trim();
+  if(apiKeyHeader.toLowerCase()==="x-playout-api-key")apiKeyPrefix="";
+  if(apiKeyHeader.toLowerCase()==="authorization"&&!apiKeyPrefix)apiKeyPrefix="Bearer";
+  return{apiKey,apiKeyHeader,apiKeyPrefix};
+}
+
 function cacheSecret(kind:IntegrationKind,secret:PersistedIntegrationSecret){
   if(typeof window==="undefined")return;
-  if(secret.apiKey)sessionStorage.setItem(secretKey(kind),secret.apiKey);
+  const normalized=normalizeIntegrationSecret(secret);
+  if(normalized.apiKey)sessionStorage.setItem(secretKey(kind),normalized.apiKey);
   else sessionStorage.removeItem(secretKey(kind));
-  sessionStorage.setItem(`${secretKey(kind)}:header`,secret.apiKeyHeader||"Authorization");
-  sessionStorage.setItem(`${secretKey(kind)}:prefix`,secret.apiKeyPrefix??"Bearer");
-  window.dispatchEvent(new CustomEvent("vlacora:integration-secret-changed",{detail:{kind,stored:Boolean(secret.apiKey)}}));
+  sessionStorage.setItem(`${secretKey(kind)}:header`,normalized.apiKeyHeader||"Authorization");
+  sessionStorage.setItem(`${secretKey(kind)}:prefix`,normalized.apiKeyPrefix??"Bearer");
+  window.dispatchEvent(new CustomEvent("vlacora:integration-secret-changed",{detail:{kind,stored:Boolean(normalized.apiKey)}}));
 }
 
 export async function loadPersistedIntegrationSecret(kind:IntegrationKind):Promise<PersistedIntegrationSecret|null>{
@@ -29,11 +44,11 @@ export async function loadPersistedIntegrationSecret(kind:IntegrationKind):Promi
   if(error)throw error;
   const row=Array.isArray(data)?data[0]:data;
   if(!row?.api_key)return null;
-  const secret:PersistedIntegrationSecret={
+  const secret=normalizeIntegrationSecret({
     apiKey:String(row.api_key||""),
     apiKeyHeader:String(row.api_key_header||"Authorization"),
     apiKeyPrefix:String(row.api_key_prefix??"Bearer")
-  };
+  });
   cacheSecret(kind,secret);
   return secret;
 }
@@ -53,9 +68,10 @@ export async function hydrateIntegrationSecret(kind:IntegrationKind):Promise<Per
 }
 
 export async function savePersistedIntegrationSecret(kind:IntegrationKind,secret:PersistedIntegrationSecret){
-  if(!secret.apiKey.trim())throw new Error("API-sleutel is leeg.");
+  const normalized=normalizeIntegrationSecret(secret);
+  if(!normalized.apiKey)throw new Error("API-sleutel is leeg.");
   if(!isSupabaseBrowserConfigured()){
-    cacheSecret(kind,secret);
+    cacheSecret(kind,normalized);
     return{central:false};
   }
   const supabase=createClient();
@@ -63,12 +79,12 @@ export async function savePersistedIntegrationSecret(kind:IntegrationKind,secret
   if(userError||!user.user)throw new Error("Log eerst in om API-sleutels veilig te bewaren.");
   const{error}=await supabase.rpc("vlacora_set_integration_secret",{
     p_kind:kind,
-    p_api_key:secret.apiKey,
-    p_api_key_header:secret.apiKeyHeader||"Authorization",
-    p_api_key_prefix:secret.apiKeyPrefix??"Bearer"
+    p_api_key:normalized.apiKey,
+    p_api_key_header:normalized.apiKeyHeader||"Authorization",
+    p_api_key_prefix:normalized.apiKeyPrefix??"Bearer"
   });
   if(error)throw error;
-  cacheSecret(kind,secret);
+  cacheSecret(kind,normalized);
   return{central:true};
 }
 

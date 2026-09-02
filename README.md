@@ -1044,3 +1044,28 @@ The existing function actually lives in `lib/supabase/settings`.
 The Playout One module now imports it from the same source as Radio API Control.
 
 All 0.18.2 functionality remains unchanged.
+
+
+## 0.18.4 — Playout One API-key repair
+
+De melding `A valid Playout One Hub API key is required.` komt van Playout One Hub zelf.
+Dat betekent dat de request Hub :5099 bereikt, maar authenticatie/autorisatie faalt.
+
+0.18.4 maakt de koppeling defensiever:
+
+- bestaande centraal opgeslagen API-key blijft behouden;
+- `po1_...`, `Bearer po1_...`, `Authorization: Bearer po1_...`
+  en `X-Playout-Api-Key: po1_...` worden naar dezelfde ruwe key genormaliseerd;
+- Playout-verzoeken gebruiken altijd eerst de officiële
+  `Authorization: Bearer po1_...` vorm;
+- alleen bij HTTP 401 volgt één retry met `X-Playout-Api-Key`;
+- een 401 toont voortaan expliciet dat de sleutel wél in VLACORA geladen is;
+- de vereiste scope uit Playout One (`stations.read`, `nowplaying.read`,
+  `queue.read`, enz.) wordt in de foutmelding meegenomen;
+- nergens wordt de plaintext sleutel in diagnostics of de UI getoond.
+
+Wanneer beide ondersteunde authvormen 401 geven, is de opgeslagen key zelf
+niet meer geldig voor deze Playout One Hub: verkeerd, geroteerd/ingetrokken,
+verlopen of zonder de vereiste scope.
+
+Geen nieuwe Supabase-migratie nodig.
