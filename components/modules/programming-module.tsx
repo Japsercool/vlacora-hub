@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { isSupabaseBrowserConfigured } from "@/lib/supabase/client";
 import { loadSharedProgramming,syncSharedProgramming } from "@/lib/supabase/hub-data";
@@ -64,7 +65,7 @@ export default function ProgrammingModule({stationSlug,stationName}:{stationSlug
           <label className="field">Presentator / team<input className="input" value={selected.host} onChange={e=>patch({host:e.target.value})} placeholder="bv. Jasper & Tibo"/></label>
           <label className="field">Format<select className="select" value={selected.format} onChange={e=>patch({format:e.target.value})}>{["Muziekprogramma","Drive","Ochtendshow","Hitlijst","Special","Opgenomen programma","DJ-set","Nieuws / info","Ander"].map(x=><option key={x}>{x}</option>)}</select></label>
           <label className="field">Notities<textarea className="input textarea" value={selected.notes} onChange={e=>patch({notes:e.target.value})} placeholder="Vaste rubrieken, DJ-wissel, redactie-afspraken…"/></label>
-          <div className="button-row"><button className="ghost" onClick={duplicate}>Dupliceren</button><button className="ghost danger-text" onClick={()=>{setBlocks(blocks.filter(x=>x.id!==selected.id));setSelectedId("")}}>Verwijderen</button></div>
+          <div className="button-row"><Link className="primary soft" href={`/hub/${stationSlug}/programmas?program=${encodeURIComponent(selected.id)}`}>Open programmapagina →</Link><button className="ghost" onClick={duplicate}>Dupliceren</button><button className="ghost danger-text" onClick={()=>{setBlocks(blocks.filter(x=>x.id!==selected.id));setSelectedId("")}}>Verwijderen</button></div>
         </>}
       </div>
     </div>

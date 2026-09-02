@@ -12,6 +12,14 @@ import EditorialModule from "@/components/modules/editorial-module";
 import RadioApiModule from "@/components/modules/radio-api-module";
 import PlayoutOneModule from "@/components/modules/playout-one-module";
 import TrafficModule from "@/components/modules/traffic-module";
+import PresenterDashboardModule from "@/components/modules/presenter-dashboard-module";
+import AbsencesModule from "@/components/modules/absences-module";
+import ContactsModule from "@/components/modules/contacts-module";
+import ProgramPagesModule from "@/components/modules/program-pages-module";
+import ContentInboxModule from "@/components/modules/content-inbox-module";
+import PersonalInboxModule from "@/components/modules/personal-inbox-module";
+import OperationalWarningsPanel from "@/components/modules/operational-warnings-panel";
+import GlobalSearch from "@/components/global-search";
 import AdminRequestsModule from "@/components/modules/admin-requests-module";
 import MusicMeetingsModule from "@/components/modules/music-meetings-module";
 import TeamRightsModule from "@/components/modules/team-rights-module";
@@ -28,6 +36,7 @@ import { HUB_STATIONS_EVENT, allHubStation, readHubStations, saveStationAlias, t
 import AccountWidget from "@/components/auth/account-widget";
 import { loadSharedRotationStations } from "@/lib/supabase/hub-data";
 import { saveStationCache } from "@/lib/radio/client-config";
+import { runOperationalChecks } from "@/lib/supabase/operations";
 import { CollaborationProvider,useCollaboration } from "@/components/collaboration/collaboration-provider";
 import {
   MandatoryNotificationModal,NotificationBell,NotificationDrawer,NotificationsPage,
@@ -97,6 +106,7 @@ function HubAppInner({ stationSlug, moduleSlug }: Props) {
     return()=>{alive=false;window.removeEventListener(HUB_STATIONS_EVENT,refresh as EventListener);window.removeEventListener("storage",refresh)};
   },[]);
   useEffect(()=>{void hydrateSharedIntegrationSettings(stationSlug)},[stationSlug]);
+  useEffect(()=>{if(stationSlug!=="all")void runOperationalChecks(stationSlug).catch(()=>{})},[stationSlug,moduleSlug]);
   useEffect(()=>{
     if(stationSlug==="all")return;
     void loadSharedSetting<HubStationAlias>(`station:${stationSlug}`,"station-alias")
@@ -196,6 +206,7 @@ function HubAppInner({ stationSlug, moduleSlug }: Props) {
       <main className="main">
         <header className="topbar">
           <div><div className="eyebrow">VLACORA / {station.name}</div><h1>{moduleName}</h1></div>
+          <GlobalSearch stationSlug={station.slug}/>
           <div className="top-actions">
             <select className="select" value={station.slug} onChange={(e) => router.push(`/hub/${e.target.value}/${moduleSlug}`)}>
               {hubStations.map((s) => <option key={s.slug} value={s.slug}>{s.name}</option>)}
@@ -229,7 +240,11 @@ function HubAppInner({ stationSlug, moduleSlug }: Props) {
             <Card><div className="section-head"><div><h3>Uitzendschema</h3><p>Vandaag • {station.name}</p></div><button className="ghost" onClick={()=>router.push(`/hub/${station.slug}/programmering`)}>Open programmering →</button></div><div className="empty-live-state compact"><strong>Bewerkbare programmering</strong><span>Programma&apos;s worden niet meer uit een vaste demo geladen. Beheer ze in Programmering.</span></div></Card>
           </>}
 
-          {moduleSlug === "meldingen" && <NotificationsPage stationSlug={station.slug} />}
+          {moduleSlug === "voor-mij" && <PersonalInboxModule stationSlug={station.slug} />}
+
+          {moduleSlug === "mijn-uitzending" && <PresenterDashboardModule stationSlug={station.slug} />}
+
+          {moduleSlug === "meldingen" && <><NotificationsPage stationSlug={station.slug} /><OperationalWarningsPanel stationSlug={station.slug}/></>}
 
           {moduleSlug === "stations" && <><div className="page-intro"><div><h2>Stations uit Rotation One</h2><p>Deze lijst wordt rechtstreeks opgebouwd uit de laatst opgehaalde Rotation One-stations.</p></div><button className="primary" onClick={()=>router.push(`/hub/${station.slug}/radio-api`)}>↻ Stations beheren</button></div>{hubStations.filter(s=>s.slug!=="all").length===0?<Card><div className="empty-live-state"><strong>Nog geen Rotation One-stations opgehaald</strong><span>Ga naar Radio API of Beheer → Integraties en klik op Stations ophalen.</span></div></Card>:<div className="station-grid">{hubStations.filter(s=>s.slug!=="all").map(s=><Card key={s.slug} className="station-card"><div className="station-card-head"><div className="station-logo" style={{background:s.accent}}>{s.short}</div><div><h3>{s.name}</h3><span className="muted">Rotation One • {s.rotationId}</span></div></div><div className="station-stat"><span>Bron</span><strong>Live Rotation One</strong></div><Link className="primary wide" href={`/hub/${s.slug}/dashboard`}>Open station</Link></Card>)}</div>}</>}
 
@@ -238,6 +253,8 @@ function HubAppInner({ stationSlug, moduleSlug }: Props) {
           {moduleSlug === "meldpunt" && <IncidentModule stationSlug={station.slug} publishNotification={collaboration.publishNotification} />}
 
           {moduleSlug === "aanvragen" && <AdminRequestsModule stationSlug={station.slug} />}
+
+          {moduleSlug === "content-inbox" && <ContentInboxModule stationSlug={station.slug} />}
 
           {moduleSlug === "messenger" && <MessengerModule stationSlug={station.slug} />}
 
@@ -255,6 +272,12 @@ function HubAppInner({ stationSlug, moduleSlug }: Props) {
           </>}
 
           {moduleSlug === "programmering" && <ProgrammingModule stationSlug={station.slug} stationName={station.name} />}
+
+          {moduleSlug === "programmas" && <ProgramPagesModule stationSlug={station.slug} />}
+
+          {moduleSlug === "afwezigheden" && <AbsencesModule stationSlug={station.slug} />}
+
+          {moduleSlug === "contacten" && <ContactsModule stationSlug={station.slug} />}
 
           {moduleSlug === "sjablonen" && <TemplatesModule stationSlug={station.slug} />}
 

@@ -1273,3 +1273,65 @@ Opgelost:
 - er is ook een expliciete knop **Opslaan**.
 
 Geen nieuwe Supabase-migratie nodig.
+
+
+## 0.20.0 — Operations Suite
+
+VLACORA groeit hiermee van een verzameling radiomodules naar één dagelijkse
+werkplek voor presentatoren, redactie, stationmanagement en techniek.
+
+### Mijn uitzending
+Toont de huidige/volgende uitzending, verplichte talks, sponsoracties,
+promo/imaging, verkeersmomenten, belangrijke teamberichten, studio-info,
+vaste programma-items, eigen taken en playliststatus.
+
+### Voor mij
+Eén persoonlijke werkbak met eigen taken, meldingen/vermeldingen, reacties
+op aanvragen, muziekmeetings, vervangingsvragen, live talks waaraan de
+gebruiker werkt en operationele waarschuwingen.
+
+### Afwezigheden & vervanging
+Een afwezigheid wordt centraal opgeslagen. VLACORA berekent op basis van
+programmateam + programmering welke uitzendingen geraakt worden, toont het
+aantal open taken van die persoon en laat per uitzending een vervanger
+kiezen, vragen en bevestigen.
+
+### Contacten
+Interne teamleden komen rechtstreeks uit Supabase Auth/profiles. Externe
+contacten voor techniek, sales, nieuws, partners, hosting en noodnummers
+kunnen centraal per station beheerd worden met team/management-zichtbaarheid.
+
+### Programma-pagina's
+Elk programma krijgt team, primair presentator, format, studio-info,
+vaste items, imaging/jingle-notities, redactietemplates, social templates,
+documenten/links, terugkerende taken en eerdere redactiewerkruimtes.
+
+### Content-inbox
+Teamleden kunnen ideeën, nieuws, gasten, social, muziek en wedstrijden
+insturen. Redactie kan een item beoordelen, toewijzen, aan een programma
+koppelen en plannen.
+
+### Universeel zoeken
+Zoek via de vaste bovenbalk of Ctrl+K door programma's, taken, contacten,
+content-inbox, muziekmeetings en songs, social, communicatie, opgeslagen
+playlist/talks en hitlijsten. Bij een expliciete zoekactie kan VLACORA ook
+de echte Rotation One muziekmappen doorzoeken. Er is geen achtergrondzoeker.
+
+### Operationele waarschuwingen
+Meldingen kunnen ontstaan voor playlistdekking <24 uur, ontbrekend nieuws,
+encoder/stream/heartbeat-problemen, een verkeersfeedfout, ontbrekende
+reclame, lege sponsor/verplichte talks en belangrijke taken zonder eigenaar.
+Controles zijn gethrottled en/of event-gestuurd; er is geen agressieve polling.
+
+### Rechten
+Programmateam-koppelingen kunnen centraal door stationmanagement/admin
+gewijzigd worden. Gewone teamleden kunnen de programmateams lezen maar
+niet rechtstreeks via de database aanpassen.
+
+### Supabase
+De productiemigraties `operations_suite_core`,
+`operations_suite_role_alignment` en `operations_program_team_security`
+zijn op het gekoppelde productieproject toegepast.
+
+Alle 0.19.9 verbeteringen voor redactie-opslag, rich-text talks, Presence
+en verkeer uitsluitend op aanvraag blijven behouden.

@@ -1,5 +1,21 @@
-VLACORA HUB 0.19.9
-Editorial persistence fix.
-VLACORA talks, traffic slots and other manually added editorial items are preserved when Rotation One refreshes.
-Talk edits autosave centrally, save immediately on editor blur, and can be saved explicitly with a visible Save button/status.
-No database migration required.
+VLACORA HUB 0.20.0
+Operations Suite
+
+Major additions:
+- Presenter dashboard: Mijn uitzending
+- Personal inbox: Voor mij
+- Absences and replacements with program impact
+- Central contacts directory
+- Program pages with team, format, templates, documents and history
+- Content inbox
+- Universal search with explicit Rotation One music search
+- Operational warnings integrated into Meldingen
+- On-demand/event-driven checks to keep usage low
+- Program team assignment security hardened
+
+Supabase production migrations verified/applied:
+- operations_suite_core
+- operations_suite_role_alignment
+- operations_program_team_security
+
+Includes all 0.19.9 editorial persistence fixes.

@@ -7,6 +7,7 @@ import { broadPlaylistLabel,canonicalPlaylistType } from "@/lib/radio/item-types
 import { fetchTrafficSnapshot,loadTrafficSettings } from "@/lib/traffic/client";
 import { useCollaboration } from "@/components/collaboration/collaboration-provider";
 import { emitActivity } from "@/lib/collaboration/activity";
+import { resolveOperationalWarning,upsertOperationalWarning } from "@/lib/supabase/operations";
 
 const uid=()=>Math.random().toString(36).slice(2)+Date.now().toString(36);
 const pad=(n:number)=>String(n).padStart(2,"0");
@@ -262,9 +263,12 @@ export default function EditorialPlaylistWorkspace(props:Props){
         presenterHtml:undefined,
         notes:`Live Vlaams Verkeerscentrum • DATEX II • update ${updateTime}`
       });
+      await resolveOperationalWarning(stationSlug,"traffic-feed-error").catch(()=>{});
       setTrafficMessage(`${data.count} verkeersmelding(en) opgehaald voor deze talk`);
     }catch(e){
-      setTrafficMessage(`Verkeer kon niet worden opgehaald: ${e instanceof Error?e.message:"onbekende fout"}`);
+      const message=e instanceof Error?e.message:"onbekende fout";
+      await upsertOperationalWarning({stationSlug,code:"traffic-feed-error",severity:"warning",title:"Live verkeersfeed kon niet laden",body:message,actionPath:`/hub/${stationSlug}/verkeer`,source:"Vlaams Verkeerscentrum"}).catch(()=>{});
+      setTrafficMessage(`Verkeer kon niet worden opgehaald: ${message}`);
     }finally{setTrafficBusy(false)}
   }
 

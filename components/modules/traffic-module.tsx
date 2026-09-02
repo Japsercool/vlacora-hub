@@ -3,6 +3,7 @@
 import { useCallback,useEffect,useMemo,useState } from "react";
 import { emitActivity } from "@/lib/collaboration/activity";
 import { DEFAULT_TRAFFIC_SETTINGS,fetchTrafficSnapshot,loadTrafficSettings,saveTrafficSettings,type TrafficSettings,type TrafficSnapshot } from "@/lib/traffic/client";
+import { resolveOperationalWarning,upsertOperationalWarning } from "@/lib/supabase/operations";
 
 const DEFAULT_ROADS=["E17","E40","R4","R1","R0","A12","E19","E313","E314"];
 function fmtTime(value:string){if(!value)return"—";const d=new Date(value);return Number.isNaN(d.getTime())?"—":d.toLocaleTimeString("nl-BE",{hour:"2-digit",minute:"2-digit",second:"2-digit"})}
@@ -26,9 +27,14 @@ export default function TrafficModule({stationSlug}:{stationSlug:string}){
     try{
       const data=await fetchTrafficSnapshot(settings);
       setSnapshot(data);setRadioText(data.radioText);setError("");
+      await resolveOperationalWarning(stationSlug,"traffic-feed-error").catch(()=>{});
       emitActivity({detail:`Verkeer • ${data.count} melding(en)`,entityType:"traffic",entityId:stationSlug});
       if(!silent)flash(`Verkeer vernieuwd • ${data.count} relevante melding(en)`);
-    }catch(e){setError(e instanceof Error?e.message:"Verkeer kon niet geladen worden")}
+    }catch(e){
+      const message=e instanceof Error?e.message:"Verkeer kon niet geladen worden";
+      setError(message);
+      await upsertOperationalWarning({stationSlug,code:"traffic-feed-error",severity:"warning",title:"Live verkeersfeed kon niet laden",body:message,actionPath:`/hub/${stationSlug}/verkeer`,source:"Vlaams Verkeerscentrum"}).catch(()=>{});
+    }
     finally{setBusy(false)}
   },[settings,stationSlug]);
 
