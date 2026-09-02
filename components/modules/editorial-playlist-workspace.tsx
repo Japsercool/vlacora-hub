@@ -19,6 +19,7 @@ type Props={
   setPlaylist:(items:EditorialItem[])=>void;
   onPull:()=>void|Promise<void>;
   playlistVersion:string;
+  syncLabel?:string;
 };
 
 const filters:{key:string;label:string;types:EditorialType[]}[]=[
@@ -57,7 +58,7 @@ function manualType(slot:EditorialTemplateSlot):EditorialType{
 function generalPlaylistType(item:EditorialItem){const k=itemKind(item);return ["imaging","promo","link"].includes(k)?"jingle":k}
 
 export default function EditorialPlaylistWorkspace(props:Props){
-  const{stationName,stationSlug,date,setDate,hour,setHour,playlist,setPlaylist,onPull,playlistVersion}=props;
+  const{stationName,stationSlug,date,setDate,hour,setHour,playlist,setPlaylist,onPull,playlistVersion,syncLabel}=props;
   const[query,setQuery]=useState("");
   const[enabled,setEnabled]=useState(()=>new Set(filters.map(x=>x.key)));
   const[selectedId,setSelectedId]=useState("");
@@ -213,7 +214,7 @@ export default function EditorialPlaylistWorkspace(props:Props){
     </div>
 
     <div className="topplaylist-templatebar">
-      <div><strong>{template?template.name:"Geen uurtemplate"}</strong><span>{templateMessage}</span></div>
+      <div><strong>{template?template.name:"Geen uurtemplate"}</strong><span>{syncLabel||templateMessage}</span></div>
       <div className="button-row"><button className="ghost" onClick={()=>void onPull()}>↻ Rotation One</button><button className="primary soft" disabled={!template} onClick={applyTemplate}>Sjabloon toepassen</button><span className="version-badge">rev {playlistVersion}</span></div>
     </div>
 

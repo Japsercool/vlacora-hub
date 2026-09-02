@@ -4,7 +4,7 @@ export type PermissionKey =
   | "dashboard" | "stations" | "taken" | "meldpunt" | "messenger"
   | "communicatie" | "kalender" | "programmering" | "sjablonen" | "muziek" | "meetings"
   | "redactie" | "playlists" | "hitlijsten" | "presentatie" | "social"
-  | "statistieken" | "control" | "radio-api" | "team" | "beheer";
+  | "statistieken" | "control" | "playout" | "radio-api" | "team" | "beheer";
 
 export type PermissionMap = Record<PermissionKey, PermissionLevel>;
 
@@ -14,7 +14,7 @@ export const permissionLabels: Record<PermissionKey,string> = {
   programmering:"Programmering", sjablonen:"Sjablonen", muziek:"Muziek", meetings:"Muziekmeetings",
   redactie:"Redactie", playlists:"Playlists", hitlijsten:"Hitlijsten",
   presentatie:"Presentatie", social:"Social Studio", statistieken:"Luistercijfers",
-  control:"On-Air Control", "radio-api":"Radio API", team:"Team & rechten", beheer:"Beheer"
+  control:"On-Air Control", playout:"Playout One", "radio-api":"Radio API", team:"Team & rechten", beheer:"Beheer"
 };
 
 const allKeys = Object.keys(permissionLabels) as PermissionKey[];
@@ -32,7 +32,7 @@ export const rolePresets: Record<string,PermissionMap> = {
     dashboard:"view",stations:"view",taken:"admin",meldpunt:"admin",messenger:"edit",
     communicatie:"publish",kalender:"admin",programmering:"publish",sjablonen:"admin",muziek:"publish",
     meetings:"publish",redactie:"publish",playlists:"publish",hitlijsten:"publish",
-    presentatie:"edit",social:"publish",statistieken:"view",control:"view",
+    presentatie:"edit",social:"publish",statistieken:"view",control:"view",playout:"view",
     "radio-api":"view",team:"admin",beheer:"edit"
   }),
   "Muziekredactie": withLevels({
@@ -45,7 +45,7 @@ export const rolePresets: Record<string,PermissionMap> = {
     dashboard:"view",taken:"edit",meldpunt:"edit",messenger:"edit",communicatie:"edit",
     kalender:"edit",programmering:"view",sjablonen:"publish",muziek:"view",meetings:"view",
     redactie:"publish",playlists:"edit",hitlijsten:"view",presentatie:"publish",
-    social:"edit",statistieken:"view",control:"view"
+    social:"edit",statistieken:"view",control:"view",playout:"view"
   }),
   "Presentator": withLevels({
     dashboard:"view",taken:"edit",meldpunt:"edit",messenger:"edit",communicatie:"view",
@@ -60,7 +60,7 @@ export const rolePresets: Record<string,PermissionMap> = {
   "Techniek": withLevels({
     dashboard:"view",taken:"edit",meldpunt:"admin",messenger:"edit",communicatie:"view",
     kalender:"edit",programmering:"view",sjablonen:"admin",playlists:"view",statistieken:"view",
-    control:"admin","radio-api":"admin",beheer:"admin"
+    control:"admin",playout:"admin","radio-api":"admin",beheer:"admin"
   }),
   "Kijker": withLevels({
     dashboard:"view",communicatie:"view",kalender:"view",programmering:"view",sjablonen:"view",

@@ -136,6 +136,13 @@ function substitute(text:string, values:Record<string,string>) {
   for (const [key,value] of Object.entries(values)) result = result.replaceAll(`{${key}}`, value);
   return result;
 }
+function brusselsHourKey(value:string|undefined){
+  if(!value)return"";
+  const d=new Date(value);if(Number.isNaN(d.getTime()))return"";
+  const parts=new Intl.DateTimeFormat("en-CA",{timeZone:"Europe/Brussels",year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",hour12:false}).formatToParts(d);
+  const get=(type:string)=>parts.find(x=>x.type===type)?.value||"";
+  return`${get("year")}-${get("month")}-${get("day")}T${get("hour")}`;
+}
 
 export default function EditorialModule({stationSlug}:{stationSlug:string}) {
   const station = useHubStation(stationSlug);
@@ -160,6 +167,7 @@ export default function EditorialModule({stationSlug}:{stationSlug:string}) {
   const [workspaceReady,setWorkspaceReady] = useState(false);
   const [manualPlayoutId,setManualPlayoutId] = useState("");
   const [manualPlayoutName,setManualPlayoutName] = useState("");
+  const [autoPulling,setAutoPulling] = useState(false);
   useEffect(()=>{
     let alive=true;
     const refreshCaches=()=>{setRotationStations(readStationCache("rotation"));setPlayoutStations(readStationCache("playout"))};
@@ -197,6 +205,11 @@ export default function EditorialModule({stationSlug}:{stationSlug:string}) {
   },[workspaceReady,station.slug,date,hour,playlist,playlistVersion]);
 
   const mapping=mappings[station.slug]||{rotationId:station.rotationId||"",rotationName:station.rotationId?station.name:"",playoutId:"",playoutName:""};
+  useEffect(()=>{
+    if(!workspaceReady||station.slug==="all"||!mapping.rotationId||!readIntegration("rotation")?.host)return;
+    const timer=window.setTimeout(()=>void pullRotation(true),350);
+    return()=>window.clearTimeout(timer);
+  },[workspaceReady,station.slug,date,hour,mapping.rotationId]);
   function setMapping(patch:Partial<typeof mapping>){const value={...mapping,...patch};const next={...mappings,[station.slug]:value};setMappingsState(next);saveMappings(next);void saveSharedRadioMapping(station.slug,value).catch(()=>{})}
 
   const selected = playlist.find(i=>i.id===selectedId) || playlist[0];
@@ -231,18 +244,31 @@ export default function EditorialModule({stationSlug}:{stationSlug:string}) {
     setPlaylist([...playlist,...items]);flash(`${items.length} sjabloonitems toegevoegd`);
   }
 
-async function pullRotation(){
-  const cfg=readIntegration("rotation");if(!cfg?.host)return flash("Stel Rotation One eerst in via Beheer → Integraties.");
-  if(!mapping.rotationId)return flash("Koppel eerst dit VLACORA-station aan een echt Rotation One-station.");
+async function pullRotation(silent=false){
+  const cfg=readIntegration("rotation");if(!cfg?.host){if(!silent)flash("Stel Rotation One eerst in via Beheer → Integraties.");return}
+  if(!mapping.rotationId){if(!silent)flash("Koppel eerst dit VLACORA-station aan een echt Rotation One-station.");return}
+  setAutoPulling(true);
   try{
-    const start=new Date(`${date}T${hour}:00`);const end=new Date(start.getTime()+60*60*1000);
+    const target=new Date(`${date}T${hour}:00`);
+    const requestFrom=new Date(target.getTime()-2*60*60*1000);
+    const requestTo=new Date(target.getTime()+3*60*60*1000);
     let path=pathFor(cfg.playlistPath||"/api/v1/stations/{stationId}/schedule",mapping.rotationId);
-    const q=new URLSearchParams({from:start.toISOString(),to:end.toISOString()});path+=`${path.includes("?")?"&":"?"}${q.toString()}`;
+    const q=new URLSearchParams({from:requestFrom.toISOString(),to:requestTo.toISOString()});
+    path+=`${path.includes("?")?"&":"?"}${q.toString()}`;
     const data=await radioRead("rotation",path,"playlist");
+    const all:EditorialItem[]=(data.items||[]) as EditorialItem[];
+    const targetKey=`${date}T${hour.slice(0,2)}`;
+    const logical=all.filter((i:any)=>brusselsHourKey(i.sourceHourStartUtc)===targetKey);
+    const airtime=all.filter((i:any)=>brusselsHourKey(i.airTimeUtc)===targetKey);
+    const source=logical.length?logical:airtime;
     const previous=new Map<string,EditorialItem>(playlist.map(i=>[i.id,i]));
-    const incoming:EditorialItem[]=(data.items||[]).map((i:any)=>({...i,presenterText:previous.get(i.id)?.presenterText||i.presenterText||"",notes:previous.get(i.id)?.notes||i.notes||""}));
-    setPlaylist(incoming);setSelectedId(incoming[0]?.id||"");setLastPull(new Date().toLocaleTimeString("nl-BE"));setPlaylistVersion(String(data.version||"—"));setLastStatus(`Rotation One: ${incoming.length} items geladen`);flash(`${incoming.length} echte Rotation One-items geladen`);
-  }catch(e){setLastStatus(e instanceof Error?e.message:"Rotation One fout");flash(e instanceof Error?e.message:"Rotation One kon niet worden bereikt")}
+    const incoming:EditorialItem[]=source.map((i:any)=>({...i,presenterText:previous.get(i.id)?.presenterText||i.presenterText||"",notes:previous.get(i.id)?.notes||i.notes||""}));
+    setPlaylist(incoming);setSelectedId(incoming[0]?.id||"");setLastPull(new Date().toLocaleTimeString("nl-BE"));setPlaylistVersion(String(data.version||"—"));
+    const mode=logical.length?"logisch Rotation-uur":"airtime fallback";
+    setLastStatus(`Rotation One: ${incoming.length} items • ${mode} • ${all.length} items rond dit uur`);
+    if(!silent)flash(incoming.length?`${incoming.length} echte Rotation One-items geladen`:`Geen items gevonden voor ${date} ${hour}. De API gaf ${all.length} items in de bredere window.`);
+  }catch(e){setLastStatus(e instanceof Error?e.message:"Rotation One fout");if(!silent)flash(e instanceof Error?e.message:"Rotation One kon niet worden bereikt")}
+  finally{setAutoPulling(false)}
 }
 async function pushRotation(){flash("Schrijven naar Rotation One staat bewust nog uit. Eerst lezen en mapping volledig valideren.")}
 async function fetchPlayoutStations(){
@@ -263,13 +289,13 @@ async function connectManualPlayout(){
  const s:RadioStation={id,name:manualPlayoutName.trim()||id},list=mergeStationCache("playout",[s]);setPlayoutStations(list);await syncSharedPlayoutStations([s]).catch(()=>{});setMapping({playoutId:id,playoutName:s.name});flash(`Playout ${s.name} gekoppeld`);
 }
 async function testConnections(){
-  try{await hydrateSharedIntegrationSettings(station.slug).catch(()=>false);const rc=readIntegration("rotation"),pc=readIntegration("playout"),sc=readIntegration("shoutcast");const parts:string[]=[];if(rc?.host){await radioRead("rotation",rc.statusPath,"raw");parts.push("Rotation online")}else parts.push("Rotation niet ingesteld");if(pc?.host){await radioRead("playout",pc.statusPath,"raw");parts.push("Playout online")}else parts.push("Playout niet ingesteld");if(sc?.host){const s=await radioRead("shoutcast",sc.statusPath||"/stats?sid=1&json=1","raw");const raw=s.raw||{};const x=raw.streams?.[0]||raw.stream||raw.stats||raw;const listeners=Number(x.currentlisteners??x.currentListeners??x.listeners??0);parts.push(`SHOUTcast online${Number.isFinite(listeners)?` • ${listeners} luisteraar(s)`:""}`)}else parts.push("SHOUTcast niet ingesteld");setLastStatus(parts.join(" • "));flash(parts.join(" • "))}catch(e){setLastStatus(e instanceof Error?e.message:"Statuscontrole mislukt");flash(e instanceof Error?e.message:"Statuscontrole mislukt")}
+  try{await hydrateSharedIntegrationSettings(station.slug).catch(()=>false);const rc=readIntegration("rotation"),pc=readIntegration("playout"),sc=readIntegration("shoutcast");const parts:string[]=[];if(rc?.host){await radioRead("rotation",rc.statusPath,"raw");parts.push("Rotation online")}else parts.push("Rotation niet ingesteld");if(pc?.host){await radioRead("playout",pc.statusPath,"raw");parts.push("Playout online")}else parts.push("Playout niet ingesteld");if(sc?.host){const s=await radioRead("shoutcast",sc.statusPath||`/stats?sid=${sc.shoutcastSid||"1"}`,"shoutcast");const listeners=Number(s.shoutcast?.listeners??0);parts.push(`SHOUTcast online${Number.isFinite(listeners)?` • ${listeners} luisteraar(s)`:""}`)}else parts.push("SHOUTcast niet ingesteld");setLastStatus(parts.join(" • "));flash(parts.join(" • "))}catch(e){setLastStatus(e instanceof Error?e.message:"Statuscontrole mislukt");flash(e instanceof Error?e.message:"Statuscontrole mislukt")}
 }
 
   return <div>
     <div className="page-intro">
       <div><h2>Redactie & uitzending</h2><p>Bewerk de Rotation One-playlist, schrijf teksten bij ieder item en koppel redactiesjablonen aan programma&apos;s.</p></div>
-      <div className="button-row"><button className="primary" onClick={pullRotation}>↻ Echte playlist ophalen</button><button className="ghost" onClick={pushRotation}>Publiceren (nog uit)</button></div>
+      <div className="button-row"><button className="primary" onClick={()=>void pullRotation(false)}>↻ Echte playlist ophalen</button><button className="ghost" onClick={pushRotation}>Publiceren (nog uit)</button></div>
     </div>
 
     <div className="editorial-tabs">
@@ -288,8 +314,9 @@ async function testConnections(){
       setHour={setHour}
       playlist={playlist}
       setPlaylist={setPlaylist}
-      onPull={pullRotation}
+      onPull={()=>pullRotation(false)}
       playlistVersion={playlistVersion}
+      syncLabel={autoPulling?"Rotation One laden…":lastStatus}
     />}
 
     {tab==="templates"&&<EditorialTemplateStudio stationSlug={station.slug} playlist={playlist}/>}

@@ -1,2 +1,2 @@
-VLACORA HUB 0.18.1
-SHOUTcast DNAS XML /stats?sid=X is now the primary listener/stream source, with JSON fallback.
+VLACORA HUB 0.18.2
+Playout One live monitor, real Messenger users, logical-hour Rotation playlists, editable SHOUTcast SID/endpoint, and selectable music meetings with song adding/reviews.

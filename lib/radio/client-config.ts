@@ -13,6 +13,12 @@ export type ClientIntegrationConfig = {
   coveragePath?:string;
   revisionPath?:string;
   nowPath?:string;
+  playoutNowPath?:string;
+  playoutNextPath?:string;
+  playoutEnginePath?:string;
+  playoutStreamPath?:string;
+  playoutQueuePath?:string;
+  playoutRevisionsPath?:string;
   shoutcastSid?:string;
   musicFoldersPath?:string;
   musicFolderItemsPath?:string;

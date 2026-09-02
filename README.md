@@ -982,3 +982,57 @@ Geen extra databasepolling of betaalde dienst toegevoegd.
 
 Geen nieuwe Supabase-schema-migratie nodig: de bestaande station-specifieke
 `shoutcast-integration` setting bewaart SID en endpoint.
+
+
+## 0.18.2 — Radio + Messenger + muziekmeetings
+
+### SHOUTcast
+- SID én DNAS endpoint zijn nu bewerkbaar.
+- Een custom endpoint wordt niet meer bij iedere refresh overschreven.
+- `/stats?sid=X` blijft de aanbevolen XML-bron.
+- Voor publieke SHOUTcast-statistieken toont VLACORA geen misleidende API-key/Vault-waarschuwing meer.
+
+### Playout One
+Er is nu een aparte sidebarpagina `Playout One` met:
+- heartbeat / online
+- AUTO/LIVE mode
+- playback state
+- NOW + voortgang
+- NEXT
+- queue count
+- engine / machine
+- encoder / bitrate
+- DSP / Stereo Tool
+- Rotation schedule-status
+- laatste fout
+- wachtrij op aanvraag
+
+Om verbruik laag te houden wordt alleen de revision-check periodiek gedaan wanneer de pagina open is.
+Een volledige status wordt alleen opnieuw gehaald wanneer de revision wijzigt. Queue is handmatig.
+
+### Redactieplaylist
+Het gekozen uur wordt automatisch bij Rotation One opgehaald wanneer station/datum/uur wijzigt.
+VLACORA vraagt een bredere schedule-window op en filtert primair op `SourceHourStartUtc`.
+Daardoor blijven items bij het logische Rotation-uur horen, ook als airtime over de uurgrens valt.
+
+### Messenger
+De oude lokale demo-gebruikers zijn verwijderd.
+Messenger gebruikt alleen actieve Supabase `profiles`.
+Verwijder je een echte Auth-gebruiker, dan verdwijnt zijn profile via de bestaande FK cascade,
+zijn chatmembership wordt ook verwijderd en een verweesde directe chat wordt automatisch opgeruimd.
+
+### Muziekmeetings
+- meeting kiezen uit dropdown
+- onbeperkt meetings maken
+- datum/start/einde
+- songs toevoegen uit echte Rotation One-mappen
+- songs handmatig toevoegen
+- songs verwijderen en rangschikken
+- eigen score 0–10
+- A-hit / B-hit / C-hit / Testen / Later / Afwijzen
+- notities
+- teamgemiddelde per song
+- meeting starten / pauzeren / afsluiten
+- realtime centrale opslag
+
+Production migrations voor Messenger en Muziekmeetings zijn al toegepast.

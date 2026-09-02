@@ -10,6 +10,8 @@ import SocialStudioModule from "@/components/modules/social-studio-module";
 import MusicLibraryModule from "@/components/modules/music-library-module";
 import EditorialModule from "@/components/modules/editorial-module";
 import RadioApiModule from "@/components/modules/radio-api-module";
+import PlayoutOneModule from "@/components/modules/playout-one-module";
+import MusicMeetingsModule from "@/components/modules/music-meetings-module";
 import TeamRightsModule from "@/components/modules/team-rights-module";
 import AdminIntegrationsModule from "@/components/modules/admin-integrations-module";
 import MusicFoldersModule from "@/components/modules/music-folders-module";
@@ -32,12 +34,10 @@ import {
 
 type Props = { stationSlug: string; moduleSlug: string };
 type Tone = "blue" | "red" | "green" | "orange" | "gray";
-type Message = { id: string; who: string; text: string; time: string };
 type Announcement = { id: string; title: string; body: string; category: string; importance: string; read: boolean; requiresAck?: boolean };
 type CalendarEvent = { id: string; title: string; type: string; day: number; row: number; time: string };
-type TeamMember = { id: string; name: string; role: string; initials: string; scope: string };
 type CustomTrack = { id: string; artist: string; title: string; genre: string; release: string };
-type ModalType = "announcement" | "event" | "playlist" | "track" | "team" | null;
+type ModalType = "announcement" | "event" | "playlist" | "track" | null;
 
 const uid = () => Math.random().toString(36).slice(2) + Date.now().toString(36);
 
@@ -104,11 +104,6 @@ function HubAppInner({ stationSlug, moduleSlug }: Props) {
   const station = hubStations.find((s) => s.slug === stationSlug) || (stationSlug==="all"?allHubStation():{slug:stationSlug,name:"Station laden…",short:"…",accent:"#26269f",source:"rotation" as const});
   const storagePrefix = `vlacora:${stationSlug}`;
 
-  const [messages, setMessages] = useLocalState<Message[]>(`${storagePrefix}:messages`, [
-    { id: "m1", who: "Tibo", text: "Nieuwe tracks voor de meeting staan klaar.", time: "16:20" },
-    { id: "m2", who: "Jasper", text: "Top, ik luister ze straks nog even na.", time: "16:24" },
-    { id: "m3", who: "Muziekredactie", text: "ANOTR staat voorlopig op 8,2/10.", time: "16:27" }
-  ]);
   const [announcements, setAnnouncements] = useLocalState<Announcement[]>(`${storagePrefix}:announcements`, [
     { id: "a1", title: "Nieuwe muziek vanaf maandag", body: "Vanaf maandag gaan Joel Corry – Whisper en ANOTR – Talk To You naar de A-rotatie. Bebe Rexha schuift door naar B.", category: "Muziekredactie", importance: "Belangrijk", read: false },
     { id: "a2", title: "Aangepast weekendschema", body: "Vanaf dit weekend start The Partyroom om 18:00. Het nieuwe schema staat in VLACORA Kalender.", category: "Programmering", importance: "Normaal", read: true }
@@ -125,24 +120,12 @@ function HubAppInner({ stationSlug, moduleSlug }: Props) {
   const [socialArtist, setSocialArtist] = useLocalState(`${storagePrefix}:socialArtist`, "Joel Corry");
   const [socialTitle, setSocialTitle] = useLocalState(`${storagePrefix}:socialTitle`, "Whisper");
   const [customTracks, setCustomTracks] = useLocalState<CustomTrack[]>(`${storagePrefix}:tracks`, []);
-  const [team, setTeam] = useLocalState<TeamMember[]>(`${storagePrefix}:team`, [
-    { id: "u1", name: "Jasper Cool", role: "Superadmin", initials: "JC", scope: "Versuz • Club FM • Vlacora One" },
-    { id: "u2", name: "Tibo Vanhee", role: "Muziekredactie", initials: "TV", scope: "Versuz" },
-    { id: "u3", name: "Bram", role: "Presentator", initials: "BR", scope: "Versuz" },
-    { id: "u4", name: "Wouter", role: "Presentator", initials: "WD", scope: "Versuz" },
-    { id: "u5", name: "Sarah", role: "Social & Marketing", initials: "SA", scope: "Versuz • Club FM" }
-  ]);
   const [stationSettings, setStationSettings] = useLocalState(`${storagePrefix}:settings`, {
     name: station.name, timezone: "Europe/Brussels", active: true, playlistWarnings: true, newsCheck: true, socialReminders: true
   });
 
-  const [msgDraft, setMsgDraft] = useState("");
-  const [selectedChannel, setSelectedChannel] = useState("muziekredactie");
   const [modal, setModal] = useState<ModalType>(null);
   const [toast, setToast] = useState("");
-  const [meetingStarted, setMeetingStarted] = useLocalState(`${storagePrefix}:meetingStarted`, false);
-  const [meetingIndex, setMeetingIndex] = useLocalState(`${storagePrefix}:meetingIndex`, 7);
-  const [meetingDecision, setMeetingDecision] = useLocalState(`${storagePrefix}:meetingDecision`, "");
   const [lastRefresh, setLastRefresh] = useState("zojuist");
 
   const moduleName = useMemo(() => navItems.find((n) => n[0] === moduleSlug)?.[2] || "Dashboard", [moduleSlug]);
@@ -165,11 +148,6 @@ function HubAppInner({ stationSlug, moduleSlug }: Props) {
     [next[index], next[target]] = [next[target], next[index]];
     setPlaylist(next);
     notify("Playlistvolgorde aangepast");
-  }
-  function sendMessage() {
-    if (!msgDraft.trim()) return;
-    setMessages([...messages, { id: uid(), who: "Jasper", text: msgDraft.trim(), time: "nu" }]);
-    setMsgDraft("");
   }
   function editPlaylistItem(index: number) {
     const changed = window.prompt("Pas dit playlistitem aan:", playlist[index]);
@@ -207,7 +185,6 @@ function HubAppInner({ stationSlug, moduleSlug }: Props) {
             <Link key={slug} href={`/hub/${station.slug}/${slug}`} className={moduleSlug === slug ? "nav-item active" : "nav-item"}>
               <span className="nav-icon">{icon}</span><span>{label}</span>
               {slug === "meldingen" && collaboration.unreadCount > 0 && <span className={`nav-count ${collaboration.requiredCount?"critical-count":""}`}>{Math.min(collaboration.unreadCount,99)}</span>}
-              {slug === "messenger" && <span className="nav-count">{Math.min(messages.length,9)}</span>}
             </Link>
           ))}
         </nav>
@@ -279,9 +256,7 @@ function HubAppInner({ stationSlug, moduleSlug }: Props) {
 
           {moduleSlug === "muziek" && <MusicLibraryModule stationSlug={station.slug} />}
 
-          {moduleSlug === "meetings" && <div className="meeting-layout"><Card className="meeting-summary"><Badge tone={meetingStarted?"green":"blue"}>{meetingStarted?"BEZIG":"GEPLAND"}</Badge><h2>Nieuwe muziek • Week 36</h2><p>Dinsdag 1 september • 10:00 – 11:30</p><div className="meeting-kpis"><span><b>18</b> tracks</span><span><b>{meetingIndex}</b> beoordeeld</span><span><b>4</b> deelnemers</span></div><button className="primary wide" onClick={()=>{setMeetingStarted(!meetingStarted);notify(meetingStarted?"Meeting gepauzeerd":"Meeting gestart")}}>{meetingStarted?"Meeting pauzeren":"Meeting starten"}</button></Card>
-            <Card className="meeting-main"><div className="section-head"><div><span className="eyebrow">{String(meetingIndex).padStart(2,"0")} / 18</span><h2>ANOTR & 54 Ultra – Talk To You</h2></div><button className="primary soft" onClick={()=>notify("Preview gestart (demo)")}>▶ Beluister</button></div><div className="score-big">8,2<small>/10 teamgemiddelde</small></div><div className="decision-grid">{["A-hit","B-hit","C-hit","Testen","Later","Afwijzen"].map((x,i)=><button className={`decision d${i} ${meetingDecision===x?"selected-decision":""}`} onClick={()=>setMeetingDecision(x)} key={x}>{x}</button>)}</div><label className="field">Notitie<textarea className="input textarea" defaultValue="Sterke opener, goede daytime fit. Testen op A-rotatie vanaf maandag."/></label><button className="primary" onClick={()=>{if(!meetingDecision){notify("Kies eerst een beslissing");return;}setMeetingIndex(Math.min(18,meetingIndex+1));notify(`${meetingDecision} opgeslagen • volgende track`)}}>Beslissing opslaan & volgende →</button></Card>
-          </div>}
+          {moduleSlug === "meetings" && <MusicMeetingsModule stationSlug={station.slug} />}
 
           {moduleSlug === "playlists" && <EditorialModule stationSlug={station.slug} /> }
 
@@ -296,6 +271,8 @@ function HubAppInner({ stationSlug, moduleSlug }: Props) {
           {moduleSlug === "statistieken" && <ShoutcastStatsModule stationSlug={station.slug} />}
 
           {moduleSlug === "control" && <><div className="page-intro"><div><h2>On-Air Control Center</h2><p>Geen vaste demo-statussen: open per station de echte API-status.</p></div><button className="ghost" onClick={()=>router.push(`/hub/${station.slug}/radio-api`)}>↻ Live API</button></div><div className="station-grid">{hubStations.filter(s=>s.slug!=="all").map(s=><Card key={s.slug} className="station-card"><div className="station-card-head"><div className="station-logo" style={{background:s.accent}}>{s.short}</div><div><h3>{s.name}</h3><span className="muted">Rotation ID: {s.rotationId}</span></div></div><Link className="primary wide" href={`/hub/${s.slug}/radio-api`}>Bekijk Rotation + Playout status</Link></Card>)}</div></>}
+
+          {moduleSlug === "playout" && <PlayoutOneModule stationSlug={station.slug} />}
 
           {moduleSlug === "radio-api" && <RadioApiModule stationSlug={station.slug} />}
 
@@ -320,7 +297,6 @@ function HubAppInner({ stationSlug, moduleSlug }: Props) {
 
       {modal === "track" && <Modal title="Nieuwe track" onClose={()=>setModal(null)}><form onSubmit={e=>{e.preventDefault();const f=new FormData(e.currentTarget);setCustomTracks([...customTracks,{id:uid(),artist:String(f.get("artist")),title:String(f.get("title")),genre:String(f.get("genre")||"Dance"),release:String(f.get("release")||"Onbekend")}]);setModal(null);notify("Track toegevoegd aan inbox")}} className="modal-form"><label className="field">Artiest<input required name="artist" className="input"/></label><label className="field">Titel<input required name="title" className="input"/></label><label className="field">Genre<input name="genre" className="input" defaultValue="Dance"/></label><label className="field">Release<input name="release" className="input" placeholder="dd/mm/jjjj"/></label><button className="primary">Toevoegen</button></form></Modal>}
 
-      {modal === "team" && <Modal title="Gebruiker toevoegen" onClose={()=>setModal(null)}><form onSubmit={e=>{e.preventDefault();const f=new FormData(e.currentTarget);const name=String(f.get("name"));setTeam([...team,{id:uid(),name,role:String(f.get("role")),initials:name.split(" ").map(x=>x[0]).slice(0,2).join("").toUpperCase(),scope:String(f.get("scope"))}]);setModal(null);notify("Teamlid toegevoegd")}} className="modal-form"><label className="field">Naam<input required name="name" className="input"/></label><label className="field">Rol<input required name="role" className="input" defaultValue="Presentator"/></label><label className="field">Stations<input name="scope" className="input" defaultValue={station.name}/></label><button className="primary">Toevoegen</button></form></Modal>}
     </div>
   );
 }

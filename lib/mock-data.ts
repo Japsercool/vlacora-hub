@@ -26,6 +26,7 @@ export const navItems = [
   ["social", "✦", "Social Studio"],
   ["statistieken", "▥", "Luistercijfers"],
   ["control", "⌁", "On-Air Control"],
+  ["playout", "▶", "Playout One"],
   ["radio-api", "↔", "Radio API"],
   ["team", "♙", "Team"],
   ["beheer", "⚙", "Beheer"]
