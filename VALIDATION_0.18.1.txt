@@ -1,0 +1,19 @@
+VLACORA HUB 0.18.1 validation
+[PASS] version 0.18.1
+[PASS] config has SID
+[PASS] XML normalizer
+[PASS] CURRENTLISTENERS parsed
+[PASS] MAXLISTENERS parsed
+[PASS] manual read shoutcast action
+[PASS] XML Accept header
+[PASS] admin SID field
+[PASS] XML path primary
+[PASS] stats module uses normalized action
+[PASS] DNAS rich details
+[PASS] social studio XML-compatible
+[PASS] radio control XML-compatible
+[PASS] CSS clean
+[PASS] touched TypeScript/TSX files contain no parser errors
+[PASS] touched TypeScript/TSX files contain no local Cannot find name errors
+[INFO] no new Supabase schema migration required
+[INFO] SHOUTcast XML and JSON both normalize into one DNAS stats shape

@@ -13,6 +13,7 @@ export type ClientIntegrationConfig = {
   coveragePath?:string;
   revisionPath?:string;
   nowPath?:string;
+  shoutcastSid?:string;
   musicFoldersPath?:string;
   musicFolderItemsPath?:string;
   chartListPath?:string;
@@ -81,7 +82,7 @@ export function readStationCache(kind:IntegrationKind):RadioStation[]{
 }
 export function saveStationCache(kind:IntegrationKind,value:RadioStation[]){if(typeof window!=="undefined"){localStorage.setItem(stationCacheKey(kind),JSON.stringify(value));window.dispatchEvent(new CustomEvent("vlacora:hub-stations-changed",{detail:{kind}}))}}
 
-export async function radioRead(kind:IntegrationKind,path:string,action:"raw"|"stations"|"playlist"|"now"|"folders"|"songs"|"charts"|"chartEditions"|"chartEdition"|"revision"="raw"){
+export async function radioRead(kind:IntegrationKind,path:string,action:"raw"|"stations"|"playlist"|"now"|"folders"|"songs"|"charts"|"chartEditions"|"chartEdition"|"revision"|"shoutcast"="raw"){
   const config=readIntegration(kind);
   if(!config?.host)throw new Error(`${kind==="rotation"?"Rotation One":kind==="playout"?"Playout One":"SHOUTcast"} is nog niet ingesteld in Beheer → Integraties.`);
   let secret=readSecret(kind);

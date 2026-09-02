@@ -884,3 +884,101 @@ Alle 0.17.1-functionaliteit blijft behouden:
 - Playout One station mapping / handmatige fallback
 - eigen VLACORA stationnaam en korte badge
 - Social Studio fase 2
+
+
+## 0.18.0 — Taken & routines
+
+Het oude lokale demo-kanban is vervangen door een echte centrale teammodule.
+
+### Taken
+- snelle taak voor jezelf
+- uitgebreide taakeditor
+- beschrijving
+- status: Te doen / Bezig / Controle / Klaar
+- prioriteit: Laag / Normaal / Hoog / Dringend
+- deadline met datum + tijd
+- lijstweergave en kanbanweergave
+- Mijn taken / Iedereen / Terugkerend
+- zoeken
+- afgeronde taken optioneel tonen
+
+### Toewijzen
+Taken worden gekoppeld aan echte Supabase-teamaccounts.
+Eén taak kan aan meerdere personen tegelijk worden toegewezen.
+Een nieuw toegewezen teamlid krijgt een VLACORA-notificatie.
+
+### Terugkerende taken
+- dagelijks
+- elke X dagen
+- wekelijks
+- meerdere weekdagen
+- elke X weken
+- maandelijks
+- elke X maanden
+- optionele einddatum
+
+Om achtergrondjobs en extra verbruik te vermijden gebruikt VLACORA een
+completion-driven recurrence model: zodra een terugkerende taak als `Klaar`
+wordt gemarkeerd, wordt de volgende occurrence automatisch centraal aangemaakt.
+Er is dus geen Vercel cron of continue polling nodig.
+
+### Live team
+De bestaande Supabase Presence wordt rechtstreeks in Taken gebruikt:
+- wie nu online is
+- wie de Taken-module open heeft
+- welke taak iemand momenteel bekijkt/bewerkt
+- online bolletje op toegewezen personen
+
+Presence blijft ephemeral en veroorzaakt geen database-write bij elke klik.
+
+### Historiek
+Iedere taak heeft een activiteitentijdlijn met:
+- aangemaakt
+- bijgewerkt
+- statuswijzigingen
+- recurrence
+- opmerkingen
+
+### Realtime
+`hub_tasks` en `hub_task_assignees` zijn toegevoegd aan Supabase Realtime.
+Er is geen polling-loop nodig.
+
+Production migration `022_task_center_recurring_assignments_presence.sql`
+is al toegepast op het gekoppelde Supabase-project.
+
+
+## 0.18.1 — SHOUTcast DNAS XML
+
+Voor iedere VLACORA-zender kan nu expliciet een SHOUTcast SID worden ingesteld.
+
+Primaire bron:
+`/stats?sid=X`
+
+VLACORA leest rechtstreeks de DNAS XML-tags:
+- CURRENTLISTENERS
+- PEAKLISTENERS
+- MAXLISTENERS
+- UNIQUELISTENERS
+- AVERAGETIME
+- SONGTITLE
+- STREAMSTATUS
+- STREAMHITS
+- STREAMPATH
+- STREAMUPTIME
+- BITRATE
+- SAMPLERATE
+- CONTENT
+- SERVERTITLE
+- SERVERGENRE
+- VERSION
+
+JSON-responses blijven ondersteund als fallback.
+
+Bestaande paden zoals `/stats?sid=4&json=1` worden bij het laden automatisch
+teruggebracht naar de DNAS XML-vorm `/stats?sid=4`. De SID blijft behouden.
+
+De luisterhistoriek blijft maximaal één sample per 10 minuten per station opslaan.
+Geen extra databasepolling of betaalde dienst toegevoegd.
+
+Geen nieuwe Supabase-schema-migratie nodig: de bestaande station-specifieke
+`shoutcast-integration` setting bewaart SID en endpoint.

@@ -108,6 +108,98 @@ export function normalizePlaylist(body: unknown) {
   })};
 }
 
+
+export type NormalizedShoutcastStats={
+  listeners:number;
+  peak:number;
+  maxListeners:number;
+  unique:number;
+  averageTimeSeconds:number;
+  streamOnline:boolean;
+  songTitle:string;
+  streamHits:number;
+  streamPath:string;
+  streamUptimeSeconds:number;
+  bitrate:number;
+  sampleRate:number;
+  content:string;
+  serverTitle:string;
+  serverGenre:string;
+  version:string;
+  sourceFormat:"xml"|"json";
+};
+
+function decodeXml(value:string){
+  return value.replace(/&lt;/g,"<").replace(/&gt;/g,">").replace(/&quot;/g,'"').replace(/&apos;/g,"'").replace(/&amp;/g,"&").trim();
+}
+function xmlTag(xml:string,tag:string){
+  const escaped=tag.replace(/[.*+?^${}()|[\]\\]/g,"\\$&");
+  const match=xml.match(new RegExp(`<${escaped}(?:\\s[^>]*)?>([\\s\\S]*?)<\\/${escaped}>`,"i"));
+  return match?decodeXml(match[1].replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g,"$1")):"";
+}
+function numeric(value:any){
+  const n=Number(value);return Number.isFinite(n)?Math.max(0,n):0;
+}
+function booleanish(value:any){
+  if(typeof value==="boolean")return value;
+  const x=String(value??"").trim().toLowerCase();
+  return x==="1"||x==="true"||x==="online"||x==="up";
+}
+function shoutcastObject(body:any){
+  if(!body||typeof body!=="object")return {};
+  if(body.currentlisteners!=null||body.CURRENTLISTENERS!=null)return body;
+  if(Array.isArray(body.streams)&&body.streams.length)return shoutcastObject(body.streams[0]);
+  if(body.stream&&typeof body.stream==="object")return shoutcastObject(body.stream);
+  if(body.stats&&typeof body.stats==="object")return shoutcastObject(body.stats);
+  return body;
+}
+
+export function normalizeShoutcastStats(body:unknown):NormalizedShoutcastStats{
+  if(typeof body==="string"&&/<SHOUTCASTSERVER\b/i.test(body)){
+    const tag=(name:string)=>xmlTag(body,name);
+    return{
+      listeners:numeric(tag("CURRENTLISTENERS")),
+      peak:numeric(tag("PEAKLISTENERS")),
+      maxListeners:numeric(tag("MAXLISTENERS")),
+      unique:numeric(tag("UNIQUELISTENERS")),
+      averageTimeSeconds:numeric(tag("AVERAGETIME")),
+      streamOnline:booleanish(tag("STREAMSTATUS")),
+      songTitle:tag("SONGTITLE"),
+      streamHits:numeric(tag("STREAMHITS")),
+      streamPath:tag("STREAMPATH"),
+      streamUptimeSeconds:numeric(tag("STREAMUPTIME")),
+      bitrate:numeric(tag("BITRATE")),
+      sampleRate:numeric(tag("SAMPLERATE")),
+      content:tag("CONTENT"),
+      serverTitle:tag("SERVERTITLE"),
+      serverGenre:tag("SERVERGENRE"),
+      version:tag("VERSION"),
+      sourceFormat:"xml"
+    };
+  }
+
+  const x=shoutcastObject(body) as any;
+  return{
+    listeners:numeric(x.currentlisteners??x.currentListeners??x.CURRENTLISTENERS??x.listeners??x.listener_count),
+    peak:numeric(x.peaklisteners??x.peakListeners??x.PEAKLISTENERS??x.peak),
+    maxListeners:numeric(x.maxlisteners??x.maxListeners??x.MAXLISTENERS??x.max),
+    unique:numeric(x.uniquelisteners??x.uniqueListeners??x.UNIQUELISTENERS??x.unique),
+    averageTimeSeconds:numeric(x.averagetime??x.averageTime??x.AVERAGETIME??x.average_time),
+    streamOnline:booleanish(x.streamstatus??x.streamStatus??x.STREAMSTATUS??x.online??x.status),
+    songTitle:String(x.songtitle??x.songTitle??x.SONGTITLE??x.currentSong??x.song??""),
+    streamHits:numeric(x.streamhits??x.streamHits??x.STREAMHITS),
+    streamPath:String(x.streampath??x.streamPath??x.STREAMPATH??""),
+    streamUptimeSeconds:numeric(x.streamuptime??x.streamUptime??x.STREAMUPTIME),
+    bitrate:numeric(x.bitrate??x.BITRATE??x.streambitrate),
+    sampleRate:numeric(x.samplerate??x.sampleRate??x.SAMPLERATE),
+    content:String(x.content??x.CONTENT??""),
+    serverTitle:String(x.servertitle??x.serverTitle??x.SERVERTITLE??x.name??""),
+    serverGenre:String(x.servergenre??x.serverGenre??x.SERVERGENRE??""),
+    version:String(x.version??x.VERSION??""),
+    sourceFormat:"json"
+  };
+}
+
 export function normalizeNow(body: unknown) {
   const obj=rec(body);
   const current=rec(first(obj,["now","Now","current","Current","currentItem","CurrentItem","nowPlaying","NowPlaying"],obj));

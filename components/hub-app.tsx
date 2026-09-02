@@ -18,6 +18,7 @@ import ChartsModule from "@/components/modules/charts-module";
 import IncidentModule,{IncidentSummaryCard} from "@/components/modules/incident-module";
 import TemplatesModule from "@/components/modules/templates-module";
 import ShoutcastStatsModule,{ListenerNowCard} from "@/components/modules/shoutcast-stats-module";
+import TasksModule,{TaskSummaryCard} from "@/components/modules/tasks-module";
 import { hydrateSharedIntegrationSettings,loadSharedSetting } from "@/lib/supabase/settings";
 import { HUB_STATIONS_EVENT, allHubStation, readHubStations, saveStationAlias, type HubStation, type HubStationAlias } from "@/lib/radio/hub-stations";
 import AccountWidget from "@/components/auth/account-widget";
@@ -31,13 +32,12 @@ import {
 
 type Props = { stationSlug: string; moduleSlug: string };
 type Tone = "blue" | "red" | "green" | "orange" | "gray";
-type Task = { id: string; title: string; owner: string; due: string; status: string; priority: string };
 type Message = { id: string; who: string; text: string; time: string };
 type Announcement = { id: string; title: string; body: string; category: string; importance: string; read: boolean; requiresAck?: boolean };
 type CalendarEvent = { id: string; title: string; type: string; day: number; row: number; time: string };
 type TeamMember = { id: string; name: string; role: string; initials: string; scope: string };
 type CustomTrack = { id: string; artist: string; title: string; genre: string; release: string };
-type ModalType = "task" | "announcement" | "event" | "playlist" | "track" | "team" | null;
+type ModalType = "announcement" | "event" | "playlist" | "track" | "team" | null;
 
 const uid = () => Math.random().toString(36).slice(2) + Date.now().toString(36);
 
@@ -104,11 +104,6 @@ function HubAppInner({ stationSlug, moduleSlug }: Props) {
   const station = hubStations.find((s) => s.slug === stationSlug) || (stationSlug==="all"?allHubStation():{slug:stationSlug,name:"Station laden…",short:"…",accent:"#26269f",source:"rotation" as const});
   const storagePrefix = `vlacora:${stationSlug}`;
 
-  const [tasks, setTasks] = useLocalState<Task[]>(`${storagePrefix}:tasks`, [
-    { id: "t1", title: "Playlist woensdag controleren", owner: "Jasper", due: "Vandaag 17:30", status: "Bezig", priority: "Hoog" },
-    { id: "t2", title: "Nieuwe muziek voorbereiden", owner: "Muziekredactie", due: "Morgen 09:30", status: "Te doen", priority: "Normaal" },
-    { id: "t3", title: "Tune of the Week visual", owner: "Social", due: "Morgen 12:00", status: "Controle", priority: "Normaal" }
-  ]);
   const [messages, setMessages] = useLocalState<Message[]>(`${storagePrefix}:messages`, [
     { id: "m1", who: "Tibo", text: "Nieuwe tracks voor de meeting staan klaar.", time: "16:20" },
     { id: "m2", who: "Jasper", text: "Top, ik luister ze straks nog even na.", time: "16:24" },
@@ -141,7 +136,6 @@ function HubAppInner({ stationSlug, moduleSlug }: Props) {
     name: station.name, timezone: "Europe/Brussels", active: true, playlistWarnings: true, newsCheck: true, socialReminders: true
   });
 
-  const [taskDraft, setTaskDraft] = useState("");
   const [msgDraft, setMsgDraft] = useState("");
   const [selectedChannel, setSelectedChannel] = useState("muziekredactie");
   const [modal, setModal] = useState<ModalType>(null);
@@ -163,12 +157,6 @@ function HubAppInner({ stationSlug, moduleSlug }: Props) {
   function notify(text: string) {
     setToast(text);
     window.setTimeout(() => setToast(""), 2600);
-  }
-  function addTaskQuick() {
-    if (!taskDraft.trim()) return;
-    setTasks([{ id: uid(), title: taskDraft.trim(), owner: "Jasper", due: "Geen deadline", status: "Te doen", priority: "Normaal" }, ...tasks]);
-    setTaskDraft("");
-    notify("Taak toegevoegd");
   }
   function movePlaylist(index: number, direction: -1 | 1) {
     const next = [...playlist];
@@ -248,7 +236,7 @@ function HubAppInner({ stationSlug, moduleSlug }: Props) {
             <div className="metric-grid">
               <ListenerNowCard stationSlug={station.slug} />
               <Card><span className="metric-label">Playlistdekking</span><strong className="metric">LIVE</strong><span className="muted">Via Rotation One coverage</span></Card>
-              <Card><span className="metric-label">Open taken</span><strong className="metric">{tasks.filter(t=>t.status!=="Klaar").length}</strong><span className="muted">VLACORA werkdata</span></Card>
+              <TaskSummaryCard stationSlug={station.slug} />
               <Card><span className="metric-label">Team bezig</span><strong className="metric">{collaboration.presence.length}</strong><span className="muted">live in de HUB</span></Card>
             </div>
             <div className="two-col">
@@ -266,12 +254,7 @@ function HubAppInner({ stationSlug, moduleSlug }: Props) {
 
           {moduleSlug === "stations" && <><div className="page-intro"><div><h2>Stations uit Rotation One</h2><p>Deze lijst wordt rechtstreeks opgebouwd uit de laatst opgehaalde Rotation One-stations.</p></div><button className="primary" onClick={()=>router.push(`/hub/${station.slug}/radio-api`)}>↻ Stations beheren</button></div>{hubStations.filter(s=>s.slug!=="all").length===0?<Card><div className="empty-live-state"><strong>Nog geen Rotation One-stations opgehaald</strong><span>Ga naar Radio API of Beheer → Integraties en klik op Stations ophalen.</span></div></Card>:<div className="station-grid">{hubStations.filter(s=>s.slug!=="all").map(s=><Card key={s.slug} className="station-card"><div className="station-card-head"><div className="station-logo" style={{background:s.accent}}>{s.short}</div><div><h3>{s.name}</h3><span className="muted">Rotation One • {s.rotationId}</span></div></div><div className="station-stat"><span>Bron</span><strong>Live Rotation One</strong></div><Link className="primary wide" href={`/hub/${s.slug}/dashboard`}>Open station</Link></Card>)}</div>}</>}
 
-          {moduleSlug === "taken" && <>
-            <div className="toolbar"><input className="input grow" placeholder="Nieuwe taak..." value={taskDraft} onChange={e=>setTaskDraft(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addTaskQuick()}/><button className="primary" onClick={addTaskQuick}>+ Snel toevoegen</button><button className="ghost" onClick={()=>setModal("task")}>Uitgebreid</button></div>
-            <div className="kanban">{["Te doen","Bezig","Controle","Klaar"].map(column=><div className="kanban-col" key={column}><div className="kanban-head"><strong>{column}</strong><span>{tasks.filter(t=>t.status===column).length}</span></div>
-              {tasks.filter(t=>t.status===column).map(task=><Card key={task.id} className={`task-card ${column==="Klaar"?"done":""}`}><Badge tone={task.priority==="Hoog"?"red":"gray"}>{task.priority}</Badge><h3>{task.title}</h3><p>{task.owner}</p><small>⏱ {task.due}</small><div className="task-actions"><select className="select compact-select" value={task.status} onChange={e=>setTasks(tasks.map(t=>t.id===task.id?{...t,status:e.target.value}:t))}>{["Te doen","Bezig","Controle","Klaar"].map(s=><option key={s}>{s}</option>)}</select><button className="mini-btn danger" onClick={()=>setTasks(tasks.filter(t=>t.id!==task.id))}>×</button></div></Card>)}
-            </div>)}</div>
-          </>}
+          {moduleSlug === "taken" && <TasksModule stationSlug={station.slug} />}
 
           {moduleSlug === "meldpunt" && <IncidentModule stationSlug={station.slug} publishNotification={collaboration.publishNotification} />}
 
@@ -328,7 +311,6 @@ function HubAppInner({ stationSlug, moduleSlug }: Props) {
 
       {toast && <div className="toast">{toast}</div>}
 
-      {modal === "task" && <Modal title="Nieuwe taak" onClose={()=>setModal(null)}><form onSubmit={e=>{e.preventDefault();const f=new FormData(e.currentTarget);setTasks([{id:uid(),title:String(f.get("title")),owner:String(f.get("owner")||"Jasper"),due:String(f.get("due")||"Geen deadline"),status:"Te doen",priority:String(f.get("priority")||"Normaal")},...tasks]);setModal(null);notify("Taak aangemaakt")}} className="modal-form"><label className="field">Titel<input required name="title" className="input"/></label><label className="field">Verantwoordelijke<input name="owner" className="input" defaultValue="Jasper"/></label><label className="field">Deadline<input name="due" className="input" placeholder="bv. Morgen 17:00"/></label><label className="field">Prioriteit<select name="priority" className="select"><option>Normaal</option><option>Hoog</option></select></label><button className="primary">Aanmaken</button></form></Modal>}
 
       {modal === "announcement" && <Modal title="Officieel bericht publiceren" onClose={()=>setModal(null)}><form onSubmit={e=>{e.preventDefault();const f=new FormData(e.currentTarget);const title=String(f.get("title"));const body=String(f.get("body"));const category=String(f.get("category"));const importance=String(f.get("importance"));const requiresAck=f.get("requiresAck")==="on";setAnnouncements([{id:uid(),title,body,category,importance,read:false,requiresAck},...announcements]);void collaboration.publishNotification({stationSlug:station.slug,title,body,category,severity:importance==="Belangrijk"?"warning":"info",requiresAck,actionPath:`/hub/${station.slug}/communicatie`}).catch(()=>notify("Bericht lokaal opgeslagen; teamnotificatie kon niet worden gedeeld."));setModal(null);notify(requiresAck?"Verplicht bericht gepubliceerd":"Officieel bericht gepubliceerd")}} className="modal-form"><label className="field">Titel<input required name="title" className="input"/></label><label className="field">Categorie<input name="category" className="input" defaultValue="Muziekredactie"/></label><label className="field">Belang<select name="importance" className="select"><option>Normaal</option><option>Belangrijk</option></select></label><label className="field">Bericht<textarea required name="body" className="input textarea"/></label><label className="required-notification-toggle"><input type="checkbox" name="requiresAck"/><div><strong>Moet iedereen gezien hebben</strong><span>De melding blijft verplicht op het scherm tot de gebruiker ze expliciet bevestigt.</span></div></label><button className="primary">Publiceren</button></form></Modal>}
 

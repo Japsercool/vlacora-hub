@@ -23,7 +23,7 @@ const seed:IntegrationStore={
     chartListPath:"/api/v1/stations/{stationId}/charts",chartEditionsPath:"/api/v1/stations/{stationId}/charts/{chartId}/editions",chartEditionPath:"/api/v1/stations/{stationId}/charts/{chartId}/editions/{editionId}",chartRevisionPath:"/api/v1/stations/{stationId}/charts/revision",chartWritePath:"/api/v1/stations/{stationId}/charts/{chartId}/editions/{editionId}",chartWriteEnabled:false,readOnly:true
   },
   playout:{enabled:false,protocol:"http",host:"",port:"5099",basePath:"",stationPath:"/api/v1/integration/stations",statusPath:"/api/v1/integration/health",nowPath:"/api/v1/integration/stations/{stationId}/status",readOnly:true},
-  shoutcast:{enabled:false,protocol:"http",host:"",port:"8000",basePath:"",stationPath:"/stats?sid=1&json=1",statusPath:"/stats?sid=1&json=1",readOnly:true}
+  shoutcast:{enabled:false,protocol:"http",host:"",port:"8000",basePath:"",stationPath:"/stats?sid=1",statusPath:"/stats?sid=1",shoutcastSid:"1",readOnly:true}
 };
 const stationSeed:StationSettings={timezone:"Europe/Brussels",active:true,playlistWarnings:true,newsCheck:true,socialReminders:true};
 
@@ -49,10 +49,18 @@ export default function AdminIntegrationsModule({stationName,stationSlug}:{stati
     (async()=>{
       const local=readIntegrationStore();
       let merged:IntegrationStore={...seed,rotation:{...seed.rotation,...local.rotation},playout:{...seed.playout,...local.playout},shoutcast:{...seed.shoutcast,...local.shoutcast}};
+      {
+        const sid=String(merged.shoutcast.shoutcastSid||merged.shoutcast.statusPath.match(/[?&]sid=(\d+)/i)?.[1]||"1");
+        merged.shoutcast={...merged.shoutcast,shoutcastSid:sid,statusPath:`/stats?sid=${sid}`,stationPath:`/stats?sid=${sid}`};
+      }
       if(supabaseConfigured){
         const remote=await loadSharedIntegrationStore(stationSlug);
         const hasRemote=Boolean(remote.rotation||remote.playout||remote.shoutcast);
         merged={...merged,rotation:{...merged.rotation,...remote.rotation},playout:{...merged.playout,...remote.playout},shoutcast:{...merged.shoutcast,...remote.shoutcast}};
+        {
+          const sid=String(merged.shoutcast.shoutcastSid||merged.shoutcast.statusPath.match(/[?&]sid=(\d+)/i)?.[1]||"1");
+          merged.shoutcast={...merged.shoutcast,shoutcastSid:sid,statusPath:`/stats?sid=${sid}`,stationPath:`/stats?sid=${sid}`};
+        }
         // One-time migration: an existing browser configuration is copied into Supabase instead of being lost after this update.
         if(!hasRemote&&(local.rotation?.host||local.playout?.host||local.shoutcast?.host))void saveSharedIntegrationStore(merged,stationSlug).catch(()=>{});
         const remoteStation=await loadSharedSetting<StationSettings>(`station:${stationSlug}`,"station-settings");
@@ -210,15 +218,18 @@ export default function AdminIntegrationsModule({stationName,stationSlug}:{stati
         <label className="field">Protocol<select className="select" value={cfg.protocol} onChange={e=>update(selected,{protocol:e.target.value as Protocol})}><option value="http">HTTP</option><option value="https">HTTPS</option></select></label>
         <label className="field">Publiek IP-adres<input className="input" value={cfg.host} onChange={e=>update(selected,{host:e.target.value.trim()})} placeholder="bv. 85.215.152.155"/></label>
         <label className="field">Poort<input className="input" value={cfg.port} onChange={e=>update(selected,{port:e.target.value.replace(/\D/g,"")})} placeholder={selected==="rotation"?"5500":selected==="playout"?"5099":"8000"}/></label>
+        {selected==="shoutcast"&&<label className="field">Stream SID<input className="input" value={cfg.shoutcastSid||cfg.statusPath.match(/[?&]sid=(\d+)/i)?.[1]||"1"} onChange={e=>{const sid=e.target.value.replace(/\D/g,"")||"1";update(selected,{shoutcastSid:sid,statusPath:`/stats?sid=${sid}`,stationPath:`/stats?sid=${sid}`})}} placeholder="bv. 4"/><small>Voor jouw voorbeeld is dit SID 4.</small></label>}
         <label className="field">Basis-pad<input className="input" value={cfg.basePath} onChange={e=>update(selected,{basePath:e.target.value})} placeholder="meestal leeg"/></label>
       </div><div className="endpoint-preview"><span>Adres</span><strong>{cfg.protocol}://{cfg.host||"JOUW-IP"}{cfg.port?`:${cfg.port}`:""}{cfg.basePath||""}</strong></div></div>
 
       <div className="settings-section"><h4>API beveiliging</h4><label className="field">API-key / shared secret<input className="input" type="password" value={keyInput} onChange={e=>setKeyInput(e.target.value)} placeholder={secretState==="stored"?"Centraal opgeslagen in Supabase Vault":"leeg laten als deze koppeling geen key gebruikt"}/></label><div className="two-form-cols"><label className="field">Header<input className="input" value={keyHeader} onChange={e=>setKeyHeader(e.target.value)}/></label><label className="field">Prefix<input className="input" value={keyPrefix} onChange={e=>setKeyPrefix(e.target.value)}/></label></div><div className="secret-explainer"><strong>🔐 {secretState==="stored"?"Veilig centraal opgeslagen":secretState==="loading"?"Sleutel laden…":secretState==="session"?"Nog alleen in deze sessie":"Nog geen centrale sleutel"}</strong><span>{supabaseConfigured?"API-sleutels worden versleuteld opgeslagen met Supabase Vault en automatisch teruggeladen na een deploy, browserherstart of op een ander toestel. Ze staan niet in GitHub, localStorage of een leesbare VLACORA-tabel.":"Supabase is niet actief; de sleutel kan alleen tijdelijk in deze browsersessie blijven."}</span></div>{(keyInput||secretState==="stored")&&<button className="ghost danger-text" disabled={busy} onClick={()=>void clearSecret()}>Verwijder opgeslagen sleutel</button>}</div>
 
       <div className="settings-section"><h4>Endpoints</h4>
-        <label className="field">Status endpoint<input className="input" value={cfg.statusPath} onChange={e=>update(selected,{statusPath:e.target.value})}/></label>
+        {selected==="shoutcast"
+          ?<label className="field">DNAS stats endpoint<input className="input" value={cfg.statusPath} readOnly/><small>VLACORA gebruikt primair de XML-response van SHOUTcast DNAS.</small></label>
+          :<label className="field">Status endpoint<input className="input" value={cfg.statusPath} onChange={e=>update(selected,{statusPath:e.target.value})}/></label>}
         {selected!=="shoutcast"&&<label className="field">Stations endpoint<input className="input" value={cfg.stationPath} onChange={e=>update(selected,{stationPath:e.target.value})}/></label>}
-        {selected==="shoutcast"&&<div className="shoutcast-config-note"><strong>Standaard voor SHOUTcast v2</strong><code>/stats?sid=1&amp;json=1</code><span>Gebruik hier de SID van de stream van dit station. VLACORA leest alleen publieke statistieken.</span></div>}
+        {selected==="shoutcast"&&<div className="shoutcast-config-note"><strong>SHOUTcast DNAS XML • aanbevolen</strong><code>/stats?sid={cfg.shoutcastSid||"1"}</code><span>VLACORA leest CURRENTLISTENERS, PEAKLISTENERS, MAXLISTENERS, UNIQUELISTENERS, AVERAGETIME, SONGTITLE, STREAMSTATUS, STREAMHITS, STREAMPATH, STREAMUPTIME, BITRATE, SAMPLERATE, CONTENT en SERVERTITLE. JSON blijft ondersteund als fallback.</span></div>}
         {selected==="rotation"&&<>
           <label className="field">Schedule endpoint<input className="input" value={cfg.playlistPath||""} onChange={e=>update(selected,{playlistPath:e.target.value})}/></label>
           <label className="field">Coverage endpoint<input className="input" value={cfg.coveragePath||""} onChange={e=>update(selected,{coveragePath:e.target.value})}/></label>

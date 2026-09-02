@@ -5,31 +5,21 @@ import { createClient,isSupabaseBrowserConfigured } from "@/lib/supabase/client"
 import { hydrateSharedIntegrationSettings } from "@/lib/supabase/settings";
 import { radioRead,readIntegration } from "@/lib/radio/client-config";
 
-type LiveStats={listeners:number;peak:number;unique:number;averageTimeSeconds:number;streamOnline:boolean;songTitle:string;bitrate:string;serverTitle:string;fetchedAt:string};
+type LiveStats={
+  listeners:number;peak:number;maxListeners:number;unique:number;averageTimeSeconds:number;streamOnline:boolean;
+  songTitle:string;streamHits:number;streamPath:string;streamUptimeSeconds:number;bitrate:number;sampleRate:number;
+  content:string;serverTitle:string;serverGenre:string;version:string;sourceFormat:"xml"|"json";fetchedAt:string
+};
 type Sample={bucket_at:string;listeners:number;peak_listeners:number;unique_listeners:number;average_time_seconds:number;stream_online:boolean;song_title:string};
 
-function numberValue(...values:any[]){for(const value of values){const n=Number(value);if(Number.isFinite(n))return Math.max(0,n)}return 0}
-function boolValue(value:any){if(typeof value==="boolean")return value;const x=String(value??"").toLowerCase();return x==="1"||x==="true"||x==="online"||x==="up"}
-function candidate(raw:any){
-  if(!raw||typeof raw!=="object")return raw||{};
-  if(raw.currentlisteners!=null||raw.currentListeners!=null)return raw;
-  if(Array.isArray(raw.streams)&&raw.streams.length)return candidate(raw.streams[0]);
-  if(raw.stream&&typeof raw.stream==="object")return candidate(raw.stream);
-  if(raw.stats&&typeof raw.stats==="object")return candidate(raw.stats);
-  return raw;
-}
 function normalize(raw:any):LiveStats{
-  const x=candidate(raw);
-  return {
-    listeners:numberValue(x.currentlisteners,x.currentListeners,x.listeners,x.listener_count),
-    peak:numberValue(x.peaklisteners,x.peakListeners,x.peak),
-    unique:numberValue(x.uniquelisteners,x.uniqueListeners,x.unique),
-    averageTimeSeconds:numberValue(x.averagetime,x.averageTime,x.average_time),
-    streamOnline:boolValue(x.streamstatus??x.streamStatus??x.online??x.status),
-    songTitle:String(x.songtitle??x.songTitle??x.currentSong??x.song??""),
-    bitrate:String(x.bitrate??x.streambitrate??""),
-    serverTitle:String(x.servertitle??x.serverTitle??x.name??""),
-    fetchedAt:new Date().toISOString()
+  const x=raw?.shoutcast||raw||{};
+  return{
+    listeners:Number(x.listeners||0),peak:Number(x.peak||0),maxListeners:Number(x.maxListeners||0),unique:Number(x.unique||0),
+    averageTimeSeconds:Number(x.averageTimeSeconds||0),streamOnline:Boolean(x.streamOnline),songTitle:String(x.songTitle||""),
+    streamHits:Number(x.streamHits||0),streamPath:String(x.streamPath||""),streamUptimeSeconds:Number(x.streamUptimeSeconds||0),
+    bitrate:Number(x.bitrate||0),sampleRate:Number(x.sampleRate||0),content:String(x.content||""),serverTitle:String(x.serverTitle||""),
+    serverGenre:String(x.serverGenre||""),version:String(x.version||""),sourceFormat:x.sourceFormat==="json"?"json":"xml",fetchedAt:new Date().toISOString()
   };
 }
 function fmtTime(seconds:number){if(!seconds)return "—";const m=Math.floor(seconds/60),s=Math.floor(seconds%60);return m>=60?`${Math.floor(m/60)}u ${m%60}m`:`${m}m ${s}s`}
@@ -76,8 +66,8 @@ function useShoutcast(stationSlug:string,intervalMs:number){
       await hydrateSharedIntegrationSettings(stationSlug);
       const config=readIntegration("shoutcast");
       if(!config?.host){setError("SHOUTcast is voor dit station nog niet ingesteld in Beheer → Integraties.");setLive(null);return}
-      const data=await radioRead("shoutcast",config.statusPath||"/stats?sid=1&json=1","raw");
-      const parsed=normalize(data.raw);
+      const data=await radioRead("shoutcast",config.statusPath||`/stats?sid=${config.shoutcastSid||"1"}`,"shoutcast");
+      const parsed=normalize(data.shoutcast);
       setLive(parsed);setError("");void persist(parsed);
     }catch(e){setError(e instanceof Error?e.message:"SHOUTcast ophalen mislukt")}
     finally{setLoading(false)}
@@ -106,7 +96,7 @@ export default function ShoutcastStatsModule({stationSlug}:{stationSlug:string})
   const avg=values.length?Math.round(values.reduce((a,b)=>a+b,0)/values.length):(live?.listeners||0);
   const max=Math.max(1,...hours.map(x=>x.value||0));
   return <div>
-    <div className="page-intro"><div><h2>Luistercijfers</h2><p>Echte SHOUTcast-statistieken • live refresh om de 30 seconden • historie maximaal 1 sample per 10 minuten.</p></div><button className="ghost" disabled={loading} onClick={()=>void refresh()}>↻ Nu vernieuwen</button></div>
+    <div className="page-intro"><div><h2>Luistercijfers</h2><p>Echte SHOUTcast DNAS-statistieken via /stats?sid=X • XML primair, JSON fallback • historie maximaal 1 sample per 10 minuten.</p></div><button className="ghost" disabled={loading} onClick={()=>void refresh()}>↻ Nu vernieuwen</button></div>
     {error&&<div className="config-error shoutcast-live-error"><strong>SHOUTcast</strong><span>{error}</span><a className="ghost" href={`/hub/${stationSlug}/beheer`}>Open instellingen</a></div>}
     <div className="metric-grid">
       <div className="card"><span className="metric-label">Nu</span><strong className="metric">{loading?"…":live?live.listeners:"—"}</strong><span className={live?.streamOnline?"positive":"muted"}>{live?.streamOnline?"● stream online":"stream offline"}</span></div>
@@ -116,7 +106,7 @@ export default function ShoutcastStatsModule({stationSlug}:{stationSlug:string})
     </div>
     <div className="two-col">
       <div className="card"><div className="section-head"><div><h3>Listeners vandaag</h3><p>Gemiddelde per uur uit 10-minuten samples</p></div><span className="badge badge-blue">{history.length} samples</span></div><div className="bar-chart listener-bar-chart">{hours.map(x=><div className="bar-wrap" key={x.hour} title={x.value==null?`${x.hour}:00 • nog geen data`:`${x.hour}:00 • ${x.value} listeners`}><div className={`bar ${x.value==null?"empty":""}`} style={{height:`${x.value==null?2:Math.max(4,Math.round((x.value/max)*100))}%`}}/><span>{String(x.hour).padStart(2,"0")}</span></div>)}</div></div>
-      <div className="card"><div className="section-head"><div><h3>Stream nu</h3><p>Rechtstreeks uit SHOUTcast</p></div><span className={`badge ${live?.streamOnline?"badge-green":"badge-gray"}`}>{live?.streamOnline?"ONLINE":"OFFLINE"}</span></div><div className="listener-details"><span>Server</span><strong>{live?.serverTitle||"—"}</strong><span>Bitrate</span><strong>{live?.bitrate?`${live.bitrate} kbps`:"—"}</strong><span>Unieke listeners</span><strong>{live?.unique??"—"}</strong><span>Song</span><strong>{live?.songTitle||"—"}</strong><span>Laatste update</span><strong>{live?new Date(live.fetchedAt).toLocaleTimeString("nl-BE"):"—"}</strong></div></div>
+      <div className="card"><div className="section-head"><div><h3>Stream nu</h3><p>Rechtstreeks uit SHOUTcast DNAS {live?`• ${live.sourceFormat.toUpperCase()}`:""}</p></div><span className={`badge ${live?.streamOnline?"badge-green":"badge-gray"}`}>{live?.streamOnline?"ONLINE":"OFFLINE"}</span></div><div className="listener-details shoutcast-dnas-details"><span>Server</span><strong>{live?.serverTitle||"—"}</strong><span>Now playing</span><strong>{live?.songTitle||"—"}</strong><span>Listeners / max</span><strong>{live?`${live.listeners} / ${live.maxListeners||"—"}`:"—"}</strong><span>Unieke listeners</span><strong>{live?.unique??"—"}</strong><span>Stream hits</span><strong>{live?.streamHits??"—"}</strong><span>Stream pad</span><strong>{live?.streamPath||"—"}</strong><span>Bitrate</span><strong>{live?.bitrate?`${live.bitrate} kbps`:"—"}</strong><span>Sample rate</span><strong>{live?.sampleRate?`${Math.round(live.sampleRate/1000)} kHz`:"—"}</strong><span>Uptime</span><strong>{live?fmtTime(live.streamUptimeSeconds):"—"}</strong><span>Content</span><strong>{live?.content||"—"}</strong><span>Genre</span><strong>{live?.serverGenre||"—"}</strong><span>DNAS versie</span><strong>{live?.version||"—"}</strong><span>Laatste update</span><strong>{live?new Date(live.fetchedAt).toLocaleTimeString("nl-BE"):"—"}</strong></div></div>
     </div>
     <div className="usage-note"><strong>Zuinig bijgewerkt</strong><span>VLACORA vraagt live cijfers alleen terwijl TODAY/Luistercijfers geopend is. De database bewaart maximaal één sample per 10 minuten per station, niet elke 30 seconden.</span></div>
   </div>

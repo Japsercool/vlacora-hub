@@ -1,2 +1,2 @@
-VLACORA HUB 0.17.2
-Vercel build fix for malformed hub-app import plus escaped-newline cleanup in 0.17.1 radio files.
+VLACORA HUB 0.18.1
+SHOUTcast DNAS XML /stats?sid=X is now the primary listener/stream source, with JSON fallback.

@@ -67,7 +67,7 @@ export async function POST(request:NextRequest) {
   const apiKey=String(body.apiKey||"");
   const apiKeyHeader=String(body.apiKeyHeader||"Authorization").trim();
   const apiKeyPrefix=String(body.apiKeyPrefix||"Bearer").trim();
-  const headers:Record<string,string>={Accept:"application/json"};
+  const headers:Record<string,string>={Accept:kind==="shoutcast"?"application/xml,text/xml,application/json;q=0.9,*/*;q=0.8":"application/json"};
 
   if(apiKey){
     if(!/^[A-Za-z0-9-]{1,64}$/.test(apiKeyHeader))return NextResponse.json({error:"Ongeldige API-key headernaam"},{status:400});
@@ -99,7 +99,7 @@ export async function POST(request:NextRequest) {
       phase: detail.code==="ETIMEDOUT" ? "http-timeout" : "http-native",
       target,
       message: detail.code==="ETIMEDOUT"
-        ? "Rotation One is bereikbaar, maar gaf niet tijdig een volledige HTTP-response terug."
+        ? "De radio-integratie is bereikbaar, maar gaf niet tijdig een volledige HTTP-response terug."
         : "De native Node HTTP-aanvraag naar de radio-API mislukte.",
       transport:cfg.protocol==="https"?"node:https":"node:http",
       httpError:detail,

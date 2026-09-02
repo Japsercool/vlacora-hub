@@ -97,8 +97,8 @@ function normalizeNow(raw:any){
   };
 }
 function listenerCount(raw:any){
-  const root=raw?.streams?.[0]||raw?.stream||raw?.stats||raw||{};
-  const value=Number(root.currentlisteners??root.currentListeners??root.listeners??root.listener_count??0);
+  const root=raw?.shoutcast||raw?.streams?.[0]||raw?.stream||raw?.stats||raw||{};
+  const value=Number(root.listeners??root.currentlisteners??root.currentListeners??root.listener_count??0);
   return Number.isFinite(value)?String(value):"";
 }
 function toLocalInput(iso:string|null){
@@ -218,7 +218,7 @@ export default function SocialStudioModule({stationSlug}:{stationSlug:string}){
       }
       const sc=readIntegration("shoutcast");
       if(sc?.host){
-        try{const raw=await radioRead("shoutcast",sc.statusPath||"/stats?sid=1&json=1","raw");const listeners=listenerCount(raw.raw);if(listeners)next.listeners=listeners;notes.push("listeners")}catch{}
+        try{const raw=await radioRead("shoutcast",sc.statusPath||`/stats?sid=${sc.shoutcastSid||"1"}`,"shoutcast");const listeners=listenerCount(raw.shoutcast);if(listeners)next.listeners=listeners;notes.push("listeners")}catch{}
       }
       try{
         const blocks=await loadSharedProgramming(stationSlug);const now=new Date();const weekday=now.getDay();const hm=now.getHours()*60+now.getMinutes();

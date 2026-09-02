@@ -3,7 +3,7 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 import { NextRequest,NextResponse } from "next/server";
-import { normalizeChartEdition,normalizeChartEditions,normalizeCharts,normalizeMusicFolders,normalizeMusicSongs,normalizeNow,normalizePlaylist,normalizeRevision,normalizeStations } from "@/lib/radio/normalize";
+import { normalizeChartEdition,normalizeChartEditions,normalizeCharts,normalizeMusicFolders,normalizeMusicSongs,normalizeNow,normalizePlaylist,normalizeRevision,normalizeShoutcastStats,normalizeStations } from "@/lib/radio/normalize";
 import { runtimeInfo,tcpProbe } from "@/lib/radio/diagnostics";
 import { nativeError,nativeHttpGet } from "@/lib/radio/native-http";
 
@@ -21,7 +21,7 @@ export async function POST(request:NextRequest){
   const started=Date.now();let body:any;try{body=await request.json()}catch{return NextResponse.json({error:"Ongeldige aanvraag"},{status:400})}
   const cfg=body.config||{};const kind=String(body.kind||"");const action=String(body.action||"raw");
   if(!["rotation","playout","shoutcast"].includes(kind))return NextResponse.json({error:"Onbekende integratie"},{status:400});
-  if(!["raw","stations","playlist","now","folders","songs","charts","chartEditions","chartEdition","revision"].includes(action))return NextResponse.json({error:"Ongeldige leesactie"},{status:400});
+  if(!["raw","stations","playlist","now","folders","songs","charts","chartEditions","chartEdition","revision","shoutcast"].includes(action))return NextResponse.json({error:"Ongeldige leesactie"},{status:400});
   if(!["http","https"].includes(cfg.protocol))return NextResponse.json({error:"Protocol moet http of https zijn"},{status:400});
   if(!isPublicIpv4(String(cfg.host||"")))return NextResponse.json({error:"Alleen een geldig openbaar IPv4-adres is toegestaan."},{status:400});
   const port=Number(cfg.port||0);if(!Number.isInteger(port)||port<1||port>65535)return NextResponse.json({error:"Ongeldige poort"},{status:400});
@@ -29,7 +29,7 @@ export async function POST(request:NextRequest){
   const basePath=String(cfg.basePath||"").trim();if(basePath&&(!basePath.startsWith("/")||basePath.includes("..")||basePath.includes("://")))return NextResponse.json({error:"Ongeldig basis-pad"},{status:400});
   const target=`${cfg.protocol}://${cfg.host}:${port}${basePath}${path}`;
   const apiKey=String(body.apiKey||"");const apiKeyHeader=String(body.apiKeyHeader||"Authorization").trim();const apiKeyPrefix=String(body.apiKeyPrefix||"Bearer").trim();
-  const headers:Record<string,string>={Accept:"application/json"};
+  const headers:Record<string,string>={Accept:kind==="shoutcast"?"application/xml,text/xml,application/json;q=0.9,*/*;q=0.8":"application/json"};
   if(apiKey){if(!/^[A-Za-z0-9-]{1,64}$/.test(apiKeyHeader))return NextResponse.json({error:"Ongeldige API-key headernaam"},{status:400});headers[apiKeyHeader]=apiKeyPrefix?`${apiKeyPrefix} ${apiKey}`:apiKey}
 
   try{
@@ -38,7 +38,7 @@ export async function POST(request:NextRequest){
     if(result.status<200||result.status>=300){
       return NextResponse.json({ok:false,error:typeof raw==="object"?(raw?.error||raw?.message||`HTTP ${result.status}`):`HTTP ${result.status}`,status:result.status,target,raw,transport:result.transport},{status:result.status||502});
     }
-    const normalized=action==="stations"?{stations:normalizeStations(raw)}:action==="playlist"?normalizePlaylist(raw):action==="now"?normalizeNow(raw):action==="folders"?{folders:normalizeMusicFolders(raw)}:action==="songs"?{songs:normalizeMusicSongs(raw)}:action==="charts"?{charts:normalizeCharts(raw)}:action==="chartEditions"?{editions:normalizeChartEditions(raw)}:action==="chartEdition"?{edition:normalizeChartEdition(raw)}:action==="revision"?{revision:normalizeRevision(raw)}:{};
+    const normalized=action==="stations"?{stations:normalizeStations(raw)}:action==="playlist"?normalizePlaylist(raw):action==="now"?normalizeNow(raw):action==="folders"?{folders:normalizeMusicFolders(raw)}:action==="songs"?{songs:normalizeMusicSongs(raw)}:action==="charts"?{charts:normalizeCharts(raw)}:action==="chartEditions"?{editions:normalizeChartEditions(raw)}:action==="chartEdition"?{edition:normalizeChartEdition(raw)}:action==="revision"?{revision:normalizeRevision(raw)}:action==="shoutcast"?{shoutcast:normalizeShoutcastStats(raw)}:{};
     return NextResponse.json({ok:true,status:result.status,target,raw,...normalized,durationMs:Date.now()-started,httpDurationMs:result.durationMs,transport:result.transport,runtime:runtimeInfo()});
   }catch(e){
     const detail=nativeError(e);const tcp=await tcpProbe(String(cfg.host),port,5000);
