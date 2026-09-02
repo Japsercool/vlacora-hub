@@ -1101,3 +1101,20 @@ nog een oude stationmapping als gekoppeld toonde.
 Er is geen extra polling toegevoegd. Station reconciliation gebeurt alleen
 bij openen/vernieuwen van de Playout One-pagina of expliciete stationrefresh.
 Geen Supabase-migratie nodig.
+
+
+## 0.19.0 — TOP-inspired visual refresh
+
+Visuele opfrissing van VLACORA zodat de omgeving meer aanvoelt als
+de TOP-workspace uit de referentiescreens:
+
+- donkerpaarse, compactere sidebar met duidelijke actieve module;
+- sterkere branding / station-chip / accountblok;
+- luchtigere topbar en grotere afgeronde cards;
+- Redactie / playlist workspace meer in de stijl van TOPplaylist:
+  datum-navigatie, uurknoppen, filterchips, playlistcards en rechteractiepanel;
+- Taken-module visueel opgeschoond met metrics, presence-strip,
+  filtertoolbar, lijst/kanban-cards en modernere task-editor;
+- alleen styling/presentatie gewijzigd; geen database- of API-wijzigingen.
+
+Deze versie is veilig als pure UI-refresh.
