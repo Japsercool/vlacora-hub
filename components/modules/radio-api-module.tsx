@@ -1,6 +1,6 @@
 "use client";
 import { useEffect,useMemo,useState } from "react";
-import { discoverPlayoutStations,mergeStationCache,pathFor,playoutRotationStation,radioRead,readIntegration,readMappings,readSecret,readStationCache,saveMappings,saveStationCache,type RadioMappingStore,type RadioStation } from "@/lib/radio/client-config";
+import { discoverPlayoutStations,matchLivePlayoutStation,mergeStationCache,pathFor,playoutRotationStation,radioRead,readIntegration,readMappings,readSecret,readStationCache,saveMappings,saveStationCache,type RadioMappingStore,type RadioStation } from "@/lib/radio/client-config";
 import { clearStationAlias,readHubStations,readStationAliases,rotationHubSlug,saveStationAlias,type HubStation,useHubStation,HUB_STATIONS_EVENT } from "@/lib/radio/hub-stations";
 import { loadSharedPlayoutStations,syncSharedPlayoutStations,syncSharedRotationStations } from "@/lib/supabase/hub-data";
 import { hydrateSharedIntegrationSettings,loadSharedRadioMapping,saveSharedRadioMapping } from "@/lib/supabase/settings";
@@ -41,12 +41,38 @@ export default function RadioApiModule({stationSlug}:{stationSlug:string}){
 
   function flash(x:string){setNotice(x);setTimeout(()=>setNotice(""),3400)}
   function setMapping(patch:any){const value={...mapping,...patch};const next={...mappings,[active.slug]:value};setMappings(next);saveMappings(next);void saveSharedRadioMapping(active.slug,value).then(()=>flash("Stationmapping centraal opgeslagen")).catch(()=>{})}
-  function buildMappings(rs:RadioStation[],ps:RadioStation[]){const next={...readMappings()};for(const rr of rs){const slug=rotationHubSlug(rr);const pp=ps.find(x=>playoutRotationStation(x)===rr.id)||ps.find(x=>x.id===rr.id)||ps.find(x=>norm(x.name)===norm(rr.name)||norm(x.name).includes(norm(rr.name))||norm(rr.name).includes(norm(x.name)));next[slug]={rotationId:rr.id,rotationName:rr.name,playoutId:next[slug]?.playoutId||pp?.id||"",playoutName:next[slug]?.playoutName||pp?.name||""}}setMappings(next);saveMappings(next)}
+  function buildMappings(rs:RadioStation[],ps:RadioStation[]){
+    const next={...readMappings()};
+    for(const rr of rs){
+      const slug=rotationHubSlug(rr),previous=next[slug]||{};
+      const match=matchLivePlayoutStation(ps,{...previous,rotationId:rr.id,rotationName:rr.name},{slug:rr.id,name:rr.name});
+      next[slug]={
+        rotationId:rr.id,rotationName:rr.name,
+        playoutId:match.station?.id||"",
+        playoutName:match.station?.name||""
+      };
+    }
+    setMappings(next);saveMappings(next);
+  }
 
   async function fetchPlayoutStations(silent=false){
     await hydrateSharedIntegrationSettings(active.slug).catch(()=>false);const pc=readIntegration("playout");if(!pc?.host){const m="Playout One is nog niet ingesteld.";if(!silent)flash(m);throw new Error(m)}
     let secret=readSecret("playout");if(!secret.apiKey){await hydrateIntegrationSecret("playout").catch(()=>null);secret=readSecret("playout")}if(!secret.apiKey)throw new Error("Playout API-key ontbreekt.");
-    try{const r=await discoverPlayoutStations(),ps=r.stations;if(ps.length){setPlayoutStations(ps);saveStationCache("playout",ps);await syncSharedPlayoutStations(ps).catch(()=>{})}buildMappings(readStationCache("rotation"),ps);const auto=active.slug!=="all"?readMappings()[active.slug]:null;if(auto)await saveSharedRadioMapping(active.slug,auto).catch(()=>{});setHubStations(readHubStations());setLastRefresh(new Date().toLocaleTimeString("nl-BE"));if(!silent)flash(r.usedCache?`${ps.length} laatst bekende Playout station(s) behouden`:`${ps.length} Playout station(s) opgehaald`);return ps}catch(e){const m=e instanceof Error?e.message:"Playout fout";if(!silent)flash(m.includes("401")?"HTTP 401: key moet stations.read of legacy monitor hebben.":m);throw e}
+    try{
+      const r=await discoverPlayoutStations(),ps=r.stations;
+      setPlayoutStations(ps);
+      if(!r.usedCache&&ps.length)await syncSharedPlayoutStations(ps).catch(()=>{});
+      if(r.hasLiveResponse)buildMappings(readStationCache("rotation"),ps);
+      const auto=active.slug!=="all"?readMappings()[active.slug]:null;
+      if(auto&&r.hasLiveResponse)await saveSharedRadioMapping(active.slug,auto).catch(()=>{});
+      setHubStations(readHubStations());setLastRefresh(new Date().toLocaleTimeString("nl-BE"));
+      if(!silent){
+        if(r.hasLiveResponse&&ps.length)flash(`${ps.length} actuele Playout Hub-station(s) opgehaald`);
+        else if(r.hasLiveResponse)flash(`Hub is bereikbaar maar meldt momenteel 0 geregistreerde stations. ${r.cachedStations.length} oude cache-item(s) worden niet meer als live getoond.`);
+        else flash(`Hub-stationlijst niet bereikbaar; ${ps.length} laatst bekende station(s) alleen als cache beschikbaar.`);
+      }
+      return ps;
+    }catch(e){const m=e instanceof Error?e.message:"Playout fout";if(!silent)flash(m.includes("401")?"HTTP 401: key moet stations.read of legacy monitor hebben.":m);throw e}
   }
   async function connectManualPlayout(){if(active.slug==="all")return;const id=manualPlayoutId.trim();if(!id)return flash("Vul een Playout station-ID in.");const s:RadioStation={id,name:manualPlayoutName.trim()||id},list=mergeStationCache("playout",[s]);setPlayoutStations(list);await syncSharedPlayoutStations([s]).catch(()=>{});setMapping({playoutId:id,playoutName:s.name});flash(`Playout ${s.name} gekoppeld`)}
   function saveAlias(){if(active.slug==="all")return;saveStationAlias(active.slug,{name:aliasName,short:aliasShort});setHubStations(readHubStations());flash("VLACORA-naam opgeslagen; bronstations blijven ongewijzigd.")}

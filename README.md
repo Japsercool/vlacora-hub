@@ -1069,3 +1069,35 @@ niet meer geldig voor deze Playout One Hub: verkeerd, geroteerd/ingetrokken,
 verlopen of zonder de vereiste scope.
 
 Geen nieuwe Supabase-migratie nodig.
+
+
+## 0.18.5 — Playout live station reconciliation
+
+Fix voor `Station is not registered in the Hub.` terwijl Radio API Control
+nog een oude stationmapping als gekoppeld toonde.
+
+- `/api/v1/integration/stations` (of `/api/v1/stations`) is nu de
+  autoritatieve live stationlijst.
+- een succesvolle live response wordt niet meer samengevoegd met oude
+  localStorage/Supabase stationcache;
+- oude cached station-IDs worden dus niet meer als “beschikbaar” getoond;
+- als de Hub bereikbaar is maar 0 stations heeft, toont VLACORA dat
+  expliciet en gebruikt hij de oude cache alleen nog als diagnostiek;
+- vóór de Playout One livepagina NOW/NEXT/status opvraagt, wordt de mapping
+  opnieuw tegen de actuele Hub-directory gevalideerd;
+- automatische matchvolgorde:
+  1. bestaand exact Playout stationId
+  2. `rotation.station` uit de Playout heartbeat
+  3. exact stationId
+  4. stationsnaam
+- wanneer bijvoorbeeld `hits` oud is maar de live Hub `ro-hits-kqdsw`
+  rapporteert met `rotation.station = hits`, wordt de mapping automatisch
+  centraal hersteld naar `ro-hits-kqdsw`;
+- na een `Station is not registered in the Hub.` wordt éénmaal opnieuw
+  gereconcilieerd en geprobeerd;
+- de foutpagina toont de actuele live Hub station-IDs als automatische
+  matching niet mogelijk is.
+
+Er is geen extra polling toegevoegd. Station reconciliation gebeurt alleen
+bij openen/vernieuwen van de Playout One-pagina of expliciete stationrefresh.
+Geen Supabase-migratie nodig.

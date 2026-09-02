@@ -136,14 +136,81 @@ export async function radioWrite(kind:IntegrationKind,path:string,method:"POST"|
   return data;
 }
 
-export type StationDiscoveryResult={stations:RadioStation[];sourcePath:string;usedCache:boolean;attempts:Array<{path:string;ok:boolean;count:number;error?:string}>};
+export type StationDiscoveryResult={
+  stations:RadioStation[];
+  liveStations:RadioStation[];
+  cachedStations:RadioStation[];
+  sourcePath:string;
+  usedCache:boolean;
+  hasLiveResponse:boolean;
+  attempts:Array<{path:string;ok:boolean;count:number;error?:string}>
+};
 function uniqueStations(items:RadioStation[]){const m=new Map<string,RadioStation>();for(const x of items){const id=String(x?.id||"").trim();if(!id)continue;const old=m.get(id);m.set(id,{...old,...x,id,name:String(x.name||old?.name||id)})}return[...m.values()].sort((a,b)=>a.name.localeCompare(b.name,"nl"))}
 export function mergeStationCache(kind:IntegrationKind,incoming:RadioStation[]){const merged=uniqueStations([...readStationCache(kind),...incoming]);if(merged.length)saveStationCache(kind,merged);return merged}
 export function playoutRotationStation(station:RadioStation){const r=station.raw as any;return String(r?.rotation?.station??r?.Rotation?.Station??r?.rotationStation??r?.RotationStation??"").trim()}
 export async function discoverPlayoutStations():Promise<StationDiscoveryResult>{
- const cfg=readIntegration("playout");if(!cfg?.host)throw new Error("Playout One is nog niet ingesteld.");
- const paths=[cfg.stationPath,"/api/v1/integration/stations","/api/v1/integration/revisions"].filter((v,i,a)=>Boolean(v)&&a.indexOf(v)===i) as string[];
- const attempts:Array<{path:string;ok:boolean;count:number;error?:string}>=[];
- for(const path of paths){try{const r=await radioRead("playout",path,"stations");const s=uniqueStations(r.stations||[]);attempts.push({path,ok:true,count:s.length});if(s.length)return{stations:mergeStationCache("playout",s),sourcePath:path,usedCache:false,attempts}}catch(e){attempts.push({path,ok:false,count:0,error:e instanceof Error?e.message:String(e)})}}
- const cached=uniqueStations(readStationCache("playout"));return{stations:cached,sourcePath:"cache",usedCache:cached.length>0,attempts};
+  const cfg=readIntegration("playout");if(!cfg?.host)throw new Error("Playout One is nog niet ingesteld.");
+  const paths=[cfg.stationPath,"/api/v1/integration/stations","/api/v1/stations"]
+    .filter((v,i,a)=>Boolean(v)&&a.indexOf(v)===i) as string[];
+  const attempts:Array<{path:string;ok:boolean;count:number;error?:string}>=[];
+  const cached=uniqueStations(readStationCache("playout"));
+  let hasLiveResponse=false;
+  let firstSuccessfulPath="";
+  for(const path of paths){
+    try{
+      const r=await radioRead("playout",path,"stations");
+      const live=uniqueStations(r.stations||[]);
+      hasLiveResponse=true;
+      if(!firstSuccessfulPath)firstSuccessfulPath=path;
+      attempts.push({path,ok:true,count:live.length});
+      if(live.length){
+        // A successful Hub response is authoritative. Do NOT merge stale cache
+        // entries into it: this is what caused old station ids to appear selectable.
+        saveStationCache("playout",live);
+        return{stations:live,liveStations:live,cachedStations:cached,sourcePath:path,usedCache:false,hasLiveResponse:true,attempts};
+      }
+    }catch(e){
+      attempts.push({path,ok:false,count:0,error:e instanceof Error?e.message:String(e)});
+    }
+  }
+  if(hasLiveResponse){
+    // Hub answered, but currently has no registered station heartbeats.
+    // Keep the old cache on disk for diagnostics only, never present it as live.
+    return{stations:[],liveStations:[],cachedStations:cached,sourcePath:firstSuccessfulPath||"live-empty",usedCache:false,hasLiveResponse:true,attempts};
+  }
+  return{stations:cached,liveStations:[],cachedStations:cached,sourcePath:"cache",usedCache:cached.length>0,hasLiveResponse:false,attempts};
+}
+
+
+export type PlayoutStationMatch={station:RadioStation|null;reason:"mapped-id"|"rotation-station"|"station-id"|"name"|"none"};
+function normStationMatch(value:unknown){return String(value??"").trim().toLowerCase().replace(/[^a-z0-9]+/g,"")}
+export function matchLivePlayoutStation(
+  liveStations:RadioStation[],
+  mapping:{playoutId?:string;playoutName?:string;rotationId?:string;rotationName?:string}|null|undefined,
+  fallback?:{slug?:string;name?:string}
+):PlayoutStationMatch{
+  const mappedId=String(mapping?.playoutId||"").trim();
+  const rotationId=String(mapping?.rotationId||fallback?.slug||"").trim();
+  const rotationName=String(mapping?.rotationName||fallback?.name||"").trim();
+  const mappedName=String(mapping?.playoutName||"").trim();
+
+  let station=liveStations.find(x=>x.id===mappedId);
+  if(station)return{station,reason:"mapped-id"};
+
+  if(rotationId){
+    station=liveStations.find(x=>playoutRotationStation(x)===rotationId);
+    if(station)return{station,reason:"rotation-station"};
+    station=liveStations.find(x=>x.id===rotationId);
+    if(station)return{station,reason:"station-id"};
+  }
+
+  const names=[mappedName,rotationName,fallback?.name||""].map(normStationMatch).filter(Boolean);
+  for(const n of names){
+    station=liveStations.find(x=>{
+      const xn=normStationMatch(x.name),xi=normStationMatch(x.id);
+      return xn===n||xi===n||(n.length>=4&&(xn.includes(n)||n.includes(xn)));
+    });
+    if(station)return{station,reason:"name"};
+  }
+  return{station:null,reason:"none"};
 }

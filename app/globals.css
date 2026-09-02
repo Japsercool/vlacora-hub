@@ -304,3 +304,7 @@ hr{border:0;border-top:1px solid var(--border);margin:22px 0}
 /* VLACORA 0.18.4 — Playout authentication diagnostics */
 .playout-auth-state{display:flex;flex-direction:column;gap:2px;min-width:135px}.playout-auth-state b{font-size:9px;color:#4f566d}.playout-auth-state small{font-size:8px;color:#8a8fa1}.playout-auth-note code{font-weight:850}
 .playout-auth-error{flex-wrap:wrap}.playout-auth-error>span{min-width:280px}
+
+
+/* VLACORA 0.18.5 — authoritative Playout station reconciliation */
+.playout-mapping-repair{display:flex;align-items:center;gap:10px}.playout-mapping-repair strong{white-space:nowrap;color:#36329d}.playout-mapping-repair span{font-size:9px;color:#666b80}.playout-auth-state small:last-child{max-width:360px;overflow-wrap:anywhere}

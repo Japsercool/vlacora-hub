@@ -1,2 +1,2 @@
-VLACORA HUB 0.18.4
-Playout One authentication repair: stored keys are normalized, canonical Bearer auth is enforced, X-Playout-Api-Key is retried once on 401, and 401 diagnostics distinguish a loaded-but-rejected key.
+VLACORA HUB 0.18.5
+Playout live station reconciliation: successful Hub station lists are authoritative, stale cached ids are no longer shown as live, and mappings auto-repair by rotation.station/id/name before NOW/NEXT status is requested.

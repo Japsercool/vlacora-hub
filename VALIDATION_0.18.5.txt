@@ -1,0 +1,15 @@
+VLACORA HUB 0.18.5 validation
+[PASS] version 0.18.5
+[PASS] live discovery result
+[PASS] legacy stations fallback
+[PASS] no cache merge on live
+[PASS] station matcher
+[PASS] rotation.station matching
+[PASS] mapping auto-save
+[PASS] 404 one retry
+[PASS] live ids diagnostic
+[PASS] radio API authoritative
+[PASS] no schema change
+[PASS] touched TypeScript/TSX files contain no parser/name errors
+[INFO] no Supabase migration required
+[INFO] Playout One 0.11.19 source confirms IntegrationStationSummary uses StationDirectory StationId and includes rotation.station from heartbeat

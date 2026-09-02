@@ -1,8 +1,8 @@
 "use client";
 
 import { useCallback,useEffect,useRef,useState } from "react";
-import { pathFor,radioRead,readIntegration,readMappings,readSecret } from "@/lib/radio/client-config";
-import { hydrateSharedIntegrationSettings,loadSharedRadioMapping } from "@/lib/supabase/settings";
+import { discoverPlayoutStations,matchLivePlayoutStation,pathFor,radioRead,readIntegration,readMappings,readSecret,saveMappings,type RadioStation } from "@/lib/radio/client-config";
+import { hydrateSharedIntegrationSettings,loadSharedRadioMapping,saveSharedRadioMapping } from "@/lib/supabase/settings";
 import { hydrateIntegrationSecret } from "@/lib/supabase/secrets";
 import { useHubStation } from "@/lib/radio/hub-stations";
 import { emitActivity } from "@/lib/collaboration/activity";
@@ -60,6 +60,8 @@ export default function PlayoutOneModule({stationSlug}:{stationSlug:string}){
   const[busy,setBusy]=useState(false);
   const[queueBusy,setQueueBusy]=useState(false);
   const[authState,setAuthState]=useState<{present:boolean;looksValid:boolean}>({present:false,looksValid:false});
+  const[liveStations,setLiveStations]=useState<RadioStation[]>([]);
+  const[mappingRepair,setMappingRepair]=useState("");
   const revisionRef=useRef("");
 
   function flash(message:string){setNotice(message);window.setTimeout(()=>setNotice(""),3000)}
@@ -68,10 +70,47 @@ export default function PlayoutOneModule({stationSlug}:{stationSlug:string}){
     let map=readMappings()[stationSlug]||null;
     const shared=await loadSharedRadioMapping(stationSlug).catch(()=>null);
     if(shared)map={...map,...shared};
+
+    const discovery=await discoverPlayoutStations();
+    const live=discovery.liveStations.length?discovery.liveStations:(discovery.hasLiveResponse?[]:discovery.stations);
+    setLiveStations(live);
+
+    if(discovery.hasLiveResponse&&live.length===0){
+      setPlayoutId("");
+      throw new Error(`Playout One Hub is bereikbaar, maar er zijn momenteel 0 stations geregistreerd via heartbeat. Oude stationcache wordt niet meer als live gebruikt.`);
+    }
+
+    if(discovery.hasLiveResponse){
+      const match=matchLivePlayoutStation(live,map,{slug:station.rotationId||stationSlug,name:station.name});
+      if(!match.station){
+        const ids=live.map(x=>`${x.name} (${x.id})`).join(", ");
+        setPlayoutId("");
+        throw new Error(`De opgeslagen mapping “${map?.playoutId||"—"}” bestaat niet meer in de actuele Hub. Beschikbaar: ${ids||"geen"}.`);
+      }
+
+      const changed=match.station.id!==map?.playoutId||match.station.name!==map?.playoutName;
+      const repaired={
+        rotationId:map?.rotationId||station.rotationId||stationSlug,
+        rotationName:map?.rotationName||station.name,
+        playoutId:match.station.id,
+        playoutName:match.station.name
+      };
+      if(changed){
+        const all={...readMappings(),[stationSlug]:repaired};
+        saveMappings(all);
+        await saveSharedRadioMapping(stationSlug,repaired).catch(()=>{});
+        setMappingRepair(`Mapping automatisch hersteld: ${map?.playoutId||"—"} → ${match.station.id} (${match.reason}).`);
+      }else setMappingRepair("");
+      setPlayoutId(match.station.id);
+      return match.station.id;
+    }
+
     const id=map?.playoutId||"";
     setPlayoutId(id);
+    if(!id)throw new Error("Dit VLACORA-station is nog niet aan een Playout One station gekoppeld.");
+    setMappingRepair("Live stationlijst kon niet worden opgehaald; opgeslagen mapping wordt tijdelijk gebruikt.");
     return id;
-  },[stationSlug]);
+  },[stationSlug,station.rotationId,station.name]);
 
   const loadStatus=useCallback(async(silent=false)=>{
     if(stationSlug==="all")return;
@@ -87,7 +126,17 @@ export default function PlayoutOneModule({stationSlug}:{stationSlug:string}){
       if(!cfg?.host)throw new Error("Playout One is nog niet ingesteld.");
       if(!readSecret("playout").apiKey)throw new Error("De Playout One Bearer API-key ontbreekt.");
       const path=pathFor(cfg.nowPath||"/api/v1/integration/stations/{stationId}/status",id);
-      const result=await radioRead("playout",path,"raw");
+      let result;
+      try{
+        result=await radioRead("playout",path,"raw");
+      }catch(firstError){
+        const message=firstError instanceof Error?firstError.message:String(firstError);
+        if(/not registered in the Hub/i.test(message)){
+          const repairedId=await resolveMapping();
+          const repairedPath=pathFor(cfg.nowPath||"/api/v1/integration/stations/{stationId}/status",repairedId);
+          result=await radioRead("playout",repairedPath,"raw");
+        }else throw firstError;
+      }
       const parsed=parseStatus(result.raw);
       setStatus(parsed);revisionRef.current=parsed.revision;setError("");
       emitActivity({detail:`Playout One • ${parsed.current.title||parsed.playback||parsed.stationId}`,entityType:"playout-station",entityId:parsed.stationId});
@@ -135,7 +184,8 @@ export default function PlayoutOneModule({stationSlug}:{stationSlug:string}){
       <div className="button-row"><button className="ghost" onClick={()=>location.href=`/hub/${stationSlug}/radio-api`}>Station mapping</button><button className="primary" disabled={busy} onClick={()=>void loadStatus(false)}>↻ Vernieuw</button></div>
     </div>
     {notice&&<div className="inline-notice standalone">{notice}</div>}
-    {error&&<div className="config-error standalone playout-auth-error"><strong>Playout One</strong><span>{error}</span><div className="playout-auth-state"><b>{authState.present?"✓ Sleutel geladen":"✕ Geen sleutel geladen"}</b>{authState.present&&<small>{authState.looksValid?"po1_-formaat herkend":"onbekend sleutelformaat"}</small>}</div><button className="ghost" onClick={()=>location.href=`/hub/${stationSlug}/beheer`}>Open integraties →</button></div>}
+    {mappingRepair&&<div className="inline-notice standalone playout-mapping-repair"><strong>Stationmapping</strong><span>{mappingRepair}</span></div>}
+    {error&&<div className="config-error standalone playout-auth-error"><strong>Playout One</strong><span>{error}</span><div className="playout-auth-state"><b>{authState.present?"✓ Sleutel geladen":"✕ Geen sleutel geladen"}</b>{authState.present&&<small>{authState.looksValid?"po1_-formaat herkend":"onbekend sleutelformaat"}</small>}{liveStations.length>0&&<small>{liveStations.length} live Hub-station(s): {liveStations.map(x=>x.id).join(", ")}</small>}</div><button className="ghost" onClick={()=>location.href=`/hub/${stationSlug}/radio-api`}>Open mapping →</button></div>}
     {!status&&!error&&<div className="card empty-live-state"><strong>Playout One-status laden…</strong></div>}
 
     {status&&<>
