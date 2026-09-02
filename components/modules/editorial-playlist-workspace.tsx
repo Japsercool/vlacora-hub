@@ -4,6 +4,7 @@ import { useEffect,useMemo,useState } from "react";
 import type { EditorialItem,EditorialType } from "@/components/modules/editorial-module";
 import { loadEditorialTemplates,type EditorialTemplateRecord,type EditorialTemplateSlot } from "@/lib/supabase/editorial";
 import { broadPlaylistLabel,canonicalPlaylistType } from "@/lib/radio/item-types";
+import { fetchTrafficSnapshot,loadTrafficSettings } from "@/lib/traffic/client";
 
 const uid=()=>Math.random().toString(36).slice(2)+Date.now().toString(36);
 const pad=(n:number)=>String(n).padStart(2,"0");
@@ -48,10 +49,14 @@ function itemKind(item:EditorialItem){return canonicalPlaylistType({type:item.ty
 function normalizedType(item:EditorialItem){const k=itemKind(item);if(k==="music")return"number";if(k==="commercial")return"commercial";if(["imaging","promo","link"].includes(k))return"link";if(k==="tease")return"tease";if(k==="browse")return"browse";return"talk"}
 function badgeLabel(item:EditorialItem){const k=itemKind(item);if(k==="music")return"Nummer";if(k==="commercial")return"Reclame";if(k==="traffic")return"Verkeer";if(k==="weather")return"Weer";if(k==="news")return"Nieuws";if(k==="browse")return"Browse List";if(k==="tease")return"Tease";if(["imaging","promo","link"].includes(k))return"Jingle";return k==="talk"?"Talk":broadPlaylistLabel(k)}
 function manualType(slot:EditorialTemplateSlot):EditorialType{
+  const label=(slot.label||"").toLowerCase();
   if(slot.type==="tease")return"tease";
   if(slot.type==="browse")return"browse";
   if(slot.type==="commercial")return"commercial";
   if(slot.type==="link")return"link";
+  if(slot.type==="weather"||label.includes("weer"))return"weather";
+  if(slot.type==="traffic"||label.includes("verkeer"))return"traffic";
+  if(slot.type==="news"||label.includes("nieuws"))return"news";
   return"talk";
 }
 
@@ -61,6 +66,7 @@ function defaultNotes(type:EditorialType,label:string){
   if(text.includes("actie")||text.includes("sponsor")||text.includes("wedstrijd"))return"Verkochte actie / sponsor";
   if(type==="news")return"Nieuws";
   if(type==="weather")return"Weer";
+  if(type==="traffic")return"Live Vlaams Verkeerscentrum";
   return"Redactie";
 }
 
@@ -74,6 +80,8 @@ export default function EditorialPlaylistWorkspace(props:Props){
   const[templates,setTemplates]=useState<EditorialTemplateRecord[]>([]);
   const[template,setTemplate]=useState<EditorialTemplateRecord|null>(null);
   const[templateMessage,setTemplateMessage]=useState("");
+  const[trafficBusy,setTrafficBusy]=useState(false);
+  const[trafficMessage,setTrafficMessage]=useState("");
   const hourNumber=Number(hour.slice(0,2));
 
   useEffect(()=>{
@@ -135,9 +143,39 @@ export default function EditorialPlaylistWorkspace(props:Props){
       setPlaylist([item]);setSelectedId(item.id);
     }
   }
+  function insertAfterSelection(item:EditorialItem){
+    const after=selected?.id||playlist[playlist.length-1]?.id||"";
+    if(!after){setPlaylist([item]);setSelectedId(item.id);return}
+    const idx=playlist.findIndex(x=>x.id===after);const next=[...playlist];next.splice(idx<0?next.length:idx+1,0,item);setPlaylist(next);setSelectedId(item.id);
+  }
+  async function quickAddLiveTraffic(){
+    setTrafficBusy(true);setTrafficMessage("");
+    try{
+      const trafficSettings=await loadTrafficSettings(stationSlug);
+      const data=await fetchTrafficSnapshot(trafficSettings);
+      const item:EditorialItem={id:uid(),time:selected?.time||playlist[playlist.length-1]?.time||hour,type:"traffic",title:"Verkeer LIVE",duration:"00:30",presenterText:data.radioText,notes:`Live Vlaams Verkeerscentrum • DATEX II • update ${new Date(data.publicationTime||data.fetchedAt).toLocaleTimeString("nl-BE",{hour:"2-digit",minute:"2-digit"})}`,source:"Vlaams Verkeerscentrum"};
+      insertAfterSelection(item);setTrafficMessage(`${data.count} verkeersmelding(en) verwerkt`);
+    }catch(e){
+      const item:EditorialItem={id:uid(),time:selected?.time||playlist[playlist.length-1]?.time||hour,type:"traffic",title:"Verkeer",duration:"00:30",presenterText:"",notes:`Live verkeersfeed kon niet laden: ${e instanceof Error?e.message:"onbekende fout"}`,source:"VLACORA"};
+      insertAfterSelection(item);setTrafficMessage("Verkeersslot toegevoegd; live feed kon niet laden");
+    }finally{setTrafficBusy(false)}
+  }
 
-  function applyTemplate(){
+  async function applyTemplate(){
     if(!template)return setTemplateMessage("Geen redactietemplate toegewezen aan dit uur.");
+
+    let liveTrafficText="",liveTrafficNote="";
+    if(template.sequence.some(slot=>slot.type==="traffic"||/verkeer|traffic/i.test(slot.label||""))){
+      setTrafficBusy(true);
+      try{
+        const trafficSettings=await loadTrafficSettings(stationSlug);
+        const data=await fetchTrafficSnapshot(trafficSettings);
+        liveTrafficText=data.radioText;
+        liveTrafficNote=`Live Vlaams Verkeerscentrum • DATEX II • update ${new Date(data.publicationTime||data.fetchedAt).toLocaleTimeString("nl-BE",{hour:"2-digit",minute:"2-digit"})}`;
+        setTrafficMessage(`${data.count} verkeersmelding(en) automatisch in template verwerkt`);
+      }catch(e){setTrafficMessage(`Verkeer in template kon niet live worden ingevuld: ${e instanceof Error?e.message:"fout"}`)}
+      finally{setTrafficBusy(false)}
+    }
 
     const unused=new Set(playlist.map(item=>item.id));
     const next:EditorialItem[]=[];
@@ -166,16 +204,17 @@ export default function EditorialPlaylistWorkspace(props:Props){
         continue;
       }
 
-      if(["talk","required_talk","tease","browse"].includes(slot.type)){
+      if(["talk","required_talk","tease","browse","traffic","weather","news"].includes(slot.type)){
+        const slotType=manualType(slot),isTraffic=slotType==="traffic";
         next.push({
           id:uid(),
           time:next[next.length-1]?.time||hour,
-          type:manualType(slot),
+          type:slotType,
           title:slot.label||"Redactieslot",
           duration:durationText(slot.durationSec||20),
-          presenterText:slot.content||"",
-          notes:slot.required?"Verplicht redactieslot":"Redactieslot",
-          source:"VLACORA"
+          presenterText:isTraffic&&liveTrafficText?liveTrafficText:(slot.content||""),
+          notes:isTraffic&&liveTrafficNote?liveTrafficNote:(slot.required?"Verplicht redactieslot":"Redactieslot"),
+          source:isTraffic&&liveTrafficText?"Vlaams Verkeerscentrum":"VLACORA"
         });
       }else if(slot.type==="category"){
         // Keep the missing category visible in the editorial workspace,
@@ -236,7 +275,7 @@ export default function EditorialPlaylistWorkspace(props:Props){
             <option value="">Geen template</option>
             {templates.map(t=><option key={t.id} value={t.id}>{t.name}</option>)}
           </select>
-          <button className="primary soft" disabled={!template} onClick={applyTemplate}>Sjabloon toepassen</button>
+          <button className="primary soft" disabled={!template||trafficBusy} onClick={()=>void applyTemplate()}>{trafficBusy?"Live data laden…":"Sjabloon toepassen"}</button>
         </div>
         <span className="template-picker-meta">{syncLabel||templateMessage}</span>
       </div>
@@ -288,13 +327,14 @@ export default function EditorialPlaylistWorkspace(props:Props){
 
       <aside className="topplaylist-actions">
         <button onClick={()=>quickAdd("weather","Weer")}><span>☁</span> WEER</button>
+        <button disabled={trafficBusy} onClick={()=>void quickAddLiveTraffic()}><span>⇄</span> {trafficBusy?"VERKEER LADEN…":"VERKEER LIVE"}</button>
         <button onClick={()=>quickAdd("news","Nieuws")}><span>▣</span> NIEUWS</button>
         <button onClick={()=>quickAdd("talk","Redactie")}><span>✎</span> REDACTIE</button>
         <button onClick={()=>quickAdd("talk","Verkochte actie")}><span>★</span> ACTIE</button>
         <button onClick={()=>quickAdd("talk","Wedstrijd / sponsoractie")}><span>✓</span> WEDSTRIJD</button>
         <button onClick={()=>quickAdd("talk","Doorverwijs")}><span>➤</span> DOORVERWIJS</button>
         <button onClick={()=>quickAdd("talk","Check bericht")}><span>⌕</span> CHECK BERICHT</button>
-        <div className="topplaylist-side-info"><strong>Uur {pad(hourNumber)}</strong><span>{playlist.length} items</span><span>{template?`Template: ${template.name}`:"Geen template"}</span><span>Gebruik toewijzingen in sjablonen om verkochte acties automatisch op vaste uren te tonen.</span></div>
+        <div className="topplaylist-side-info"><strong>Uur {pad(hourNumber)}</strong><span>{playlist.length} items</span><span>{template?`Template: ${template.name}`:"Geen template"}</span><span>Gebruik toewijzingen in sjablonen om verkochte acties en verkeer automatisch op vaste uren te tonen.</span>{trafficMessage&&<span className="traffic-inline-status">{trafficMessage}</span>}</div>
       </aside>
     </div>
   </div>

@@ -1152,3 +1152,34 @@ Geen databasewijzigingen. Geen API-wijzigingen.
 - De template-selector blijft bovenaan beschikbaar.
 
 Geen databasewijzigingen en geen API-wijzigingen.
+
+
+## 0.19.4 — Live verkeer via Vlaams Verkeerscentrum
+
+VLACORA gebruikt nu de publieke **DATEX II v3 full feed** van het Vlaams Verkeerscentrum:
+`https://www.verkeerscentrum.be/uitwisseling/datex2v3full`.
+
+### Nieuwe module Verkeer
+- aparte `Verkeer`-pagina in het hoofdmenu;
+- per station prioritaire wegen instellen, bv. E17, E40, R4, R1, R0;
+- keuze tussen heel Vlaanderen of alleen de gekozen wegen;
+- ongevallen/incidenten, files en wegenwerken afzonderlijk aan/uit;
+- live incidentenlijst met update- en geldigheidstijd;
+- automatisch gegenereerde, bewerkbare radiotekst;
+- auto-refresh standaard elke 2 minuten, alleen wanneer de pagina open is;
+- centrale stationinstellingen via bestaande `hub_settings` (geen nieuwe tabel).
+
+### Redactie / playlist
+- nieuwe knop `VERKEER LIVE`;
+- één klik maakt een verkeersslot met de actuele radiotekst;
+- een `traffic`-slot in een redactietemplate wordt bij `Sjabloon toepassen`
+  automatisch gevuld met de actuele verkeersinfo;
+- template-slots voor verkeer, weer en nieuws behouden nu ook hun echte type.
+
+### Zuinig gebruik
+- de externe DATEX-feed wordt server-side via Next.js opgehaald;
+- de externe feed heeft een revalidate-cache van 60 seconden;
+- browserclients halen de grote XML-feed dus niet zelf op;
+- geen 24/7 polling wanneer niemand de Verkeer-pagina gebruikt.
+
+Geen database-migratie en geen betaalde verkeers-API nodig.

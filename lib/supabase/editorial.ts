@@ -4,7 +4,7 @@ import { createClient,isSupabaseBrowserConfigured } from "@/lib/supabase/client"
 
 export type EditorialTemplateSlot={
   id:string;
-  type:"number"|"link"|"commercial"|"browse"|"talk"|"required_talk"|"tease"|"category";
+  type:"number"|"link"|"commercial"|"browse"|"talk"|"required_talk"|"tease"|"weather"|"traffic"|"news"|"category";
   label:string;
   durationSec:number;
   content:string;

@@ -11,6 +11,7 @@ import MusicLibraryModule from "@/components/modules/music-library-module";
 import EditorialModule from "@/components/modules/editorial-module";
 import RadioApiModule from "@/components/modules/radio-api-module";
 import PlayoutOneModule from "@/components/modules/playout-one-module";
+import TrafficModule from "@/components/modules/traffic-module";
 import MusicMeetingsModule from "@/components/modules/music-meetings-module";
 import TeamRightsModule from "@/components/modules/team-rights-module";
 import AdminIntegrationsModule from "@/components/modules/admin-integrations-module";
@@ -261,6 +262,8 @@ function HubAppInner({ stationSlug, moduleSlug }: Props) {
           {moduleSlug === "playlists" && <EditorialModule stationSlug={station.slug} /> }
 
           {moduleSlug === "redactie" && <EditorialModule stationSlug={station.slug} />}
+
+          {moduleSlug === "verkeer" && <TrafficModule stationSlug={station.slug} />}
 
           {moduleSlug === "hitlijsten" && <ChartsModule stationSlug={station.slug} stationName={station.name} />}
 

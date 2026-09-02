@@ -48,14 +48,15 @@ function derivePlaylistCategories(playlist:EditorialItem[]):PlaylistCategoryOpti
 
 const slotButtons:{type:EditorialTemplateSlot["type"];label:string}[]=[
   {type:"number",label:"Nummer"},{type:"link",label:"Link"},{type:"commercial",label:"Reclame"},
-  {type:"browse",label:"Browse List"},{type:"talk",label:"Talk"},{type:"required_talk",label:"Verplichte talk"},{type:"tease",label:"Tease"}
+  {type:"browse",label:"Browse List"},{type:"talk",label:"Talk"},{type:"required_talk",label:"Verplichte talk"},{type:"tease",label:"Tease"},
+  {type:"traffic",label:"Verkeer"},{type:"weather",label:"Weer"},{type:"news",label:"Nieuws"}
 ];
 const defaultSequence:EditorialTemplateSlot[]=[
   {id:uid(),type:"link",label:"Link",durationSec:0,content:"",required:false,permanentMessage:""},
   {id:uid(),type:"talk",label:"Prenews",durationSec:10,content:"",required:false,permanentMessage:""},
   {id:uid(),type:"number",label:"Nummer",durationSec:0,content:"",required:false,permanentMessage:""},
   {id:uid(),type:"link",label:"Link",durationSec:0,content:"",required:false,permanentMessage:""},
-  {id:uid(),type:"talk",label:"Verkeer",durationSec:40,content:"",required:false,permanentMessage:""},
+  {id:uid(),type:"traffic",label:"Verkeer",durationSec:40,content:"",required:false,permanentMessage:""},
   {id:uid(),type:"link",label:"Link",durationSec:0,content:"",required:false,permanentMessage:""},
   {id:uid(),type:"talk",label:"TOTH",durationSec:20,content:"",required:false,permanentMessage:""},
   {id:uid(),type:"number",label:"Nummer",durationSec:0,content:"",required:false,permanentMessage:""},
@@ -67,7 +68,7 @@ const defaultSequence:EditorialTemplateSlot[]=[
 
 function labelFor(type:EditorialTemplateSlot["type"]){return type==="category"?"Playlistcategorie":slotButtons.find(x=>x.type===type)?.label||type}
 function chipClass(type:EditorialTemplateSlot["type"]){return type==="category"?"category":type==="number"?"number":type==="commercial"?"commercial":type==="link"?"link":type==="tease"?"tease":"talk"}
-function isTalk(type:EditorialTemplateSlot["type"]){return["talk","required_talk","browse","tease"].includes(type)}
+function isTalk(type:EditorialTemplateSlot["type"]){return["talk","required_talk","browse","tease","traffic","weather","news"].includes(type)}
 function blank(stationSlug:string):EditorialTemplateRecord{
   return{id:`new-${uid()}`,station_slug:stationSlug,name:"Nieuw redactietemplate",program_name:"",sequence:defaultSequence.map(x=>({...x,id:uid()})),assignments:[],notes:"",active:true};
 }
@@ -191,7 +192,7 @@ export default function EditorialTemplateStudio({stationSlug,playlist}:{stationS
 
           <div className="slot-add-section">
             <strong>Redactieslots toevoegen:</strong>
-            <div className="slot-add-buttons">{slotButtons.filter(x=>["talk","required_talk","tease","browse"].includes(x.type)).map(x=><button key={x.type} className={`add-slot add-${chipClass(x.type)}`} onClick={()=>addSlot(x.type)}>＋ {x.label}</button>)}</div>
+            <div className="slot-add-buttons">{slotButtons.filter(x=>["talk","required_talk","tease","browse","traffic","weather","news"].includes(x.type)).map(x=><button key={x.type} className={`add-slot add-${chipClass(x.type)}`} onClick={()=>addSlot(x.type)}>＋ {x.label}</button>)}</div>
             <div className="slot-add-buttons special-talk-buttons">
               <button className="add-slot add-talk" onClick={()=>addCustomTalk("Verkochte actie",20,true,"Vaste verkochte actie / sponsorvermelding voor dit uur.")}>＋ Actie / sponsor</button>
               <button className="add-slot add-talk" onClick={()=>addCustomTalk("Wedstrijd / sponsoractie",30,true,"Uitleg van de actie, sponsorvermelding en call-to-action.")}>＋ Wedstrijd</button>

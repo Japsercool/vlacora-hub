@@ -1,5 +1,4 @@
-VLACORA HUB 0.19.3
-Compact TOPplaylist spacing.
-Playlist sections now sit directly against each other, playlist rows have only a small 5px gap, and the green add-talk button is vertically centered.
-Template chooser remains at the top.
-No database or API changes.
+VLACORA HUB 0.19.4
+Live traffic integration using the official Vlaams Verkeerscentrum DATEX II v3 full feed.
+Includes station road priorities, cached server-side feed access, radio-ready traffic text, live traffic page, and automatic traffic text in editorial templates/playlist slots.
+No database migration required; station traffic preferences reuse hub_settings.

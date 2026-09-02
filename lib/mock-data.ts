@@ -20,6 +20,7 @@ export const navItems = [
   ["muziek", "♫", "Muziek"],
   ["meetings", "◎", "Muziekmeetings"],
   ["redactie", "✎", "Redactie"],
+  ["verkeer", "⌁", "Verkeer"],
   ["playlists", "≡", "Playlists"],
   ["hitlijsten", "↕", "Hitlijsten"],
   ["presentatie", "✎", "Presentatie"],

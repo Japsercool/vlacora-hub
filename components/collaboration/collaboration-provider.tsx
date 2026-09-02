@@ -74,7 +74,7 @@ const CollaborationContext=createContext<CollaborationContextValue|null>(null);
 const MODULES:Record<string,string>={
   dashboard:"TODAY",stations:"Stations",meldingen:"Meldingen",taken:"Taken",meldpunt:"Meldpunt",
   messenger:"Messenger",communicatie:"Communicatie",muziekmappen:"Muziekmappen PDF",kalender:"Kalender",
-  programmering:"Programmering",sjablonen:"Sjablonen",muziek:"Muziek",meetings:"Muziekmeeting",redactie:"Redactie",
+  programmering:"Programmering",sjablonen:"Sjablonen",muziek:"Muziek",meetings:"Muziekmeeting",redactie:"Redactie",verkeer:"Verkeer",
   playlists:"Playlists",hitlijsten:"Hitlijsten",presentatie:"Presentatie",social:"Social Studio",
   statistieken:"Luistercijfers",control:"On-Air Control",playout:"Playout One","radio-api":"Radio API",team:"Team",beheer:"Beheer"
 };
