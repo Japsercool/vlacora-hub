@@ -145,6 +145,60 @@ function brusselsHourKey(value:string|undefined){
   return`${get("year")}-${get("month")}-${get("day")}T${get("hour")}`;
 }
 
+function mergeRotationWithEditorial(previous:EditorialItem[],incoming:EditorialItem[]){
+  const previousById=new Map(previous.map(item=>[item.id,item]));
+  const next=incoming.map(item=>{
+    const old=previousById.get(item.id);
+    return old?{
+      ...item,
+      presenterText:old.presenterText||item.presenterText||"",
+      presenterHtml:old.presenterHtml||item.presenterHtml||"",
+      notes:old.notes||item.notes||""
+    }:item;
+  });
+
+  // Editorial additions are owned by VLACORA, not Rotation One.
+  // Keep them exactly where the editor placed them, anchored to a nearby
+  // Rotation item where possible.
+  const editorial=previous.filter(item=>item.source==="VLACORA");
+  const incomingIds=new Set(next.map(item=>item.id));
+
+  for(const local of editorial){
+    if(incomingIds.has(local.id))continue;
+    const oldIndex=previous.findIndex(item=>item.id===local.id);
+
+    let previousAnchor="";
+    for(let i=oldIndex-1;i>=0;i--){
+      const candidate=previous[i];
+      if(candidate.source!=="VLACORA"&&incomingIds.has(candidate.id)){
+        previousAnchor=candidate.id;break;
+      }
+    }
+    if(previousAnchor){
+      let insertAt=next.findIndex(item=>item.id===previousAnchor)+1;
+      // Keep multiple VLACORA items that followed the same Rotation item together.
+      while(insertAt<next.length&&next[insertAt].source==="VLACORA")insertAt++;
+      next.splice(insertAt,0,local);
+      continue;
+    }
+
+    let nextAnchor="";
+    for(let i=oldIndex+1;i<previous.length;i++){
+      const candidate=previous[i];
+      if(candidate.source!=="VLACORA"&&incomingIds.has(candidate.id)){
+        nextAnchor=candidate.id;break;
+      }
+    }
+    if(nextAnchor){
+      const insertAt=next.findIndex(item=>item.id===nextAnchor);
+      next.splice(Math.max(0,insertAt),0,local);
+    }else{
+      next.push(local);
+    }
+  }
+  return next;
+}
+
 export default function EditorialModule({stationSlug}:{stationSlug:string}) {
   const station = useHubStation(stationSlug);
   const [tab,setTab] = useState<"playlist"|"templates"|"koppeling">("playlist");
@@ -166,6 +220,7 @@ export default function EditorialModule({stationSlug}:{stationSlug:string}) {
   const [programmingPrograms,setProgrammingPrograms] = useState<{name:string;host:string}[]>([]);
   const [busy,setBusy] = useState(false);
   const [workspaceReady,setWorkspaceReady] = useState(false);
+  const [workspaceSaveState,setWorkspaceSaveState] = useState("Laden…");
   const [manualPlayoutId,setManualPlayoutId] = useState("");
   const [manualPlayoutName,setManualPlayoutName] = useState("");
   const [autoPulling,setAutoPulling] = useState(false);
@@ -185,24 +240,44 @@ export default function EditorialModule({stationSlug}:{stationSlug:string}) {
   },[station.slug]);
 
   useEffect(()=>{
-    let alive=true;setWorkspaceReady(false);
+    let alive=true;setWorkspaceReady(false);setWorkspaceSaveState("Laden…");
     (async()=>{
       try{
         const saved=await loadEditorialWorkspace(station.slug,date,Number(hour.slice(0,2)));
-        if(alive&&saved&&Array.isArray(saved.items)&&saved.items.length)setPlaylist(saved.items as EditorialItem[]);
+        if(alive&&saved&&Array.isArray(saved.items))setPlaylist(saved.items as EditorialItem[]);
         if(alive&&saved?.source_revision)setPlaylistVersion(String(saved.source_revision));
-      }catch{}
+        if(alive)setWorkspaceSaveState(saved?"✓ Centraal geladen":"✓ Lokale werkruimte");
+      }catch{
+        if(alive)setWorkspaceSaveState("✓ Lokale werkruimte");
+      }
       finally{if(alive)setWorkspaceReady(true)}
     })();
     return()=>{alive=false};
   },[station.slug,date,hour]);
 
+  async function persistWorkspace(showNotice=false){
+    if(!workspaceReady)return false;
+    setWorkspaceSaveState("Opslaan…");
+    try{
+      const central=await saveEditorialWorkspace(station.slug,date,Number(hour.slice(0,2)),playlist,playlistVersion);
+      const stamp=new Date().toLocaleTimeString("nl-BE",{hour:"2-digit",minute:"2-digit"});
+      setWorkspaceSaveState(central?`✓ Opgeslagen ${stamp}`:`✓ Lokaal opgeslagen ${stamp}`);
+      if(showNotice)flash(central?"Redactiewerk centraal opgeslagen":"Redactiewerk lokaal opgeslagen");
+      return central;
+    }catch(e){
+      setWorkspaceSaveState("⚠ Opslaan mislukt");
+      if(showNotice)flash(e instanceof Error?e.message:"Opslaan mislukt");
+      return false;
+    }
+  }
+
   useEffect(()=>{
     if(!workspaceReady)return;
-    const timer=window.setTimeout(()=>{
-      void saveEditorialWorkspace(station.slug,date,Number(hour.slice(0,2)),playlist,playlistVersion).catch(()=>{});
-    },1200);
+    setWorkspaceSaveState("Wijzigingen…");
+    const timer=window.setTimeout(()=>{void persistWorkspace(false)},900);
     return()=>window.clearTimeout(timer);
+    // playlist is intentionally the main autosave trigger.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   },[workspaceReady,station.slug,date,hour,playlist,playlistVersion]);
 
   const mapping=mappings[station.slug]||{rotationId:station.rotationId||"",rotationName:station.rotationId?station.name:"",playoutId:"",playoutName:""};
@@ -262,12 +337,13 @@ async function pullRotation(silent=false){
     const logical=all.filter((i:any)=>brusselsHourKey(i.sourceHourStartUtc)===targetKey);
     const airtime=all.filter((i:any)=>brusselsHourKey(i.airTimeUtc)===targetKey);
     const source=logical.length?logical:airtime;
-    const previous=new Map<string,EditorialItem>(playlist.map(i=>[i.id,i]));
-    const incoming:EditorialItem[]=source.map((i:any)=>({...i,presenterText:previous.get(i.id)?.presenterText||i.presenterText||"",presenterHtml:previous.get(i.id)?.presenterHtml||i.presenterHtml||"",notes:previous.get(i.id)?.notes||i.notes||""}));
-    setPlaylist(incoming);setSelectedId(incoming[0]?.id||"");setLastPull(new Date().toLocaleTimeString("nl-BE"));setPlaylistVersion(String(data.version||"—"));
+    const incoming:EditorialItem[]=source.map((i:any)=>({...i,presenterText:i.presenterText||"",presenterHtml:i.presenterHtml||"",notes:i.notes||""}));
+    const merged=mergeRotationWithEditorial(playlist,incoming);
+    const editorialCount=merged.filter(i=>i.source==="VLACORA").length;
+    setPlaylist(merged);setSelectedId(merged[0]?.id||"");setLastPull(new Date().toLocaleTimeString("nl-BE"));setPlaylistVersion(String(data.version||"—"));
     const mode=logical.length?"logisch Rotation-uur":"airtime fallback";
-    setLastStatus(`Rotation One: ${incoming.length} items • ${mode} • ${all.length} items rond dit uur`);
-    if(!silent)flash(incoming.length?`${incoming.length} echte Rotation One-items geladen`:`Geen items gevonden voor ${date} ${hour}. De API gaf ${all.length} items in de bredere window.`);
+    setLastStatus(`Rotation One: ${incoming.length} items • ${editorialCount} VLACORA-redactie-item(s) bewaard • ${mode}`);
+    if(!silent)flash(incoming.length?`${incoming.length} Rotation-items bijgewerkt; ${editorialCount} redactietalk(s) bewaard`:`Geen Rotation-items voor ${date} ${hour}; bestaande redactietalks blijven behouden.`);
   }catch(e){setLastStatus(e instanceof Error?e.message:"Rotation One fout");if(!silent)flash(e instanceof Error?e.message:"Rotation One kon niet worden bereikt")}
   finally{setAutoPulling(false)}
 }
@@ -318,6 +394,8 @@ async function testConnections(){
       onPull={()=>pullRotation(false)}
       playlistVersion={playlistVersion}
       syncLabel={autoPulling?"Rotation One laden…":lastStatus}
+      saveLabel={workspaceSaveState}
+      onSave={()=>persistWorkspace(true)}
     />}
 
     {tab==="templates"&&<EditorialTemplateStudio stationSlug={station.slug} playlist={playlist}/>}

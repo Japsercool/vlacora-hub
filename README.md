@@ -1252,3 +1252,24 @@ aanvrager een VLACORA-notificatie.
 De bestaande Supabase-migratie `admin_requests` is gecontroleerd op het
 verbonden project. Deze release behoudt ook de 0.19.7 rich-text talkeditor,
 live Presence per talk en verkeer uitsluitend op expliciete aanvraag.
+
+
+## 0.19.9 — talks en redactie-items blijven nu echt bewaard
+
+Oorzaak van het probleem: na het laden van de centrale redactiewerkruimte
+haalde VLACORA automatisch opnieuw de Rotation One-playlist op. Die refresh
+verving daarna de volledige lijst door alleen de Rotation One-items.
+Handmatig toegevoegde VLACORA-talks konden daardoor verdwijnen alsof ze
+nooit waren opgeslagen.
+
+Opgelost:
+- Rotation One refresh **merge't** voortaan met de redactiewerkruimte;
+- items met `source: VLACORA` blijven op hun gekozen positie staan;
+- talktekst, rich-text HTML en notities blijven aan bestaande Rotation-items gekoppeld;
+- autosave naar `hub_editorial_workspaces` blijft actief;
+- autosave gebeurt na een korte schrijfpauze;
+- bij het verlaten van de talk-editor wordt meteen centraal opgeslagen;
+- bovenaan staat nu een zichtbare status zoals `✓ Opgeslagen 13:24`;
+- er is ook een expliciete knop **Opslaan**.
+
+Geen nieuwe Supabase-migratie nodig.

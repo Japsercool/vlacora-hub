@@ -1,0 +1,13 @@
+VLACORA HUB 0.19.9 validation
+[PASS] version 0.19.9
+[PASS] rotation merge helper
+[PASS] VLACORA editorial preserved
+[PASS] workspace autosave
+[PASS] save status
+[PASS] save button
+[PASS] save on rich editor blur
+[PASS] rich html preserved
+[PASS] no new migration
+[PASS] touched TSX files parser/name sanity
+[INFO] no database migration required
+[INFO] localStorage remains instant fallback; Supabase workspace is central persistence

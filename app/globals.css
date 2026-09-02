@@ -1802,3 +1802,26 @@ hr{border:0;border-top:1px solid var(--border);margin:22px 0}
   }
   .talk-rich-content{min-height:150px}
 }
+
+
+/* VLACORA 0.19.9 — editorial persistence status */
+.workspace-save-label{
+  display:inline-flex;
+  align-items:center;
+  min-height:34px;
+  padding:0 10px;
+  border-radius:10px;
+  background:#f3f5fa;
+  color:#737990;
+  font-size:11px;
+  font-weight:800;
+  white-space:nowrap;
+}
+.workspace-save-label.saved{
+  background:#edf8ef;
+  color:#3f8050;
+}
+.workspace-save-label.error{
+  background:#fff0f0;
+  color:#b64a54;
+}

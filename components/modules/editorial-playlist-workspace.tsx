@@ -23,6 +23,8 @@ type Props={
   onPull:()=>void|Promise<void>;
   playlistVersion:string;
   syncLabel?:string;
+  saveLabel?:string;
+  onSave?:()=>void|Promise<unknown>;
 };
 
 const filters:{key:string;label:string;types:EditorialType[]}[]=[
@@ -78,11 +80,12 @@ function escapeHtml(value:string){
 }
 
 function TalkRichTextEditor({
-  item,stationSlug,onChange,onRequestTraffic,trafficBusy
+  item,stationSlug,onChange,onCommit,onRequestTraffic,trafficBusy
 }:{
   item:EditorialItem;
   stationSlug:string;
   onChange:(patch:Partial<EditorialItem>)=>void;
+  onCommit?:()=>void|Promise<unknown>;
   onRequestTraffic?:()=>void;
   trafficBusy?:boolean;
 }){
@@ -123,6 +126,7 @@ function TalkRichTextEditor({
   function blur(){
     focusedRef.current=false;
     publish();
+    void onCommit?.();
     emitActivity({detail:`Redactie • ${item.time} • ${item.title}`,entityType:"playlist-item",entityId:item.id});
   }
 
@@ -170,7 +174,7 @@ function TalkRichTextEditor({
 }
 
 export default function EditorialPlaylistWorkspace(props:Props){
-  const{stationName,stationSlug,date,setDate,hour,setHour,playlist,setPlaylist,onPull,playlistVersion,syncLabel}=props;
+  const{stationName,stationSlug,date,setDate,hour,setHour,playlist,setPlaylist,onPull,playlistVersion,syncLabel,saveLabel,onSave}=props;
   const[query,setQuery]=useState("");
   const[enabled,setEnabled]=useState(()=>new Set(filters.map(x=>x.key)));
   const[selectedId,setSelectedId]=useState("");
@@ -369,7 +373,7 @@ export default function EditorialPlaylistWorkspace(props:Props){
         </div>
         <span className="template-picker-meta">{syncLabel||templateMessage}</span>
       </div>
-      <div className="button-row"><button className="ghost" onClick={()=>void onPull()}>↻ Rotation One</button><span className="version-badge">rev {playlistVersion}</span></div>
+      <div className="button-row"><span className={`workspace-save-label ${saveLabel?.includes("mislukt")?"error":saveLabel?.startsWith("✓")?"saved":""}`}>{saveLabel||"—"}</span><button className="ghost" onClick={()=>void onSave?.()}>💾 Opslaan</button><button className="ghost" onClick={()=>void onPull()}>↻ Rotation One</button><span className="version-badge">rev {playlistVersion}</span></div>
     </div>
 
     <div className="topplaylist-main">
@@ -405,7 +409,7 @@ export default function EditorialPlaylistWorkspace(props:Props){
                   <button className="row-icon" title="Omlaag" onClick={e=>{e.stopPropagation();const idx=playlist.findIndex(x=>x.id===item.id);if(idx<playlist.length-1)moveItem(item.id,playlist[idx+1].id)}}>⌄</button>
                   <button className="row-icon danger" onClick={e=>{e.stopPropagation();removeItem(item.id)}}>⌫</button>
                 </div>
-                {selectedId===item.id&&<div className="talk-content-panel"><div className="talk-editor-caption"><strong>{badgeLabel(item)} bewerken</strong><span>{item.type==="traffic"?"Live verkeer alleen op aanvraag":"Presentatietekst voor dit moment"}</span></div><TalkRichTextEditor item={item} stationSlug={stationSlug} trafficBusy={trafficBusy} onRequestTraffic={item.type==="traffic"?()=>void fetchTrafficForItem(item.id):undefined} onChange={patch=>patchItem(item.id,patch)}/></div>}
+                {selectedId===item.id&&<div className="talk-content-panel"><div className="talk-editor-caption"><strong>{badgeLabel(item)} bewerken</strong><span>{item.type==="traffic"?"Live verkeer alleen op aanvraag":"Presentatietekst voor dit moment"}</span></div><TalkRichTextEditor item={item} stationSlug={stationSlug} trafficBusy={trafficBusy} onRequestTraffic={item.type==="traffic"?()=>void fetchTrafficForItem(item.id):undefined} onChange={patch=>patchItem(item.id,patch)} onCommit={onSave}/></div>}
               </>:<>
                 <span className="row-time">{item.time}</span>
                 <div className="music-main">{item.artist&&<span className="music-artist">{item.artist}</span>}<strong>{item.title}</strong></div>

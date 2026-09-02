@@ -1,6 +1,5 @@
-VLACORA HUB 0.19.8
-Admin requests / suggestions inbox.
-Team members can submit requested additions, ideas, traffic requests, editorial requests or technical requests directly to administration.
-Admins can review, set status, respond, and the requester receives a notification.
-Includes 0.19.7 rich talk editor, live edit presence and on-demand-only traffic.
-Supabase migration admin_requests is present and verified in the connected project.
+VLACORA HUB 0.19.9
+Editorial persistence fix.
+VLACORA talks, traffic slots and other manually added editorial items are preserved when Rotation One refreshes.
+Talk edits autosave centrally, save immediately on editor blur, and can be saved explicitly with a visible Save button/status.
+No database migration required.
