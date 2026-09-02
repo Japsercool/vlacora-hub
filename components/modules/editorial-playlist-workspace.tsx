@@ -56,6 +56,13 @@ function manualType(slot:EditorialTemplateSlot):EditorialType{
 }
 
 function generalPlaylistType(item:EditorialItem){const k=itemKind(item);return ["imaging","promo","link"].includes(k)?"jingle":k}
+function defaultNotes(type:EditorialType,label:string){
+  const text=`${label} ${type}`.toLowerCase();
+  if(text.includes("actie")||text.includes("sponsor")||text.includes("wedstrijd"))return"Verkochte actie / sponsor";
+  if(type==="news")return"Nieuws";
+  if(type==="weather")return"Weer";
+  return"Redactie";
+}
 
 export default function EditorialPlaylistWorkspace(props:Props){
   const{stationName,stationSlug,date,setDate,hour,setHour,playlist,setPlaylist,onPull,playlistVersion,syncLabel}=props;
@@ -109,14 +116,14 @@ export default function EditorialPlaylistWorkspace(props:Props){
   function addTalkAfter(afterId:string,type:EditorialType="talk",label="Nieuwe talk"){
     const idx=playlist.findIndex(x=>x.id===afterId);
     const source=playlist[Math.max(0,idx)];
-    const item:EditorialItem={id:uid(),time:source?.time||hour,type,title:label,duration:"00:20",presenterText:"",notes:"Redactie",source:"VLACORA"};
+    const item:EditorialItem={id:uid(),time:source?.time||hour,type,title:label,duration:"00:20",presenterText:"",notes:defaultNotes(type,label),source:"VLACORA"};
     const next=[...playlist];next.splice(idx<0?next.length:idx+1,0,item);setPlaylist(next);setSelectedId(item.id);
   }
   function quickAdd(type:EditorialType,label:string){
     const after=selected?.id||playlist[playlist.length-1]?.id||"";
     if(after)addTalkAfter(after,type,label);
     else{
-      const item:EditorialItem={id:uid(),time:hour,type,title:label,duration:"00:20",presenterText:"",notes:"Redactie",source:"VLACORA"};
+      const item:EditorialItem={id:uid(),time:hour,type,title:label,duration:"00:20",presenterText:"",notes:defaultNotes(type,label),source:"VLACORA"};
       setPlaylist([item]);setSelectedId(item.id);
     }
   }
@@ -265,9 +272,11 @@ export default function EditorialPlaylistWorkspace(props:Props){
         <button onClick={()=>quickAdd("weather","Weer")}><span>☁</span> WEER</button>
         <button onClick={()=>quickAdd("news","Nieuws")}><span>▣</span> NIEUWS</button>
         <button onClick={()=>quickAdd("talk","Redactie")}><span>✎</span> REDACTIE</button>
+        <button onClick={()=>quickAdd("talk","Verkochte actie")}><span>★</span> ACTIE</button>
+        <button onClick={()=>quickAdd("talk","Wedstrijd / sponsoractie")}><span>✓</span> WEDSTRIJD</button>
         <button onClick={()=>quickAdd("talk","Doorverwijs")}><span>➤</span> DOORVERWIJS</button>
         <button onClick={()=>quickAdd("talk","Check bericht")}><span>⌕</span> CHECK BERICHT</button>
-        <div className="topplaylist-side-info"><strong>Uur {pad(hourNumber)}</strong><span>{playlist.length} items</span><span>{template?`Template: ${template.name}`:"Geen template"}</span></div>
+        <div className="topplaylist-side-info"><strong>Uur {pad(hourNumber)}</strong><span>{playlist.length} items</span><span>{template?`Template: ${template.name}`:"Geen template"}</span><span>Gebruik toewijzingen in sjablonen om verkochte acties automatisch op vaste uren te tonen.</span></div>
       </aside>
     </div>
   </div>

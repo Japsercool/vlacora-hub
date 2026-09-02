@@ -1,3 +1,4 @@
-VLACORA HUB 0.19.0
-TOP-inspired visual refresh for the main shell, sidebar, Redactie / playlist workspace and Taken module.
-No schema changes. No API changes.
+VLACORA HUB 0.19.1
+Playlist style partly rolled back to the cleaner 0.18.5 layout.
+Improved add-talk plus button alignment.
+Added quick actions for sold/sponsored talks and contest talks in playlist and template studio.

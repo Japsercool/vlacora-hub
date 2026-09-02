@@ -106,6 +106,11 @@ export default function EditorialTemplateStudio({stationSlug,playlist}:{stationS
     const slot:EditorialTemplateSlot={id:uid(),type,label:labelFor(type),durationSec:isTalk(type)?20:0,content:"",required:type==="required_talk",permanentMessage:""};
     patch({sequence:[...draft.sequence,slot]});
   }
+  function addCustomTalk(label:string,durationSec=20,required=false,content=""){
+    if(!draft)return;
+    const slot:EditorialTemplateSlot={id:uid(),type:required?"required_talk":"talk",label,durationSec,content,required,permanentMessage:""};
+    patch({sequence:[...draft.sequence,slot]});
+  }
 
   function addCategorySlot(category:PlaylistCategoryOption){
     if(!draft)return;
@@ -187,6 +192,11 @@ export default function EditorialTemplateStudio({stationSlug,playlist}:{stationS
           <div className="slot-add-section">
             <strong>Redactieslots toevoegen:</strong>
             <div className="slot-add-buttons">{slotButtons.filter(x=>["talk","required_talk","tease","browse"].includes(x.type)).map(x=><button key={x.type} className={`add-slot add-${chipClass(x.type)}`} onClick={()=>addSlot(x.type)}>＋ {x.label}</button>)}</div>
+            <div className="slot-add-buttons special-talk-buttons">
+              <button className="add-slot add-talk" onClick={()=>addCustomTalk("Verkochte actie",20,true,"Vaste verkochte actie / sponsorvermelding voor dit uur.")}>＋ Actie / sponsor</button>
+              <button className="add-slot add-talk" onClick={()=>addCustomTalk("Wedstrijd / sponsoractie",30,true,"Uitleg van de actie, sponsorvermelding en call-to-action.")}>＋ Wedstrijd</button>
+            </div>
+            <p className="template-hour-hint">Gebruik hieronder <strong>Toewijzingen</strong> om zulke vaste talks automatisch op een bepaalde weekdag en uur te laten verschijnen.</p>
 
             <div className="real-category-section">
               <div className="real-category-head">

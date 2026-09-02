@@ -1118,3 +1118,14 @@ de TOP-workspace uit de referentiescreens:
 - alleen styling/presentatie gewijzigd; geen database- of API-wijzigingen.
 
 Deze versie is veilig als pure UI-refresh.
+
+
+## 0.19.1 — playlist rollback + actie-talks
+
+- TOPtaken-stijl blijft behouden.
+- De **playlist / redactie-weergave** is visueel terug dichter gezet bij de vorige versie, omdat die rustiger en duidelijker was.
+- Het **plusknopje** rechts van playlist-items is opnieuw netjes gecentreerd en compacter gemaakt.
+- In de playlist-actieknoppen kun je nu sneller **Verkochte actie** en **Wedstrijd / sponsoractie** toevoegen.
+- In **Redactietemplates** kun je nu ook meteen zulke vaste talks toevoegen en via **Toewijzingen** koppelen aan een bepaalde weekdag en uur.
+
+Geen databasewijzigingen. Geen API-wijzigingen.
