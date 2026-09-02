@@ -84,7 +84,10 @@ export function saveStationCache(kind:IntegrationKind,value:RadioStation[]){if(t
 export async function radioRead(kind:IntegrationKind,path:string,action:"raw"|"stations"|"playlist"|"now"|"folders"|"songs"|"charts"|"chartEditions"|"chartEdition"|"revision"="raw"){
   const config=readIntegration(kind);
   if(!config?.host)throw new Error(`${kind==="rotation"?"Rotation One":kind==="playout"?"Playout One":"SHOUTcast"} is nog niet ingesteld in Beheer → Integraties.`);
-  const secret=readSecret(kind);
+  let secret=readSecret(kind);
+  if(!secret.apiKey){
+    try{const mod=await import("@/lib/supabase/secrets");await mod.hydrateIntegrationSecret(kind);secret=readSecret(kind)}catch{}
+  }
   const requestId=`${Date.now()}-${Math.random().toString(36).slice(2,8)}`;
   const res=await fetch("/api/radio/manual/read",{
     method:"POST",
@@ -113,7 +116,10 @@ export function pathForChart(template:string|undefined,stationId:string,chartId:
 export async function radioWrite(kind:IntegrationKind,path:string,method:"POST"|"PUT"|"PATCH",payload:unknown){
   const config=readIntegration(kind);
   if(!config?.host)throw new Error(`${kind==="rotation"?"Rotation One":"Playout One"} is nog niet ingesteld in Beheer → Integraties.`);
-  const secret=readSecret(kind);
+  let secret=readSecret(kind);
+  if(!secret.apiKey){
+    try{const mod=await import("@/lib/supabase/secrets");await mod.hydrateIntegrationSecret(kind);secret=readSecret(kind)}catch{}
+  }
   const res=await fetch("/api/radio/manual/write",{
     method:"POST",headers:{"Content-Type":"application/json"},
     body:JSON.stringify({kind,path,method,payload,config,...secret})

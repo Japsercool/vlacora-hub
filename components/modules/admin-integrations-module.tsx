@@ -4,12 +4,13 @@ import { useEffect,useMemo,useState } from "react";
 import { isSupabaseBrowserConfigured } from "@/lib/supabase/client";
 import { syncSharedPlayoutStations,syncSharedRotationStations } from "@/lib/supabase/hub-data";
 import {
-  CONFIG_KEY,readIntegrationStore,saveStationCache,sessionKey,writeIntegrationStore,
+  CONFIG_KEY,readIntegrationStore,readSecret,saveStationCache,sessionKey,writeIntegrationStore,
   type ClientIntegrationConfig,type IntegrationKind,type IntegrationStore,type Protocol
 } from "@/lib/radio/client-config";
 import {
   loadSharedIntegrationStore,loadSharedSetting,saveSharedIntegrationStore,saveSharedSetting
 } from "@/lib/supabase/settings";
+import { deletePersistedIntegrationSecret,hydrateIntegrationSecret,migrateSessionSecretToVault,savePersistedIntegrationSecret } from "@/lib/supabase/secrets";
 
 type StationSettings={timezone:string;active:boolean;playlistWarnings:boolean;newsCheck:boolean;socialReminders:boolean};
 
@@ -36,6 +37,7 @@ export default function AdminIntegrationsModule({stationName,stationSlug}:{stati
   const[busy,setBusy]=useState(false);
   const[diagnostic,setDiagnostic]=useState<any>(null);
   const[loaded,setLoaded]=useState(false);
+  const[secretState,setSecretState]=useState<"idle"|"loading"|"stored"|"session"|"none">("idle");
   const supabaseConfigured=useMemo(()=>isSupabaseBrowserConfigured(),[]);
   const cfg=selected?configs[selected]:null;
 
@@ -58,16 +60,34 @@ export default function AdminIntegrationsModule({stationName,stationSlug}:{stati
       }
       if(!alive)return;
       setConfigs(merged);writeIntegrationStore(merged);setLoaded(true);
+      if(supabaseConfigured){
+        void Promise.all((["rotation","playout","shoutcast"] as IntegrationKind[]).map(kind=>migrateSessionSecretToVault(kind))).catch(()=>{});
+      }
     })().catch(()=>setLoaded(true));
     return()=>{alive=false};
   },[stationSlug,supabaseConfigured]);
 
   useEffect(()=>{
     if(!selected)return;
-    setKeyInput(sessionStorage.getItem(sessionKey(selected))||"");
-    setKeyHeader(sessionStorage.getItem(`${sessionKey(selected)}:header`)||"Authorization");
-    setKeyPrefix(sessionStorage.getItem(`${sessionKey(selected)}:prefix`)||"Bearer");
-  },[selected]);
+    let alive=true;
+    setSecretState("loading");
+    const local=readSecret(selected);
+    setKeyInput(local.apiKey);
+    setKeyHeader(local.apiKeyHeader);
+    setKeyPrefix(local.apiKeyPrefix);
+    (async()=>{
+      if(supabaseConfigured){
+        const central=await hydrateIntegrationSecret(selected);
+        if(!alive)return;
+        if(central?.apiKey){
+          setKeyInput(central.apiKey);setKeyHeader(central.apiKeyHeader);setKeyPrefix(central.apiKeyPrefix);setSecretState("stored");return;
+        }
+      }
+      if(!alive)return;
+      setSecretState(local.apiKey?"session":"none");
+    })().catch(()=>{if(alive)setSecretState(local.apiKey?"session":"none")});
+    return()=>{alive=false};
+  },[selected,supabaseConfigured]);
 
   function flash(text:string){setNotice(text);window.setTimeout(()=>setNotice(""),3200)}
   function update(kind:IntegrationKind,patch:Partial<ClientIntegrationConfig>){
@@ -80,13 +100,25 @@ export default function AdminIntegrationsModule({stationName,stationSlug}:{stati
   }
   async function saveIntegration(){
     if(!selected)return;
+    setBusy(true);
     saveSessionSecret(selected);
     writeIntegrationStore(configs);
     try{
-      if(supabaseConfigured){await saveSharedIntegrationStore(configs,stationSlug);flash("Centraal opgeslagen in Supabase. Deze instellingen blijven behouden na updates en op andere toestellen.")}
-      else flash("Lokaal opgeslagen. Activeer Supabase om instellingen centraal te bewaren.");
+      if(supabaseConfigured){
+        await saveSharedIntegrationStore(configs,stationSlug);
+        if(keyInput.trim()){
+          await savePersistedIntegrationSecret(selected,{apiKey:keyInput,apiKeyHeader:keyHeader,apiKeyPrefix:keyPrefix});
+          setSecretState("stored");
+          flash("Instellingen én API-sleutel veilig centraal opgeslagen. Ze blijven behouden na updates en browserherstarts.");
+        }else{
+          flash("Publieke instellingen centraal opgeslagen. Een bestaande centrale API-sleutel is behouden.");
+        }
+      }else{
+        flash("Lokaal opgeslagen. De API-sleutel blijft alleen actief in deze browsersessie zolang Supabase niet actief is.");
+      }
       setSelected(null);
     }catch(e){flash(e instanceof Error?e.message:"Opslaan mislukt")}
+    finally{setBusy(false)}
   }
   async function saveStationSettings(){
     try{
@@ -94,16 +126,31 @@ export default function AdminIntegrationsModule({stationName,stationSlug}:{stati
       else{localStorage.setItem(`vlacora:station-settings:${stationSlug}`,JSON.stringify(stationSettings));flash("Stationinstellingen lokaal opgeslagen")}
     }catch(e){flash(e instanceof Error?e.message:"Opslaan mislukt")}
   }
-  function clearSecret(){if(!selected)return;sessionStorage.removeItem(sessionKey(selected));setKeyInput("");flash("Tijdelijke API-sleutel verwijderd")}
+  async function clearSecret(){
+    if(!selected)return;
+    if(!window.confirm("Deze API-sleutel echt centraal verwijderen? Rotation/Playout kan daarna niet meer verbinden tot je een nieuwe sleutel opslaat."))return;
+    setBusy(true);
+    try{
+      await deletePersistedIntegrationSecret(selected);
+      sessionStorage.removeItem(sessionKey(selected));
+      sessionStorage.removeItem(`${sessionKey(selected)}:header`);
+      sessionStorage.removeItem(`${sessionKey(selected)}:prefix`);
+      setKeyInput("");setKeyHeader("Authorization");setKeyPrefix("Bearer");setSecretState("none");
+      flash("API-sleutel centraal verwijderd");
+    }catch(e){flash(e instanceof Error?e.message:"API-sleutel verwijderen mislukt")}
+    finally{setBusy(false)}
+  }
 
   async function test(kind:IntegrationKind,action:"status"|"stations"){
     const c=configs[kind];if(!c.host.trim())return flash("Vul eerst het publieke IP-adres in.");
     if(kind==="shoutcast"&&action==="stations")return;
     setBusy(true);setDiagnostic(null);
     try{
-      const secret=kind===selected?keyInput:(sessionStorage.getItem(sessionKey(kind))||"");
-      const header=kind===selected?keyHeader:(sessionStorage.getItem(`${sessionKey(kind)}:header`)||"Authorization");
-      const prefix=kind===selected?keyPrefix:(sessionStorage.getItem(`${sessionKey(kind)}:prefix`)||"Bearer");
+      let cached=readSecret(kind);
+      if(!cached.apiKey&&supabaseConfigured){await hydrateIntegrationSecret(kind).catch(()=>null);cached=readSecret(kind)}
+      const secret=kind===selected?(keyInput||cached.apiKey):cached.apiKey;
+      const header=kind===selected?keyHeader:cached.apiKeyHeader;
+      const prefix=kind===selected?keyPrefix:cached.apiKeyPrefix;
       const response=await fetch("/api/radio/manual/test",{method:"POST",cache:"no-store",headers:{"Content-Type":"application/json","Cache-Control":"no-cache"},body:JSON.stringify({kind,action,config:c,apiKey:secret,apiKeyHeader:header,apiKeyPrefix:prefix})});
       const data=await response.json();setDiagnostic(data);
       if(!response.ok){const code=data?.httpError?.code||data?.tcp?.error?.code||"";throw new Error(`${data?.phase||"verbinding"}${code?` • ${code}`:""}: ${data?.message||data?.error||`HTTP ${response.status}`}`)}
@@ -166,7 +213,7 @@ export default function AdminIntegrationsModule({stationName,stationSlug}:{stati
         <label className="field">Basis-pad<input className="input" value={cfg.basePath} onChange={e=>update(selected,{basePath:e.target.value})} placeholder="meestal leeg"/></label>
       </div><div className="endpoint-preview"><span>Adres</span><strong>{cfg.protocol}://{cfg.host||"JOUW-IP"}{cfg.port?`:${cfg.port}`:""}{cfg.basePath||""}</strong></div></div>
 
-      <div className="settings-section"><h4>API beveiliging</h4><label className="field">API-key / shared secret<input className="input" type="password" value={keyInput} onChange={e=>setKeyInput(e.target.value)} placeholder="leeg laten als deze koppeling geen key gebruikt"/></label><div className="two-form-cols"><label className="field">Header<input className="input" value={keyHeader} onChange={e=>setKeyHeader(e.target.value)}/></label><label className="field">Prefix<input className="input" value={keyPrefix} onChange={e=>setKeyPrefix(e.target.value)}/></label></div><div className="secret-explainer"><strong>🔒 Geheim blijft apart</strong><span>De publieke instellingen worden centraal bewaard. Een API-secret blijft voorlopig alleen in je browsersessie; we zetten geheimen niet in GitHub of een leesbare tabel.</span></div>{keyInput&&<button className="ghost danger-text" onClick={clearSecret}>Verwijder tijdelijke sleutel</button>}</div>
+      <div className="settings-section"><h4>API beveiliging</h4><label className="field">API-key / shared secret<input className="input" type="password" value={keyInput} onChange={e=>setKeyInput(e.target.value)} placeholder={secretState==="stored"?"Centraal opgeslagen in Supabase Vault":"leeg laten als deze koppeling geen key gebruikt"}/></label><div className="two-form-cols"><label className="field">Header<input className="input" value={keyHeader} onChange={e=>setKeyHeader(e.target.value)}/></label><label className="field">Prefix<input className="input" value={keyPrefix} onChange={e=>setKeyPrefix(e.target.value)}/></label></div><div className="secret-explainer"><strong>🔐 {secretState==="stored"?"Veilig centraal opgeslagen":secretState==="loading"?"Sleutel laden…":secretState==="session"?"Nog alleen in deze sessie":"Nog geen centrale sleutel"}</strong><span>{supabaseConfigured?"API-sleutels worden versleuteld opgeslagen met Supabase Vault en automatisch teruggeladen na een deploy, browserherstart of op een ander toestel. Ze staan niet in GitHub, localStorage of een leesbare VLACORA-tabel.":"Supabase is niet actief; de sleutel kan alleen tijdelijk in deze browsersessie blijven."}</span></div>{(keyInput||secretState==="stored")&&<button className="ghost danger-text" disabled={busy} onClick={()=>void clearSecret()}>Verwijder opgeslagen sleutel</button>}</div>
 
       <div className="settings-section"><h4>Endpoints</h4>
         <label className="field">Status endpoint<input className="input" value={cfg.statusPath} onChange={e=>update(selected,{statusPath:e.target.value})}/></label>
@@ -194,7 +241,7 @@ export default function AdminIntegrationsModule({stationName,stationSlug}:{stati
       {cfg.lastError&&<div className="config-error"><strong>Laatste fout</strong><span>{cfg.lastError}</span></div>}
       {cfg.lastOk&&<div className="config-ok"><strong>Laatste verbinding</strong><span>{cfg.lastOk}</span></div>}
       {diagnostic&&<div className="connection-diagnostic"><div className="diagnostic-grid"><span>Fase</span><strong>{diagnostic.phase||"—"}</strong><span>Doel</span><strong>{diagnostic.target||"—"}</strong><span>HTTP</span><strong>{diagnostic.status||diagnostic.httpError?.code||"—"}</strong><span>Vercel regio</span><strong>{diagnostic.runtime?.vercelRegion||"onbekend"}</strong></div></div>}
-      <div className="drawer-actions">{selected!=="shoutcast"&&<button className="ghost" disabled={busy} onClick={()=>test(selected,"stations")}>Stations ophalen</button>}<button className="ghost" disabled={busy} onClick={()=>test(selected,"status")}>Test verbinding</button><button className="primary" onClick={saveIntegration}>Opslaan</button></div>
+      <div className="drawer-actions">{selected!=="shoutcast"&&<button className="ghost" disabled={busy} onClick={()=>test(selected,"stations")}>Stations ophalen</button>}<button className="ghost" disabled={busy} onClick={()=>test(selected,"status")}>Test verbinding</button><button className="primary" disabled={busy||secretState==="loading"} onClick={saveIntegration}>{busy?"Opslaan…":"Opslaan"}</button></div>
     </div></div>}
   </div>
 }

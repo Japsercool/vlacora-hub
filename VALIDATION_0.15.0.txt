@@ -1,0 +1,17 @@
+VLACORA HUB 0.15.0 static validation
+[PASS] version 0.15.0
+[PASS] playlist workspace exists
+[PASS] template studio exists
+[PASS] migration 019 exists
+[PASS] editorial types exported
+[PASS] playlist tab uses workspace
+[PASS] template tab uses studio
+[PASS] central workspace save
+[PASS] template assignments
+[PASS] template drag/drop
+[PASS] LIVE mode
+[PASS] hours 24
+[PASS] CSS no escaped newline
+[PASS] touched TypeScript files contain no TS1xxx parser errors
+[PASS] touched TypeScript files contain no local Cannot find name errors in standalone check
+[INFO] Supabase production migration 019 already applied

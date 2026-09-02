@@ -4,6 +4,7 @@ import { pathFor,radioRead,readIntegration,readMappings,readSecret,readStationCa
 import { readHubStations,rotationHubSlug,type HubStation,useHubStation,HUB_STATIONS_EVENT } from "@/lib/radio/hub-stations";
 import { loadSharedPlayoutStations,syncSharedPlayoutStations,syncSharedRotationStations } from "@/lib/supabase/hub-data";
 import { hydrateSharedIntegrationSettings,loadSharedRadioMapping,saveSharedRadioMapping } from "@/lib/supabase/settings";
+import { hydrateIntegrationSecret } from "@/lib/supabase/secrets";
 
 const norm=(x:string)=>x.toLowerCase().replace(/[^a-z0-9]/g,"");
 function shoutSummary(raw:any){
@@ -29,7 +30,7 @@ export default function RadioApiModule({stationSlug}:{stationSlug:string}){
       const refreshCache=()=>{setRotationStations(readStationCache("rotation"));setPlayoutStations(readStationCache("playout"));setHubStations(readHubStations())};
       if(readStationCache("playout").length===0){const sharedPlayout=await loadSharedPlayoutStations().catch(()=>[]);if(sharedPlayout.length)saveStationCache("playout",sharedPlayout)}
       refreshCache();setLoaded(true);
-      const pc=readIntegration("playout");const secret=readSecret("playout");
+      const pc=readIntegration("playout");let secret=readSecret("playout");if(!secret.apiKey){await hydrateIntegrationSecret("playout").catch(()=>null);secret=readSecret("playout")}
       if(pc?.host&&readStationCache("playout").length===0&&secret.apiKey){void fetchPlayoutStations(true)}
     };
     void load();
@@ -47,8 +48,8 @@ export default function RadioApiModule({stationSlug}:{stationSlug:string}){
     await hydrateSharedIntegrationSettings(active.slug).catch(()=>false);
     const pc=readIntegration("playout");
     if(!pc?.host){const message="Playout One is nog niet ingesteld in Beheer → Integraties.";if(!silent)flash(message);throw new Error(message)}
-    const secret=readSecret("playout");
-    if(!secret.apiKey){const message="Playout One Bearer API-key ontbreekt in deze browsersessie. Open Beheer → Integraties → Playout One en vul de API-key opnieuw in.";if(!silent)flash(message);throw new Error(message)}
+    let secret=readSecret("playout");if(!secret.apiKey){await hydrateIntegrationSecret("playout").catch(()=>null);secret=readSecret("playout")}
+    if(!secret.apiKey){const message="Playout One Bearer API-key is nog niet centraal opgeslagen. Open Beheer → Integraties → Playout One, vul de key één keer in en klik Opslaan.";if(!silent)flash(message);throw new Error(message)}
     try{
       const p=await radioRead("playout",pc.stationPath,"stations");
       const ps=p.stations||[];
@@ -98,7 +99,7 @@ export default function RadioApiModule({stationSlug}:{stationSlug:string}){
   }
   async function test(){setBusy(true);setNow(null);setShout(null);try{await hydrateSharedIntegrationSettings(active.slug).catch(()=>false);const rc=readIntegration("rotation"),pc=readIntegration("playout"),sc=readIntegration("shoutcast");const next:any={checkedAt:new Date().toISOString()};if(rc?.host){try{const r=await radioRead("rotation",rc.statusPath,"raw");next.rotation={online:true,status:r.status,raw:r.raw}}catch(e){next.rotation={online:false,error:e instanceof Error?e.message:String(e)}}}if(pc?.host){try{const p=await radioRead("playout",pc.statusPath,"raw");next.playout={online:true,status:p.status,raw:p.raw}}catch(e){next.playout={online:false,error:e instanceof Error?e.message:String(e)}}}if(pc?.host&&mapping.playoutId&&pc.nowPath){try{const n=await radioRead("playout",pathFor(pc.nowPath,mapping.playoutId),"now");setNow(n)}catch(e){next.playoutNowError=e instanceof Error?e.message:String(e)}}if(sc?.host&&active.slug!=="all"){try{const s=await radioRead("shoutcast",sc.statusPath||"/stats?sid=1&json=1","raw");setShout(shoutSummary(s.raw));next.shoutcast={online:true,status:s.status}}catch(e){next.shoutcast={online:false,error:e instanceof Error?e.message:String(e)}}}setStatus(next);flash("Rotation + Playout + SHOUTcast status vernieuwd")}finally{setBusy(false)}}
   const rc=typeof window!=="undefined"?readIntegration("rotation"):null;const pc=typeof window!=="undefined"?readIntegration("playout"):null;const sc=typeof window!=="undefined"?readIntegration("shoutcast"):null;
-  const playoutHint=useMemo(()=>{if(!loaded)return"Stationlijst laden…";if(!pc?.host)return"Playout One nog niet ingesteld in Beheer → Integraties.";if(playoutStations.length===0){return readSecret("playout").apiKey?"API-key aanwezig, maar nog geen Playout stations geladen. Klik ‘Playout stations ophalen’.":"Geen Playout stations geladen. Vul eerst de Bearer API-key in Beheer → Integraties in en klik Stations ophalen."}return `${playoutStations.length} Playout One station(s) beschikbaar.`},[loaded,pc?.host,playoutStations.length]);
+  const playoutHint=useMemo(()=>{if(!loaded)return"Stationlijst laden…";if(!pc?.host)return"Playout One nog niet ingesteld in Beheer → Integraties.";if(playoutStations.length===0){return readSecret("playout").apiKey?"API-key aanwezig, maar nog geen Playout stations geladen. Klik ‘Playout stations ophalen’.":"Geen Playout stations geladen. Sla eerst de Bearer API-key centraal op via Beheer → Integraties en klik Stations ophalen."}return `${playoutStations.length} Playout One station(s) beschikbaar.`},[loaded,pc?.host,playoutStations.length]);
   const shoutAddress=sc?.host?`${sc.protocol}://${sc.host}:${sc.port}${sc.basePath||""}${sc.statusPath||""}`:"";
   return <div>
     <div className="page-intro"><div><h2>Radio API Control</h2><p>Eén overzicht voor Rotation One, Playout One én SHOUTcast per VLACORA-station.</p></div><div className="button-row"><button className="ghost" onClick={refreshStations} disabled={busy}>↻ Alle echte stations ophalen</button><button className="primary" onClick={test} disabled={busy}>Test alle live koppelingen</button></div></div>

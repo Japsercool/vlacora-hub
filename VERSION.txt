@@ -1,2 +1,2 @@
-VLACORA HUB 0.14.6
-Vercel type fix: add missing busy/setBusy state to EditorialModule refresh workflow.
+VLACORA HUB 0.17.0
+Social Studio Phase 2: real month planning, team review/approval history, reusable copy blocks, team notifications and selectable multi-format export.

@@ -1,0 +1,15 @@
+VLACORA HUB 0.15.1 static validation
+[PASS] version 0.15.1
+[PASS] playlist passed to template studio
+[PASS] EditorialItem preserves Rotation categories
+[PASS] category slot persisted in JSON
+[PASS] derive categories from real playlist
+[PASS] real category buttons
+[PASS] count shown on category button
+[PASS] template apply matches category key
+[PASS] missing category explicit
+[PASS] remaining Rotation items preserve original order
+[PASS] CSS remains free of escaped newline corruption
+[PASS] touched TypeScript files contain no parser errors
+[PASS] touched TypeScript files contain no local Cannot find name errors
+[INFO] No database migration required: template sequence is already JSONB.

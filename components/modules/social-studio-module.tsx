@@ -1,18 +1,608 @@
 "use client";
-import { useEffect, useState } from "react";
-type Template={id:string;name:string;label:string;caption:string;brand:string;brandSub:string;tagline:string;bg1:string;bg2:string;textColor:string;labelColor:string;brandX:number;brandY:number;labelX:number;labelY:number;artistX:number;artistY:number;titleX:number;titleY:number;taglineX:number;taglineY:number;artistSize:number;titleSize:number;taglineSize:number;imageX:number;imageY:number;imageSize:number;backgroundImage?:string;artworkImage?:string;logoImage?:string};
-type Draft={id:string;templateId:string;artist:string;title:string;caption:string;status:string};
-const seeds:Template[]=[{id:"st1",name:"Tune of the Week",label:"TUNE OF THE WEEK",caption:"🔥 Deze week onze Tune of the Week: {artist} - {title}. Nu op {station}.",brand:"VLACORA",brandSub:"radio",tagline:"RADIO • TEAM • CONTENT",bg1:"#29279c",bg2:"#6848ff",textColor:"#ffffff",labelColor:"#6d43ff",brandX:6,brandY:5,labelX:6,labelY:18,artistX:6,artistY:60,titleX:6,titleY:72,taglineX:6,taglineY:92,artistSize:64,titleSize:42,taglineSize:22,imageX:58,imageY:30,imageSize:34},{id:"st2",name:"Nieuwe #1",label:"NEW NUMBER ONE",caption:"🏆 Een nieuwe nummer 1! {artist} - {title}.",brand:"VLACORA",brandSub:"radio",tagline:"THIS WEEK • ON AIR",bg1:"#0d0e1d",bg2:"#5638e8",textColor:"#ffffff",labelColor:"#3d258f",brandX:6,brandY:5,labelX:6,labelY:18,artistX:6,artistY:60,titleX:6,titleY:72,taglineX:6,taglineY:92,artistSize:64,titleSize:42,taglineSize:22,imageX:58,imageY:30,imageSize:34}];
+
+import { useEffect,useMemo,useState } from "react";
+import { useCollaboration } from "@/components/collaboration/collaboration-provider";
+import { loadSharedHitlists,loadSharedProgramming } from "@/lib/supabase/hub-data";
+import { hydrateSharedIntegrationSettings } from "@/lib/supabase/settings";
+import { pathFor,radioRead,readIntegration,readMappings } from "@/lib/radio/client-config";
+import {
+  addSocialReviewEvent,deleteSocialAsset,deleteSocialCopyBlock,deleteSocialPost,deleteSocialTemplate,
+  loadBrandKit,loadSocialAssets,loadSocialCopyBlocks,loadSocialPosts,loadSocialReviewEvents,loadSocialTemplates,
+  saveBrandKit,saveSocialCopyBlock,saveSocialPost,saveSocialTemplate,uploadSocialAsset,
+  type BrandKit,type SocialAsset,type SocialCopyBlock,type SocialPost,type SocialReviewEvent,type SocialTemplate
+} from "@/lib/supabase/social";
+
+type Tab="studio"|"brand"|"templates"|"calendar"|"copy"|"assets";
+type FormatKey="1:1"|"4:5"|"9:16"|"16:9";
+type Context={
+  station:string;artist:string;title:string;program:string;presenter:string;listeners:string;
+  chartPosition:string;previousPosition:string;nextShow:string;date:string;time:string;cta:string;
+};
+type VisualConfig={
+  label:string;headline:string;subline:string;footer:string;
+  backgroundImage:string;artworkImage:string;
+  showArtwork:boolean;artworkShape:"circle"|"rounded"|"square";
+  align:"left"|"center";overlay:number;accentBar:boolean;
+};
+
 const uid=()=>Math.random().toString(36).slice(2)+Date.now().toString(36);
-function useStored<T>(key:string,initial:T){const[v,s]=useState<T>(initial);const[r,setR]=useState(false);useEffect(()=>{try{const x=localStorage.getItem(key);if(x)s(JSON.parse(x))}catch{}setR(true)},[key]);useEffect(()=>{if(r)try{localStorage.setItem(key,JSON.stringify(v))}catch{}},[key,r,v]);return[v,s]as const}
-function fileToData(file:File,cb:(v:string)=>void){const r=new FileReader();r.onload=()=>cb(String(r.result||""));r.readAsDataURL(file)}
-function loadImage(src:string){return new Promise<HTMLImageElement>((resolve,reject)=>{const im=new Image();im.onload=()=>resolve(im);im.onerror=reject;im.src=src})}
-function wrap(ctx:CanvasRenderingContext2D,text:string,x:number,y:number,max:number,line:number){const words=text.split(" ");let row="";for(const w of words){const test=row+w+" ";if(ctx.measureText(test).width>max&&row){ctx.fillText(row,x,y);row=w+" ";y+=line}else row=test}if(row)ctx.fillText(row,x,y)}
-const pct=(v:number)=>`${v}%`;
+const formats:Record<FormatKey,{w:number;h:number;label:string}>={
+  "1:1":{w:1080,h:1080,label:"Square 1:1"},
+  "4:5":{w:1080,h:1350,label:"Post 4:5"},
+  "9:16":{w:1080,h:1920,label:"Story 9:16"},
+  "16:9":{w:1600,h:900,label:"Banner 16:9"}
+};
+const variables=["{station}","{artist}","{title}","{program}","{presenter}","{listeners}","{chart_position}","{previous_position}","{next_show}","{date}","{time}","{cta}"];
+
+const presetTemplates:Array<{name:string;contentType:string;format:FormatKey;caption:string;config:VisualConfig}>= [
+  {name:"Now Playing",contentType:"nowplaying",format:"4:5",caption:"🎵 Nu op {station}: {artist} — {title}. {cta} #nowplaying",config:{label:"NOW PLAYING",headline:"{artist}",subline:"{title}",footer:"{station} • {time}",backgroundImage:"",artworkImage:"",showArtwork:true,artworkShape:"circle",align:"left",overlay:28,accentBar:true}},
+  {name:"Straks in de show",contentType:"program",format:"4:5",caption:"🎙️ Straks op {station}: {program} met {presenter}. Vanaf {time}.",config:{label:"STRAKS",headline:"{program}",subline:"met {presenter}",footer:"{station} • {time}",backgroundImage:"",artworkImage:"",showArtwork:true,artworkShape:"rounded",align:"left",overlay:34,accentBar:true}},
+  {name:"Hitlijst positie",contentType:"chart",format:"4:5",caption:"🏆 #{chart_position} deze week: {artist} — {title}. Bekijk de volledige lijst bij {station}.",config:{label:"DE HITLIJST",headline:"#{chart_position} • {artist}",subline:"{title}",footer:"vorige week #{previous_position}",backgroundImage:"",artworkImage:"",showArtwork:true,artworkShape:"rounded",align:"left",overlay:30,accentBar:true}},
+  {name:"Presentator quote",contentType:"quote",format:"1:1",caption:"💬 {presenter}: “{title}” — {program} op {station}.",config:{label:"ON AIR",headline:"“{title}”",subline:"— {presenter}",footer:"{program} • {station}",backgroundImage:"",artworkImage:"",showArtwork:false,artworkShape:"circle",align:"center",overlay:22,accentBar:false}},
+  {name:"Gast in de studio",contentType:"guest",format:"9:16",caption:"🎤 Vandaag te gast in {program}: {title}. Luister mee op {station}.",config:{label:"TE GAST",headline:"{title}",subline:"in {program}",footer:"{station} • {time}",backgroundImage:"",artworkImage:"",showArtwork:true,artworkShape:"rounded",align:"left",overlay:36,accentBar:true}},
+  {name:"Winactie",contentType:"contest",format:"4:5",caption:"🎁 WIN! {title}. Doe mee via {station}. {cta}",config:{label:"WINACTIE",headline:"{title}",subline:"Doe mee en maak kans",footer:"{station}",backgroundImage:"",artworkImage:"",showArtwork:true,artworkShape:"rounded",align:"left",overlay:30,accentBar:true}}
+];
+
+const defaultContext=(stationSlug:string):Context=>({
+  station:stationSlug==="all"?"VLACORA":stationSlug,artist:"Joel Corry",title:"Whisper",program:"",presenter:"",
+  listeners:"",chartPosition:"1",previousPosition:"2",nextShow:"",date:new Date().toLocaleDateString("nl-BE"),
+  time:new Date().toLocaleTimeString("nl-BE",{hour:"2-digit",minute:"2-digit"}),cta:"Luister nu live"
+});
+const defaultBrand=(stationSlug:string):BrandKit=>({
+  station_slug:stationSlug,brand_name:stationSlug==="all"?"VLACORA":stationSlug,logo_url:"",
+  primary_color:"#27269f",secondary_color:"#4d38ff",accent_color:"#ef4a5d",background_color:"#101124",
+  text_color:"#ffffff",font_family:"Inter",default_cta:"Luister nu live",default_hashtags:"#radio #vlacora"
+});
+
+function replaceVars(text:string,ctx:Context){
+  return text
+    .replaceAll("{station}",ctx.station).replaceAll("{artist}",ctx.artist).replaceAll("{title}",ctx.title)
+    .replaceAll("{program}",ctx.program).replaceAll("{presenter}",ctx.presenter).replaceAll("{listeners}",ctx.listeners)
+    .replaceAll("{chart_position}",ctx.chartPosition).replaceAll("{previous_position}",ctx.previousPosition)
+    .replaceAll("{next_show}",ctx.nextShow).replaceAll("{date}",ctx.date).replaceAll("{time}",ctx.time).replaceAll("{cta}",ctx.cta);
+}
+function cfg(template:SocialTemplate|null):VisualConfig{
+  const x=(template?.config||{}) as Partial<VisualConfig>;
+  return{
+    label:String(x.label||"SOCIAL"),
+    headline:String(x.headline||"{artist}"),
+    subline:String(x.subline||"{title}"),
+    footer:String(x.footer||"{station}"),
+    backgroundImage:String(x.backgroundImage||""),
+    artworkImage:String(x.artworkImage||""),
+    showArtwork:x.showArtwork!==false,
+    artworkShape:(x.artworkShape==="square"||x.artworkShape==="rounded")?x.artworkShape:"circle",
+    align:x.align==="center"?"center":"left",
+    overlay:Number.isFinite(Number(x.overlay))?Number(x.overlay):28,
+    accentBar:x.accentBar!==false
+  };
+}
+function loadImage(src:string){return new Promise<HTMLImageElement>((resolve,reject)=>{const image=new Image();if(/^https?:/i.test(src))image.crossOrigin="anonymous";image.onload=()=>resolve(image);image.onerror=reject;image.src=src})}
+function wrap(ctx:CanvasRenderingContext2D,text:string,x:number,y:number,maxWidth:number,lineHeight:number,maxLines=4){
+  const words=text.split(/\s+/).filter(Boolean);let line="";let lines=0;
+  for(const word of words){
+    const test=line?`${line} ${word}`:word;
+    if(ctx.measureText(test).width>maxWidth&&line){
+      ctx.fillText(line,x,y);y+=lineHeight;lines++;line=word;
+      if(lines>=maxLines-1)break;
+    }else line=test;
+  }
+  if(line&&lines<maxLines)ctx.fillText(line,x,y);
+}
+function normalizeNow(raw:any){
+  const root=raw?.now||raw?.snapshot?.now||raw?.raw?.now||raw?.raw||raw||{};
+  return{
+    artist:String(root.artist??root.performer??root.creator??""),
+    title:String(root.title??root.name??root.trackTitle??"")
+  };
+}
+function listenerCount(raw:any){
+  const root=raw?.streams?.[0]||raw?.stream||raw?.stats||raw||{};
+  const value=Number(root.currentlisteners??root.currentListeners??root.listeners??root.listener_count??0);
+  return Number.isFinite(value)?String(value):"";
+}
+function toLocalInput(iso:string|null){
+  if(!iso)return"";
+  const d=new Date(iso);if(Number.isNaN(d.getTime()))return"";
+  const pad=(n:number)=>String(n).padStart(2,"0");
+  return`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+function fromLocalInput(value:string){return value?new Date(value).toISOString():null}
+function localDateKey(date:Date){
+  const pad=(n:number)=>String(n).padStart(2,"0");
+  return`${date.getFullYear()}-${pad(date.getMonth()+1)}-${pad(date.getDate())}`;
+}
+function monthStart(date:Date){return new Date(date.getFullYear(),date.getMonth(),1,12)}
+function addMonths(date:Date,delta:number){return new Date(date.getFullYear(),date.getMonth()+delta,1,12)}
+function monthCells(date:Date){
+  const first=monthStart(date);
+  const mondayIndex=(first.getDay()+6)%7;
+  const start=new Date(first);start.setDate(first.getDate()-mondayIndex);
+  return Array.from({length:42},(_,i)=>{const d=new Date(start);d.setDate(start.getDate()+i);return d});
+}
+function postDay(post:SocialPost){return post.scheduled_at?localDateKey(new Date(post.scheduled_at)):""}
+function statusLabel(status:SocialPost["status"]){
+  return status==="concept"?"Concept":status==="review"?"Review gevraagd":status==="approved"?"Goedgekeurd":status==="published"?"Gepubliceerd":"Archief";
+}
+function reviewLabel(type:SocialReviewEvent["event_type"]){
+  return type==="review_requested"?"Review gevraagd":type==="approved"?"Goedgekeurd":type==="changes_requested"?"Aanpassingen gevraagd":type==="published"?"Gepubliceerd":"Opmerking";
+}
+function newCopyBlock(stationSlug:string,category="Algemeen",content=""):SocialCopyBlock{
+  return{id:`new-${uid()}`,station_slug:stationSlug,name:"Nieuw copyblok",category,content,active:true};
+}
+function newTemplate(stationSlug:string,preset=presetTemplates[0]):SocialTemplate{
+  return{id:`new-${uid()}`,station_slug:stationSlug,name:preset.name,content_type:preset.contentType,aspect_ratio:preset.format,caption_template:preset.caption,config:preset.config,active:true};
+}
+function newPost(stationSlug:string,template:SocialTemplate,ctx:Context):SocialPost{
+  return{id:`new-${uid()}`,station_slug:stationSlug,template_id:template.id.startsWith("new-")?null:template.id,title:replaceVars(String(cfg(template).headline),ctx),status:"concept",format:template.aspect_ratio||"4:5",payload:ctx,caption:replaceVars(template.caption_template,ctx),scheduled_at:null,published_at:null};
+}
 
 export default function SocialStudioModule({stationSlug}:{stationSlug:string}){
- const[templates,setTemplates]=useStored<Template[]>(`vlacora:${stationSlug}:social:templates:v4`,seeds);const[drafts,setDrafts]=useStored<Draft[]>(`vlacora:${stationSlug}:social:drafts:v4`,[]);const[selectedId,setSelectedId]=useState(seeds[0].id);const[artist,setArtist]=useState("Joel Corry");const[title,setTitle]=useState("Whisper");const[notice,setNotice]=useState("");const t=templates.find(x=>x.id===selectedId)||templates[0];useEffect(()=>{if(!templates.some(x=>x.id===selectedId)&&templates[0])setSelectedId(templates[0].id)},[templates,selectedId]);const caption=(t?.caption||"").replaceAll("{artist}",artist).replaceAll("{title}",title).replaceAll("{station}",stationSlug==="all"?"VLACORA":stationSlug);
- function update(p:Partial<Template>){if(!t)return;setTemplates(templates.map(x=>x.id===t.id?{...x,...p}:x))}function flash(x:string){setNotice(x);setTimeout(()=>setNotice(""),2200)}function create(){const n={...seeds[0],id:uid(),name:"Nieuw template",label:"NIEUW TEMPLATE"};setTemplates([...templates,n]);setSelectedId(n.id);flash("Nieuw template aangemaakt")}function saveDraft(){if(!t)return;setDrafts([{id:uid(),templateId:t.id,artist,title,caption,status:"Concept"},...drafts]);flash("Concept opgeslagen")}
- async function download(){if(!t)return;const c=document.createElement("canvas");c.width=1080;c.height=1350;const x=c.getContext("2d");if(!x)return;if(t.backgroundImage){try{x.drawImage(await loadImage(t.backgroundImage),0,0,1080,1350)}catch{}}else{const g=x.createLinearGradient(0,0,1080,1350);g.addColorStop(0,t.bg1);g.addColorStop(1,t.bg2);x.fillStyle=g;x.fillRect(0,0,1080,1350)}if(t.logoImage){try{x.drawImage(await loadImage(t.logoImage),t.brandX*10.8,t.brandY*13.5,280,110)}catch{}}else{x.fillStyle=t.textColor;x.font="bold 62px Arial";x.fillText(t.brand,t.brandX*10.8,t.brandY*13.5+60);x.font="36px Arial";x.fillText(t.brandSub,t.brandX*10.8+290,t.brandY*13.5+60)}x.fillStyle=t.labelColor;x.fillRect(t.labelX*10.8,t.labelY*13.5,580,90);x.fillStyle=t.textColor;x.font="bold 42px Arial";x.fillText(t.label,t.labelX*10.8+25,t.labelY*13.5+58);if(t.artworkImage){try{const im=await loadImage(t.artworkImage);const s=t.imageSize*10.8;x.save();x.beginPath();x.arc(t.imageX*10.8+s/2,t.imageY*13.5+s/2,s/2,0,Math.PI*2);x.clip();x.drawImage(im,t.imageX*10.8,t.imageY*13.5,s,s);x.restore()}catch{}}x.fillStyle=t.textColor;x.font=`bold ${t.artistSize}px Arial`;wrap(x,artist,t.artistX*10.8,t.artistY*13.5,930,Math.max(50,t.artistSize*1.15));x.font=`${t.titleSize}px Arial`;wrap(x,title,t.titleX*10.8,t.titleY*13.5,930,Math.max(42,t.titleSize*1.15));x.font=`bold ${t.taglineSize}px Arial`;x.fillText(t.tagline,t.taglineX*10.8,t.taglineY*13.5);const a=document.createElement("a");a.href=c.toDataURL("image/png");a.download=`vlacora-${t.name}.png`.replace(/\s+/g,"-").toLowerCase();a.click();flash("PNG gedownload")}
- return <div><div className="page-intro"><div><h2>Social Template Studio</h2><p>Upload eigen bestanden en bepaal zelf tekst, kleuren, posities en groottes.</p></div><div className="button-row"><button className="ghost" onClick={create}>+ Nieuw template</button><button className="primary" onClick={download}>Download PNG</button></div></div>{notice&&<div className="inline-notice standalone">{notice}</div>}<div className="social-builder-layout"><div className="card social-template-list">{templates.map(x=><button className={`social-template-option ${t?.id===x.id?"selected":""}`} key={x.id} onClick={()=>setSelectedId(x.id)}><strong>{x.name}</strong><span>{x.label}</span></button>)}<button className="ghost wide spaced" onClick={create}>+ Template</button></div>{t&&<div className="card social-template-editor-v4"><div className="module-title-row"><div><span className="eyebrow">ALLES AANPASBAAR</span><h3>{t.name}</h3></div><button className="ghost danger-text" onClick={()=>setTemplates(templates.filter(x=>x.id!==t.id))}>Verwijder</button></div><div className="social-settings-scroll"><div className="settings-section"><h4>Inhoud</h4><div className="two-form-cols"><label className="field">Templatenaam<input className="input" value={t.name} onChange={e=>update({name:e.target.value})}/></label><label className="field">Label<input className="input" value={t.label} onChange={e=>update({label:e.target.value})}/></label><label className="field">Artiest<input className="input" value={artist} onChange={e=>setArtist(e.target.value)}/></label><label className="field">Titel<input className="input" value={title} onChange={e=>setTitle(e.target.value)}/></label></div><label className="field">Caption<textarea className="input textarea compact-area" value={t.caption} onChange={e=>update({caption:e.target.value})}/></label></div><div className="settings-section"><h4>Branding</h4><div className="two-form-cols"><label className="field">Hoofdnaam<input className="input" value={t.brand} onChange={e=>update({brand:e.target.value})}/></label><label className="field">Subnaam<input className="input" value={t.brandSub} onChange={e=>update({brandSub:e.target.value})}/></label></div><label className="field">Slogan onderaan<input className="input" value={t.tagline} onChange={e=>update({tagline:e.target.value})}/></label><div className="upload-grid"><label className="upload-box">Upload logo<input type="file" accept="image/*" onChange={e=>{const f=e.target.files?.[0];if(f)fileToData(f,v=>update({logoImage:v}))}}/></label><label className="upload-box">Upload achtergrond<input type="file" accept="image/*" onChange={e=>{const f=e.target.files?.[0];if(f)fileToData(f,v=>update({backgroundImage:v}))}}/></label><label className="upload-box">Upload artwork/foto<input type="file" accept="image/*" onChange={e=>{const f=e.target.files?.[0];if(f)fileToData(f,v=>update({artworkImage:v}))}}/></label></div></div><div className="settings-section"><h4>Kleuren</h4><div className="color-grid">{[["Achtergrond 1","bg1"],["Achtergrond 2","bg2"],["Tekst","textColor"],["Label","labelColor"]].map(([label,key])=><label className="color-field" key={key}><span>{label}</span><input type="color" value={(t as any)[key]} onChange={e=>update({[key]:e.target.value} as any)}/><code>{(t as any)[key]}</code></label>)}</div></div><div className="settings-section"><h4>Posities & grootte</h4>{[["Brand X","brandX",0,80],["Brand Y","brandY",0,30],["Label X","labelX",0,80],["Label Y","labelY",0,80],["Artwork X","imageX",0,80],["Artwork Y","imageY",0,80],["Artwork grootte","imageSize",10,70],["Artiest X","artistX",0,80],["Artiest Y","artistY",0,95],["Artiest grootte","artistSize",28,100],["Titel X","titleX",0,80],["Titel Y","titleY",0,95],["Titel grootte","titleSize",20,80],["Slogan X","taglineX",0,80],["Slogan Y","taglineY",0,98],["Slogan grootte","taglineSize",12,50]].map(([label,key,min,max])=><label className="range-field" key={String(key)}><span>{label}</span><input type="range" min={Number(min)} max={Number(max)} value={Number((t as any)[key])} onChange={e=>update({[key]:Number(e.target.value)} as any)}/><b>{String((t as any)[key])}</b></label>)}</div></div></div>} {t&&<div className="social-preview-column"><div className="social-canvas-v4" style={{background:t.backgroundImage?`url(${t.backgroundImage}) center/cover`:`linear-gradient(150deg,${t.bg1},${t.bg2})`,color:t.textColor}}>{t.logoImage?<img className="canvas-logo" src={t.logoImage} alt="" style={{left:pct(t.brandX),top:pct(t.brandY)}}/>:<div className="canvas-brand" style={{left:pct(t.brandX),top:pct(t.brandY)}}><strong>{t.brand}</strong><span>{t.brandSub}</span></div>}<div className="canvas-label" style={{left:pct(t.labelX),top:pct(t.labelY),background:t.labelColor}}>{t.label}</div>{t.artworkImage?<img className="canvas-artwork" src={t.artworkImage} alt="" style={{left:pct(t.imageX),top:pct(t.imageY),width:pct(t.imageSize)}}/>:<div className="canvas-artwork placeholder" style={{left:pct(t.imageX),top:pct(t.imageY),width:pct(t.imageSize)}}>♫</div>}<div className="canvas-artist" style={{left:pct(t.artistX),top:pct(t.artistY),fontSize:`${Math.max(18,t.artistSize/2.2)}px`}}>{artist}</div><div className="canvas-title" style={{left:pct(t.titleX),top:pct(t.titleY),fontSize:`${Math.max(16,t.titleSize/2.2)}px`}}>{title}</div><div className="canvas-tagline" style={{left:pct(t.taglineX),top:pct(t.taglineY),fontSize:`${Math.max(9,t.taglineSize/2.2)}px`}}>{t.tagline}</div></div><div className="card caption-card"><strong>Caption preview</strong><p>{caption}</p><div className="button-row"><button className="primary" onClick={saveDraft}>Concept bewaren</button><button className="ghost" onClick={download}>PNG</button></div></div>{drafts.length>0&&<div className="card"><h3>Conceptposts</h3>{drafts.slice(0,5).map(d=><div className="draft-row" key={d.id}><div><strong>{d.artist} – {d.title}</strong><small>{d.status}</small></div><button className="mini-btn danger" onClick={()=>setDrafts(drafts.filter(x=>x.id!==d.id))}>×</button></div>)}</div>}</div>}</div></div>
+  const[tab,setTab]=useState<Tab>("studio");
+  const[brand,setBrand]=useState<BrandKit>(()=>defaultBrand(stationSlug));
+  const[templates,setTemplates]=useState<SocialTemplate[]>([]);
+  const[posts,setPosts]=useState<SocialPost[]>([]);
+  const[assets,setAssets]=useState<SocialAsset[]>([]);
+  const[selectedTemplateId,setSelectedTemplateId]=useState("");
+  const[templateDraft,setTemplateDraft]=useState<SocialTemplate|null>(null);
+  const[ctx,setCtx]=useState<Context>(()=>defaultContext(stationSlug));
+  const[currentPost,setCurrentPost]=useState<SocialPost|null>(null);
+  const[format,setFormat]=useState<FormatKey>("4:5");
+  const[notice,setNotice]=useState("");
+  const[busy,setBusy]=useState(false);
+  const[assetTags,setAssetTags]=useState("");
+  const[assetUpload,setAssetUpload]=useState(false);
+  const[copyBlocks,setCopyBlocks]=useState<SocialCopyBlock[]>([]);
+  const[copyDraft,setCopyDraft]=useState<SocialCopyBlock|null>(null);
+  const[calendarMonth,setCalendarMonth]=useState(()=>monthStart(new Date()));
+  const[selectedCalendarPostId,setSelectedCalendarPostId]=useState("");
+  const[reviewEvents,setReviewEvents]=useState<SocialReviewEvent[]>([]);
+  const[reviewComment,setReviewComment]=useState("");
+  const[exportFormats,setExportFormats]=useState<Record<FormatKey,boolean>>({"1:1":true,"4:5":true,"9:16":true,"16:9":false});
+
+  const collaboration=useCollaboration();
+
+  function flash(message:string){setNotice(message);window.setTimeout(()=>setNotice(""),3200)}
+  async function loadAll(){
+    if(stationSlug==="all"){setBrand(defaultBrand(stationSlug));setTemplates([]);setPosts([]);setAssets([]);return}
+    setBusy(true);
+    try{
+      const[kit,cloudTemplates,cloudPosts,cloudAssets,cloudCopyBlocks]=await Promise.all([
+        loadBrandKit(stationSlug),loadSocialTemplates(stationSlug),loadSocialPosts(stationSlug),loadSocialAssets(stationSlug),loadSocialCopyBlocks(stationSlug)
+      ]);
+      setBrand(kit);setCtx(x=>({...x,station:kit.brand_name||stationSlug,cta:kit.default_cta||x.cta}));
+      const nextTemplates=cloudTemplates.length?cloudTemplates:presetTemplates.map(p=>newTemplate(stationSlug,p));
+      setTemplates(nextTemplates);
+      const first=nextTemplates[0];if(first){setSelectedTemplateId(first.id);setTemplateDraft(first);setFormat((first.aspect_ratio as FormatKey)||"4:5")}
+      setPosts(cloudPosts);setAssets(cloudAssets);setCopyBlocks(cloudCopyBlocks);
+    }catch(e){flash(e instanceof Error?e.message:"Social Studio laden mislukt")}
+    finally{setBusy(false)}
+  }
+  useEffect(()=>{void loadAll()},[stationSlug]);
+
+  const selectedTemplate=useMemo(()=>templates.find(x=>x.id===selectedTemplateId)||templateDraft||templates[0]||null,[templates,selectedTemplateId,templateDraft]);
+  const selectedCalendarPost=useMemo(()=>posts.find(x=>x.id===selectedCalendarPostId)||null,[posts,selectedCalendarPostId]);
+  const calendarCells=useMemo(()=>monthCells(calendarMonth),[calendarMonth]);
+  const visual=cfg(selectedTemplate);
+  const liveCaption=currentPost?.caption??replaceVars(selectedTemplate?.caption_template||"",ctx);
+  const previewHeadline=replaceVars(visual.headline,ctx);
+  const previewSubline=replaceVars(visual.subline,ctx);
+  const previewFooter=replaceVars(visual.footer,ctx);
+  const formatInfo=formats[format];
+
+  useEffect(()=>{
+    if(!selectedTemplate)return;
+    if(!currentPost||currentPost.template_id!==selectedTemplate.id){
+      setCurrentPost(newPost(stationSlug,selectedTemplate,ctx));
+    }
+  },[selectedTemplateId]);
+
+  useEffect(()=>{
+    let alive=true;setReviewEvents([]);setReviewComment("");
+    if(!selectedCalendarPost||selectedCalendarPost.id.startsWith("new-"))return()=>{alive=false};
+    void loadSocialReviewEvents(selectedCalendarPost.id).then(rows=>{if(alive)setReviewEvents(rows)}).catch(()=>{});
+    return()=>{alive=false};
+  },[selectedCalendarPostId]);
+
+  async function autofill(){
+    if(stationSlug==="all")return flash("Kies één station om live data in te vullen.");
+    setBusy(true);
+    const next={...ctx,date:new Date().toLocaleDateString("nl-BE"),time:new Date().toLocaleTimeString("nl-BE",{hour:"2-digit",minute:"2-digit"})};
+    const notes:string[]=[];
+    try{
+      await hydrateSharedIntegrationSettings(stationSlug).catch(()=>false);
+      const mapping=readMappings()[stationSlug];
+      const pc=readIntegration("playout");
+      if(pc?.host&&pc.nowPath&&mapping?.playoutId){
+        try{const raw=await radioRead("playout",pathFor(pc.nowPath,mapping.playoutId),"now");const now=normalizeNow(raw);if(now.artist)next.artist=now.artist;if(now.title)next.title=now.title;notes.push("NOW") }catch{}
+      }
+      const sc=readIntegration("shoutcast");
+      if(sc?.host){
+        try{const raw=await radioRead("shoutcast",sc.statusPath||"/stats?sid=1&json=1","raw");const listeners=listenerCount(raw.raw);if(listeners)next.listeners=listeners;notes.push("listeners")}catch{}
+      }
+      try{
+        const blocks=await loadSharedProgramming(stationSlug);const now=new Date();const weekday=now.getDay();const hm=now.getHours()*60+now.getMinutes();
+        const current=blocks.find(x=>x.active&&x.day===weekday&&Number(x.start.slice(0,2))*60+Number(x.start.slice(3,5))<=hm&&Number(x.end.slice(0,2))*60+Number(x.end.slice(3,5))>hm);
+        const upcoming=blocks.filter(x=>x.active&&x.day===weekday&&Number(x.start.slice(0,2))*60+Number(x.start.slice(3,5))>hm).sort((a,b)=>a.start.localeCompare(b.start))[0];
+        if(current){next.program=current.name;next.presenter=current.host;notes.push("programma")}
+        if(upcoming)next.nextShow=`${upcoming.name} om ${upcoming.start}`;
+      }catch{}
+      try{
+        const hitlists=await loadSharedHitlists(stationSlug);const latest=hitlists[0];const first=latest?.entries?.[0];
+        if(first){next.chartPosition="1";next.previousPosition=first.previousPosition==null?"—":String(first.previousPosition);if(!next.artist)next.artist=first.artist;if(!next.title)next.title=first.title;notes.push("hitlijst")}
+      }catch{}
+      next.station=brand.brand_name||stationSlug;next.cta=brand.default_cta||next.cta;
+      setCtx(next);
+      setCurrentPost(post=>post?{...post,payload:next,title:replaceVars(visual.headline,next),caption:replaceVars(selectedTemplate?.caption_template||post.caption,next)}:post);
+      flash(notes.length?`Automatisch ingevuld: ${notes.join(", ")}`:"Geen live brondata gevonden; handmatig verder werken.");
+    }finally{setBusy(false)}
+  }
+
+  function chooseTemplate(template:SocialTemplate){
+    setSelectedTemplateId(template.id);setTemplateDraft(template);setFormat((template.aspect_ratio as FormatKey)||"4:5");
+    setCurrentPost(newPost(stationSlug,template,ctx));setTab("studio");
+  }
+  function patchTemplate(patch:Partial<SocialTemplate>){if(templateDraft)setTemplateDraft({...templateDraft,...patch})}
+  function patchVisual(patch:Partial<VisualConfig>){if(templateDraft)patchTemplate({config:{...cfg(templateDraft),...patch}})}
+  function patchContext(key:keyof Context,value:string){
+    const next={...ctx,[key]:value};setCtx(next);
+    setCurrentPost(post=>post?{...post,payload:next}:post);
+  }
+
+  async function persistTemplate(){
+    if(!templateDraft)return;
+    setBusy(true);try{
+      const saved=await saveSocialTemplate({...templateDraft,aspect_ratio:format});
+      setTemplates(rows=>[saved,...rows.filter(x=>x.id!==templateDraft.id&&x.id!==saved.id)]);
+      setTemplateDraft(saved);setSelectedTemplateId(saved.id);flash("Social template centraal opgeslagen");
+    }catch(e){flash(e instanceof Error?e.message:"Template opslaan mislukt")}finally{setBusy(false)}
+  }
+  async function removeTemplate(){
+    if(!templateDraft||templateDraft.id.startsWith("new-"))return;
+    if(!confirm(`Template “${templateDraft.name}” verwijderen?`))return;
+    try{await deleteSocialTemplate(templateDraft.id);setTemplates(rows=>rows.filter(x=>x.id!==templateDraft.id));setTemplateDraft(null);setSelectedTemplateId("");flash("Template verwijderd")}catch(e){flash(e instanceof Error?e.message:"Verwijderen mislukt")}
+  }
+  async function persistBrand(){
+    setBusy(true);try{await saveBrandKit(brand);setCtx(x=>({...x,station:brand.brand_name||stationSlug,cta:brand.default_cta||x.cta}));flash("Brand kit centraal opgeslagen")}catch(e){flash(e instanceof Error?e.message:"Brand kit opslaan mislukt")}finally{setBusy(false)}
+  }
+  async function persistPost(){
+    if(!selectedTemplate)return;
+    const base=currentPost||newPost(stationSlug,selectedTemplate,ctx);
+    const post:SocialPost={...base,format,template_id:selectedTemplate.id.startsWith("new-")?null:selectedTemplate.id,payload:ctx,title:replaceVars(visual.headline,ctx),caption:base.caption||replaceVars(selectedTemplate.caption_template,ctx)};
+    setBusy(true);try{
+      const saved=await saveSocialPost(post);
+      setCurrentPost(saved);
+      setPosts(rows=>[saved,...rows.filter(x=>x.id!==base.id&&x.id!==saved.id)]);
+      setSelectedCalendarPostId(saved.id);
+      flash("Socialpost centraal opgeslagen");
+    }catch(e){flash(e instanceof Error?e.message:"Post opslaan mislukt")}finally{setBusy(false)}
+  }
+  async function updatePostStatus(post:SocialPost,status:SocialPost["status"]){
+    try{
+      const now=new Date().toISOString();
+      const next:SocialPost={...post,status};
+      if(status==="review")next.review_requested_at=post.review_requested_at||now;
+      if(status==="approved"){next.approved_at=now;next.approved_by=collaboration.currentUser?.id||post.approved_by||null}
+      if(status==="published")next.published_at=post.published_at||now;
+      const saved=await saveSocialPost(next);
+      setPosts(rows=>rows.map(x=>x.id===saved.id?saved:x));
+      if(currentPost?.id===saved.id)setCurrentPost(saved);
+      flash(`Status: ${statusLabel(status)}`);
+    }catch(e){flash(e instanceof Error?e.message:"Status wijzigen mislukt")}
+  }
+
+  async function workflow(post:SocialPost,action:"review_requested"|"approved"|"changes_requested"|"published",comment=""){
+    if(post.id.startsWith("new-"))return flash("Bewaar de post eerst.");
+    setBusy(true);
+    try{
+      const now=new Date().toISOString();
+      let next:SocialPost={...post};
+      if(action==="review_requested")next={...next,status:"review",review_requested_at:now};
+      if(action==="approved")next={...next,status:"approved",approved_at:now,approved_by:collaboration.currentUser?.id||null};
+      if(action==="changes_requested")next={...next,status:"concept",changes_requested_at:now};
+      if(action==="published")next={...next,status:"published",published_at:now};
+      const saved=await saveSocialPost(next);
+      const event=await addSocialReviewEvent(saved,action,comment);
+      setPosts(rows=>rows.map(x=>x.id===saved.id?saved:x));
+      setReviewEvents(rows=>[...rows,event]);
+      setReviewComment("");
+      if(currentPost?.id===saved.id)setCurrentPost(saved);
+      if(action==="review_requested"){
+        await collaboration.publishNotification({
+          stationSlug,title:`Social review gevraagd: ${saved.title||"socialpost"}`,
+          body:comment||"Een socialpost staat klaar om na te kijken.",category:"Social",
+          severity:"info",actionPath:`/hub/${stationSlug}/social`
+        }).catch(()=>{});
+      }else if(action==="changes_requested"){
+        await collaboration.publishNotification({
+          stationSlug,title:`Aanpassing gevraagd: ${saved.title||"socialpost"}`,
+          body:comment||"De socialpost heeft nog aanpassingen nodig.",category:"Social",
+          severity:"warning",actionPath:`/hub/${stationSlug}/social`
+        }).catch(()=>{});
+      }else if(action==="approved"){
+        await collaboration.publishNotification({
+          stationSlug,title:`Socialpost goedgekeurd: ${saved.title||"socialpost"}`,
+          body:comment||"De socialpost is klaar voor publicatie.",category:"Social",
+          severity:"info",actionPath:`/hub/${stationSlug}/social`
+        }).catch(()=>{});
+      }
+      flash(reviewLabel(action));
+    }catch(e){flash(e instanceof Error?e.message:"Reviewactie mislukt")}
+    finally{setBusy(false)}
+  }
+
+  async function addReviewComment(post:SocialPost){
+    if(!reviewComment.trim())return;
+    try{
+      const event=await addSocialReviewEvent(post,"comment",reviewComment);
+      setReviewEvents(rows=>[...rows,event]);setReviewComment("");flash("Opmerking toegevoegd");
+    }catch(e){flash(e instanceof Error?e.message:"Opmerking toevoegen mislukt")}
+  }
+
+  async function reschedulePost(post:SocialPost,value:string){
+    try{
+      const saved=await saveSocialPost({...post,scheduled_at:fromLocalInput(value)});
+      setPosts(rows=>rows.map(x=>x.id===saved.id?saved:x));
+      flash("Planning aangepast");
+    }catch(e){flash(e instanceof Error?e.message:"Planning aanpassen mislukt")}
+  }
+
+  async function saveCopyBlock(){
+    if(!copyDraft)return;
+    setBusy(true);
+    try{
+      const saved=await saveSocialCopyBlock(copyDraft);
+      setCopyBlocks(rows=>[saved,...rows.filter(x=>x.id!==copyDraft.id&&x.id!==saved.id)]);
+      setCopyDraft(saved);flash("Copyblok centraal opgeslagen");
+    }catch(e){flash(e instanceof Error?e.message:"Copyblok opslaan mislukt")}
+    finally{setBusy(false)}
+  }
+
+  async function removeCopyBlock(){
+    if(!copyDraft||copyDraft.id.startsWith("new-"))return;
+    if(!confirm(`Copyblok “${copyDraft.name}” verwijderen?`))return;
+    try{
+      await deleteSocialCopyBlock(copyDraft.id);
+      setCopyBlocks(rows=>rows.filter(x=>x.id!==copyDraft.id));setCopyDraft(null);flash("Copyblok verwijderd");
+    }catch(e){flash(e instanceof Error?e.message:"Copyblok verwijderen mislukt")}
+  }
+
+  function insertCopyBlock(block:SocialCopyBlock){
+    const rendered=replaceVars(block.content,ctx);
+    setCurrentPost(post=>{
+      if(!post&&selectedTemplate)return{...newPost(stationSlug,selectedTemplate,ctx),caption:rendered};
+      if(!post)return post;
+      return{...post,caption:`${post.caption}${post.caption.trim()?"\\n\\n":""}${rendered}`};
+    });
+    flash(`${block.name} ingevoegd`);
+  }
+
+  async function renderPng(targetFormat:FormatKey,download=true){
+    if(!selectedTemplate)return;
+    const f=formats[targetFormat];const canvas=document.createElement("canvas");canvas.width=f.w;canvas.height=f.h;const g=canvas.getContext("2d");if(!g)return;
+    const v=cfg(selectedTemplate),scale=f.w/1080;
+    if(v.backgroundImage){try{const im=await loadImage(v.backgroundImage);const ratio=Math.max(f.w/im.width,f.h/im.height);const dw=im.width*ratio,dh=im.height*ratio;g.drawImage(im,(f.w-dw)/2,(f.h-dh)/2,dw,dh)}catch{g.fillStyle=brand.background_color;g.fillRect(0,0,f.w,f.h)}}else{
+      const grad=g.createLinearGradient(0,0,f.w,f.h);grad.addColorStop(0,brand.primary_color);grad.addColorStop(.62,brand.secondary_color);grad.addColorStop(1,brand.background_color);g.fillStyle=grad;g.fillRect(0,0,f.w,f.h);
+    }
+    if(v.overlay>0){g.fillStyle=`rgba(7,8,20,${Math.min(.75,v.overlay/100)})`;g.fillRect(0,0,f.w,f.h)}
+    if(v.accentBar){g.fillStyle=brand.accent_color;g.fillRect(0,0,18*scale,f.h)}
+    const left=v.align==="center"?f.w/2:78*scale;const textAlign=v.align==="center"?"center":"left";g.textAlign=textAlign as CanvasTextAlign;
+    if(brand.logo_url){try{const logo=await loadImage(brand.logo_url);const maxW=260*scale,maxH=110*scale;const r=Math.min(maxW/logo.width,maxH/logo.height);g.drawImage(logo,v.align==="center"?(f.w-logo.width*r)/2:78*scale,58*scale,logo.width*r,logo.height*r)}catch{}}
+    else{g.fillStyle=brand.text_color;g.font=`900 ${50*scale}px ${brand.font_family}, Arial`;g.fillText(brand.brand_name||ctx.station,left,105*scale)}
+    g.fillStyle=brand.accent_color;const label=replaceVars(v.label,ctx).toUpperCase();g.font=`900 ${25*scale}px ${brand.font_family}, Arial`;const labelWidth=Math.min(f.w*.72,g.measureText(label).width+42*scale);const labelX=v.align==="center"?(f.w-labelWidth)/2:78*scale;g.fillRect(labelX,190*scale,labelWidth,58*scale);g.fillStyle=brand.text_color;g.textAlign="center";g.fillText(label,labelX+labelWidth/2,229*scale);
+    const artwork=v.artworkImage;if(v.showArtwork&&artwork){try{const image=await loadImage(artwork);const size=Math.min(f.w*.42,f.h*.32);const x=v.align==="center"?(f.w-size)/2:f.w-size-80*scale;const y=310*scale;g.save();if(v.artworkShape==="circle"){g.beginPath();g.arc(x+size/2,y+size/2,size/2,0,Math.PI*2);g.clip()}else if(v.artworkShape==="rounded"){const r=36*scale;g.beginPath();g.roundRect(x,y,size,size,r);g.clip()}g.drawImage(image,x,y,size,size);g.restore()}catch{}}
+    g.textAlign=textAlign as CanvasTextAlign;g.fillStyle=brand.text_color;g.font=`900 ${Math.max(48,78*scale)}px ${brand.font_family}, Arial`;
+    const headlineY=v.showArtwork&&artwork?f.h*.62:f.h*.45;wrap(g,previewHeadline,left,headlineY,v.align==="center"?f.w*.82:f.w*.78,86*scale,3);
+    g.font=`600 ${Math.max(34,46*scale)}px ${brand.font_family}, Arial`;g.globalAlpha=.86;wrap(g,previewSubline,left,headlineY+145*scale,v.align==="center"?f.w*.82:f.w*.75,55*scale,3);g.globalAlpha=1;
+    g.font=`800 ${Math.max(23,27*scale)}px ${brand.font_family}, Arial`;g.globalAlpha=.8;g.fillText(previewFooter,left,f.h-88*scale);g.globalAlpha=1;
+    if(download){const a=document.createElement("a");a.href=canvas.toDataURL("image/png");a.download=`${ctx.station}-${selectedTemplate.name}-${targetFormat}.png`.replace(/[^a-z0-9._-]+/gi,"-").toLowerCase();a.click()}
+    return canvas;
+  }
+  async function exportPack(){
+    const selected=(Object.keys(formats) as FormatKey[]).filter(key=>exportFormats[key]);
+    if(!selected.length)return flash("Kies minstens één exportformaat.");
+    for(const key of selected){await renderPng(key,true);await new Promise(r=>setTimeout(r,180))}
+    flash(`${selected.length} formaat${selected.length===1?"":"en"} gegenereerd`);
+  }
+  async function copyCaption(){try{await navigator.clipboard.writeText(currentPost?.caption||liveCaption);flash("Caption gekopieerd")}catch{flash("Kopiëren niet beschikbaar")}}
+  async function handleAsset(file:File){
+    if(stationSlug==="all")return flash("Kies één station.");
+    setAssetUpload(true);try{const asset=await uploadSocialAsset(stationSlug,file,assetTags.split(",").map(x=>x.trim()).filter(Boolean));setAssets(rows=>[asset,...rows]);flash("Asset geüpload naar Supabase Storage")}catch(e){flash(e instanceof Error?e.message:"Upload mislukt")}finally{setAssetUpload(false)}
+  }
+  async function removeAsset(asset:SocialAsset){if(!confirm(`Asset “${asset.name}” verwijderen?`))return;try{await deleteSocialAsset(asset);setAssets(rows=>rows.filter(x=>x.id!==asset.id));flash("Asset verwijderd")}catch(e){flash(e instanceof Error?e.message:"Verwijderen mislukt")}}
+
+  if(stationSlug==="all")return <div><div className="page-intro"><div><h2>Social Studio</h2><p>Kies één station zodat VLACORA de juiste brand kit, assets en templates gebruikt.</p></div></div><div className="card empty-live-state"><strong>Social Studio is station-specifiek</strong><span>Kies bovenaan een station.</span></div></div>;
+
+  return <div className="social-studio-v16">
+    <div className="page-intro social-studio-intro">
+      <div><span className="eyebrow">VLACORA CONTENT</span><h2>Social Studio</h2><p>Branding, templates, live data, contentplanning en export in één lichte werkplek.</p></div>
+      <div className="button-row"><button className="ghost" disabled={busy} onClick={()=>void autofill()}>⚡ Vul live data in</button><button className="primary" disabled={busy||!selectedTemplate} onClick={()=>void persistPost()}>Bewaar concept</button></div>
+    </div>
+    {notice&&<div className="inline-notice standalone">{notice}</div>}
+    <div className="social-tabs">
+      {([["studio","Studio"],["brand","Brand kit"],["templates","Templates"],["calendar","Contentkalender"],["copy","Copyblokken"],["assets","Assets"]] as [Tab,string][]).map(([key,label])=><button key={key} className={tab===key?"active":""} onClick={()=>setTab(key)}>{label}</button>)}
+    </div>
+
+    {tab==="studio"&&selectedTemplate&&<div className="social-workbench">
+      <section className="card social-composer">
+        <div className="section-head"><div><h3>Maak content</h3><p>Gebruik echte data of vul zelf aan.</p></div><span className="badge badge-blue">{selectedTemplate.name}</span></div>
+        <label className="field">Template<select className="select" value={selectedTemplate.id} onChange={e=>{const x=templates.find(t=>t.id===e.target.value);if(x)chooseTemplate(x)}}>{templates.map(t=><option key={t.id} value={t.id}>{t.name}</option>)}</select></label>
+        <div className="social-format-row">{(Object.keys(formats) as FormatKey[]).map(key=><button key={key} className={format===key?"active":""} onClick={()=>setFormat(key)}>{formats[key].label}</button>)}</div>
+        <div className="social-context-grid">
+          <label>Artiest<input value={ctx.artist} onChange={e=>patchContext("artist",e.target.value)}/></label>
+          <label>Titel / onderwerp<input value={ctx.title} onChange={e=>patchContext("title",e.target.value)}/></label>
+          <label>Programma<input value={ctx.program} onChange={e=>patchContext("program",e.target.value)}/></label>
+          <label>Presentator<input value={ctx.presenter} onChange={e=>patchContext("presenter",e.target.value)}/></label>
+          <label>Listeners<input value={ctx.listeners} onChange={e=>patchContext("listeners",e.target.value)}/></label>
+          <label>Hitlijstpositie<input value={ctx.chartPosition} onChange={e=>patchContext("chartPosition",e.target.value)}/></label>
+          <label>Vorige positie<input value={ctx.previousPosition} onChange={e=>patchContext("previousPosition",e.target.value)}/></label>
+          <label>Volgende show<input value={ctx.nextShow} onChange={e=>patchContext("nextShow",e.target.value)}/></label>
+        </div>
+        <div className="social-caption-head"><strong>Caption</strong><button onClick={()=>void copyCaption()}>Kopieer</button></div>
+        <textarea className="social-caption-editor" value={currentPost?.caption??liveCaption} onChange={e=>setCurrentPost(p=>p?{...p,caption:e.target.value}:p)} />
+        <div className="variable-strip">{variables.map(v=><button key={v} onClick={()=>setCurrentPost(p=>p?{...p,caption:`${p.caption}${p.caption.endsWith(" ")?"":" "}${v}`}:p)}>{v}</button>)}</div>
+        <div className="studio-copy-blocks">
+          <div className="social-caption-head"><strong>Snelle copyblokken</strong><button onClick={()=>setTab("copy")}>Beheer</button></div>
+          <div className="studio-copy-buttons">{copyBlocks.length?copyBlocks.slice(0,8).map(block=><button key={block.id} onClick={()=>insertCopyBlock(block)}><span>{block.category}</span><strong>{block.name}</strong></button>):<span className="muted-copy-hint">Nog geen copyblokken. Maak vaste CTA’s, hashtags of programmablokken onder Copyblokken.</span>}</div>
+        </div>
+        <div className="social-post-controls">
+          <label>Status<select value={currentPost?.status||"concept"} onChange={e=>setCurrentPost(p=>p?{...p,status:e.target.value as SocialPost["status"]}:p)}><option value="concept">Concept</option><option value="review">Klaar voor review</option><option value="approved">Goedgekeurd</option><option value="published">Gepubliceerd</option></select></label>
+          <label>Planning<input type="datetime-local" value={toLocalInput(currentPost?.scheduled_at||null)} onChange={e=>setCurrentPost(p=>p?{...p,scheduled_at:fromLocalInput(e.target.value)}:p)}/></label>
+        </div>
+      </section>
+
+      <section className="social-preview-stage">
+        <div className="social-preview-toolbar"><div><strong>Live preview</strong><span>{formatInfo.w} × {formatInfo.h}</span></div><div className="button-row"><button className="ghost" onClick={()=>void renderPng(format,true)}>PNG huidig</button><button className="primary soft" onClick={()=>void exportPack()}>Export geselecteerd</button></div></div>
+        <div className="social-export-set">{(Object.keys(formats) as FormatKey[]).map(key=><label key={key}><input type="checkbox" checked={exportFormats[key]} onChange={e=>setExportFormats({...exportFormats,[key]:e.target.checked})}/><span>{formats[key].label}</span></label>)}</div>
+        <div className={`social-artboard ratio-${format.replace(":","-")}`} style={{fontFamily:`${brand.font_family},sans-serif`,color:brand.text_color,background:visual.backgroundImage?`linear-gradient(rgba(7,8,20,${visual.overlay/100}),rgba(7,8,20,${visual.overlay/100})),url(${visual.backgroundImage}) center/cover`:`linear-gradient(145deg,${brand.primary_color},${brand.secondary_color} 62%,${brand.background_color})`,textAlign:visual.align}}>
+          {visual.accentBar&&<span className="social-accent-edge" style={{background:brand.accent_color}}/>}
+          <div className="social-preview-brand">{brand.logo_url?<img src={brand.logo_url} alt=""/>:<strong>{brand.brand_name}</strong>}</div>
+          <span className="social-preview-label" style={{background:brand.accent_color}}>{replaceVars(visual.label,ctx)}</span>
+          {visual.showArtwork&&<div className={`social-preview-artwork ${visual.artworkShape}`}>{visual.artworkImage?<img src={visual.artworkImage} alt=""/>:<span>♫</span>}</div>}
+          <div className="social-preview-copy"><h2>{previewHeadline}</h2><h3>{previewSubline}</h3></div>
+          <div className="social-preview-footer">{previewFooter}</div>
+        </div>
+        <div className="card social-autofill-card"><div><strong>Automatische variabelen</strong><span>Playout NOW, SHOUTcast, programmering en de recentste hitlijst worden alleen opgehaald wanneer je op “Vul live data in” klikt.</span></div><button className="ghost" disabled={busy} onClick={()=>void autofill()}>⚡ Vernieuw data</button></div>
+      </section>
+    </div>}
+
+    {tab==="brand"&&<div className="social-brand-layout">
+      <section className="card"><div className="section-head"><div><h3>Brand kit • {stationSlug}</h3><p>De basisstijl voor alle nieuwe social visuals.</p></div><button className="primary" disabled={busy} onClick={()=>void persistBrand()}>Opslaan</button></div>
+        <div className="brand-kit-grid">
+          <label>Merknaam<input value={brand.brand_name} onChange={e=>setBrand({...brand,brand_name:e.target.value})}/></label>
+          <label>Logo URL<input value={brand.logo_url} onChange={e=>setBrand({...brand,logo_url:e.target.value})} placeholder="of kies een asset hieronder"/></label>
+          <label>Font<select value={brand.font_family} onChange={e=>setBrand({...brand,font_family:e.target.value})}><option>Inter</option><option>Arial</option><option>Georgia</option><option>Trebuchet MS</option><option>Verdana</option></select></label>
+          <label>Standaard CTA<input value={brand.default_cta} onChange={e=>setBrand({...brand,default_cta:e.target.value})}/></label>
+          <label className="wide-brand-field">Standaard hashtags<input value={brand.default_hashtags} onChange={e=>setBrand({...brand,default_hashtags:e.target.value})}/></label>
+        </div>
+        <div className="brand-color-grid">{([
+          ["Primair","primary_color"],["Secundair","secondary_color"],["Accent","accent_color"],["Achtergrond","background_color"],["Tekst","text_color"]
+        ] as [string,keyof BrandKit][]).map(([label,key])=><label key={String(key)}><span>{label}</span><input type="color" value={String(brand[key])} onChange={e=>setBrand({...brand,[key]:e.target.value})}/><code>{String(brand[key])}</code></label>)}</div>
+      </section>
+      <section className="card brand-preview-card" style={{background:`linear-gradient(140deg,${brand.primary_color},${brand.secondary_color} 65%,${brand.background_color})`,color:brand.text_color,fontFamily:`${brand.font_family},sans-serif`}}><span className="eyebrow" style={{color:brand.text_color}}>BRAND PREVIEW</span>{brand.logo_url?<img src={brand.logo_url} alt=""/>:<h2>{brand.brand_name}</h2>}<b style={{background:brand.accent_color}}>{brand.default_cta}</b><p>{brand.default_hashtags}</p></section>
+      <section className="card brand-assets"><div className="section-head"><div><h3>Snel logo kiezen</h3><p>Gebruik één van de centrale assets.</p></div></div><div className="mini-asset-grid">{assets.slice(0,8).map(a=><button key={a.id} onClick={()=>setBrand({...brand,logo_url:a.public_url})}><img src={a.public_url} alt=""/><span>{a.name}</span></button>)}</div></section>
+    </div>}
+
+    {tab==="templates"&&<div className="social-template-layout-v16">
+      <aside className="card social-template-browser-v16">
+        <div className="section-head"><div><h3>Templates</h3><p>Centraal per station.</p></div><button className="mini-btn" onClick={()=>{const n=newTemplate(stationSlug,presetTemplates[0]);setTemplateDraft(n);setSelectedTemplateId(n.id)}}>＋</button></div>
+        {templates.map(t=><button key={t.id} className={selectedTemplateId===t.id?"selected":""} onClick={()=>{setSelectedTemplateId(t.id);setTemplateDraft(t);setFormat((t.aspect_ratio as FormatKey)||"4:5")}}><strong>{t.name}</strong><span>{t.content_type} • {t.aspect_ratio}</span></button>)}
+        <div className="social-preset-list"><strong>Snelle presets</strong>{presetTemplates.map(p=><button key={p.name} onClick={()=>{const n=newTemplate(stationSlug,p);setTemplateDraft(n);setSelectedTemplateId(n.id);setFormat(p.format)}}>＋ {p.name}</button>)}</div>
+      </aside>
+      <section className="card social-template-config-v16">
+        {!templateDraft?<div className="empty-live-state"><strong>Kies een template</strong></div>:<>
+          <div className="section-head"><div><h3>{templateDraft.name}</h3><p>Visuele regels + captionvariabelen.</p></div><div className="button-row"><button className="primary" disabled={busy} onClick={()=>void persistTemplate()}>Opslaan</button>{!templateDraft.id.startsWith("new-")&&<button className="ghost danger-text" onClick={()=>void removeTemplate()}>Verwijder</button>}</div></div>
+          <div className="template-config-grid">
+            <label>Naam<input value={templateDraft.name} onChange={e=>patchTemplate({name:e.target.value})}/></label>
+            <label>Type<input value={templateDraft.content_type} onChange={e=>patchTemplate({content_type:e.target.value})}/></label>
+            <label>Formaat<select value={format} onChange={e=>{const x=e.target.value as FormatKey;setFormat(x);patchTemplate({aspect_ratio:x})}}>{(Object.keys(formats) as FormatKey[]).map(k=><option key={k}>{k}</option>)}</select></label>
+            <label>Uitlijning<select value={cfg(templateDraft).align} onChange={e=>patchVisual({align:e.target.value as "left"|"center"})}><option value="left">Links</option><option value="center">Midden</option></select></label>
+            <label>Label<input value={cfg(templateDraft).label} onChange={e=>patchVisual({label:e.target.value})}/></label>
+            <label>Headline<input value={cfg(templateDraft).headline} onChange={e=>patchVisual({headline:e.target.value})}/></label>
+            <label>Subline<input value={cfg(templateDraft).subline} onChange={e=>patchVisual({subline:e.target.value})}/></label>
+            <label>Footer<input value={cfg(templateDraft).footer} onChange={e=>patchVisual({footer:e.target.value})}/></label>
+            <label>Overlay %<input type="number" min="0" max="75" value={cfg(templateDraft).overlay} onChange={e=>patchVisual({overlay:Number(e.target.value)})}/></label>
+            <label>Artworkvorm<select value={cfg(templateDraft).artworkShape} onChange={e=>patchVisual({artworkShape:e.target.value as VisualConfig["artworkShape"]})}><option value="circle">Cirkel</option><option value="rounded">Afgerond</option><option value="square">Vierkant</option></select></label>
+          </div>
+          <div className="template-switch-row"><label><input type="checkbox" checked={cfg(templateDraft).showArtwork} onChange={e=>patchVisual({showArtwork:e.target.checked})}/> Artwork tonen</label><label><input type="checkbox" checked={cfg(templateDraft).accentBar} onChange={e=>patchVisual({accentBar:e.target.checked})}/> Accentbalk</label></div>
+          <label className="field">Caption template<textarea className="input textarea" value={templateDraft.caption_template} onChange={e=>patchTemplate({caption_template:e.target.value})}/></label>
+          <div className="variable-strip">{variables.map(v=><button key={v} onClick={()=>patchTemplate({caption_template:`${templateDraft.caption_template}${templateDraft.caption_template.endsWith(" ")?"":" "}${v}`})}>{v}</button>)}</div>
+          <div className="asset-picker-row"><strong>Achtergrond</strong><button className="ghost" onClick={()=>patchVisual({backgroundImage:""})}>Gradient</button>{assets.slice(0,10).map(a=><button key={a.id} onClick={()=>patchVisual({backgroundImage:a.public_url})}><img src={a.public_url} alt=""/></button>)}</div>
+          <div className="asset-picker-row"><strong>Artwork</strong><button className="ghost" onClick={()=>patchVisual({artworkImage:""})}>Leeg</button>{assets.slice(0,10).map(a=><button key={a.id} onClick={()=>patchVisual({artworkImage:a.public_url})}><img src={a.public_url} alt=""/></button>)}</div>
+        </>}
+      </section>
+    </div>}
+
+    {tab==="calendar"&&<div className="social-phase2-calendar">
+      <div className="page-intro sub-intro">
+        <div><h3>Contentkalender & review</h3><p>Plan de maand, vraag feedback, keur posts goed en houd alle opmerkingen bij.</p></div>
+        <div className="button-row"><button className="ghost" onClick={()=>setCalendarMonth(addMonths(calendarMonth,-1))}>‹ Vorige</button><button className="ghost" onClick={()=>setCalendarMonth(monthStart(new Date()))}>Deze maand</button><button className="ghost" onClick={()=>setCalendarMonth(addMonths(calendarMonth,1))}>Volgende ›</button><button className="primary soft" onClick={()=>setTab("studio")}>＋ Nieuwe post</button></div>
+      </div>
+
+      <div className="social-calendar-summary">
+        <div className="card"><span>Concept</span><strong>{posts.filter(p=>p.status==="concept").length}</strong></div>
+        <div className="card"><span>Wacht op review</span><strong>{posts.filter(p=>p.status==="review").length}</strong></div>
+        <div className="card"><span>Goedgekeurd</span><strong>{posts.filter(p=>p.status==="approved").length}</strong></div>
+        <div className="card"><span>Gepubliceerd</span><strong>{posts.filter(p=>p.status==="published").length}</strong></div>
+      </div>
+
+      <div className="social-calendar-review-layout">
+        <section className="card social-month-card">
+          <div className="social-month-title"><strong>{new Intl.DateTimeFormat("nl-BE",{month:"long",year:"numeric"}).format(calendarMonth)}</strong><span>Klik op een post om review en planning te openen.</span></div>
+          <div className="social-month-weekdays">{["ma","di","wo","do","vr","za","zo"].map(d=><span key={d}>{d}</span>)}</div>
+          <div className="social-month-grid">{calendarCells.map(day=>{
+            const key=localDateKey(day);
+            const dayPosts=posts.filter(post=>postDay(post)===key);
+            const outside=day.getMonth()!==calendarMonth.getMonth();
+            const today=key===localDateKey(new Date());
+            return <div key={key} className={`social-day-cell ${outside?"outside":""} ${today?"today":""}`}>
+              <div className="social-day-number"><b>{day.getDate()}</b>{today&&<span>vandaag</span>}</div>
+              <div className="social-day-posts">{dayPosts.slice(0,4).map(post=><button key={post.id} className={`social-day-post ${post.status} ${selectedCalendarPostId===post.id?"selected":""}`} onClick={()=>setSelectedCalendarPostId(post.id)}><span>{post.scheduled_at?new Date(post.scheduled_at).toLocaleTimeString("nl-BE",{hour:"2-digit",minute:"2-digit"}):""}</span><strong>{post.title||"Socialpost"}</strong></button>)}{dayPosts.length>4&&<small>+{dayPosts.length-4} meer</small>}</div>
+            </div>
+          })}</div>
+          <div className="social-unscheduled">
+            <strong>Nog niet ingepland</strong>
+            <div>{posts.filter(p=>!p.scheduled_at&&p.status!=="archived").map(post=><button key={post.id} onClick={()=>setSelectedCalendarPostId(post.id)}><span className={`social-status-dot ${post.status}`}/>{post.title||"Socialpost"} <small>{statusLabel(post.status)}</small></button>)}</div>
+          </div>
+        </section>
+
+        <aside className="card social-review-panel">
+          {!selectedCalendarPost?<div className="empty-live-state"><strong>Kies een socialpost</strong><span>Dan zie je hier planning, reviewstatus en opmerkingen.</span></div>:<>
+            <div className="social-review-head"><div><span className={`social-review-status ${selectedCalendarPost.status}`}>{statusLabel(selectedCalendarPost.status)}</span><h3>{selectedCalendarPost.title||"Socialpost"}</h3><p>{selectedCalendarPost.caption}</p></div><button className="mini-btn" onClick={()=>{setCurrentPost(selectedCalendarPost);setCtx({...defaultContext(stationSlug),...(selectedCalendarPost.payload as Partial<Context>)});setFormat((selectedCalendarPost.format as FormatKey)||"4:5");const tt=templates.find(x=>x.id===selectedCalendarPost.template_id);if(tt)chooseTemplate(tt);setTab("studio")}}>Bewerk</button></div>
+
+            <label className="field">Publicatiemoment<input className="input" type="datetime-local" value={toLocalInput(selectedCalendarPost.scheduled_at)} onChange={e=>void reschedulePost(selectedCalendarPost,e.target.value)}/></label>
+
+            <div className="social-review-actions">
+              <button disabled={busy} className="review-request" onClick={()=>void workflow(selectedCalendarPost,"review_requested",reviewComment)}>👀 Vraag review</button>
+              <button disabled={busy} className="review-approve" onClick={()=>void workflow(selectedCalendarPost,"approved",reviewComment)}>✓ Goedkeuren</button>
+              <button disabled={busy} className="review-changes" onClick={()=>void workflow(selectedCalendarPost,"changes_requested",reviewComment)}>↺ Aanpassing nodig</button>
+              <button disabled={busy} className="review-publish" onClick={()=>void workflow(selectedCalendarPost,"published",reviewComment)}>● Markeer gepubliceerd</button>
+            </div>
+
+            <div className="social-review-timeline">
+              <div className="section-head"><div><h3>Reviewgeschiedenis</h3><p>Append-only: beslissingen en opmerkingen blijven zichtbaar.</p></div></div>
+              {reviewEvents.length===0&&<div className="empty-live-state compact"><strong>Nog geen reviewhistoriek</strong><span>Vraag review of voeg hieronder een opmerking toe.</span></div>}
+              {reviewEvents.map(event=><div className={`social-review-event event-${event.event_type}`} key={event.id}><span className="review-event-dot"/><div><strong>{reviewLabel(event.event_type)}</strong><small>{event.author_name||"Teamlid"} • {new Date(event.created_at).toLocaleString("nl-BE")}</small>{event.comment&&<p>{event.comment}</p>}</div></div>)}
+            </div>
+
+            <div className="review-comment-box"><textarea value={reviewComment} onChange={e=>setReviewComment(e.target.value)} placeholder="Opmerking voor de redactie / socialreview…"/><button className="primary soft" disabled={!reviewComment.trim()||busy} onClick={()=>void addReviewComment(selectedCalendarPost)}>Opmerking toevoegen</button></div>
+          </>}
+        </aside>
+      </div>
+    </div>}
+
+    {tab==="copy"&&<div className="social-copy-layout">
+      <section className="card social-copy-browser">
+        <div className="section-head"><div><h3>Copyblokken</h3><p>Herbruikbare CTA’s, hashtags, promo’s en vaste teksten.</p></div><button className="mini-btn" onClick={()=>setCopyDraft(newCopyBlock(stationSlug))}>＋</button></div>
+        {copyBlocks.length===0&&<div className="empty-live-state compact"><strong>Nog geen copyblokken</strong><span>Maak bijvoorbeeld “Luister live”, “Instagram hashtags” of “Winactie voorwaarden”.</span></div>}
+        {[...new Set(copyBlocks.map(x=>x.category))].map(category=><div className="copy-category-group" key={category}><strong>{category}</strong>{copyBlocks.filter(x=>x.category===category).map(block=><button key={block.id} className={copyDraft?.id===block.id?"selected":""} onClick={()=>setCopyDraft(block)}><span>{block.name}</span><small>{block.content.slice(0,90)}</small></button>)}</div>)}
+        <div className="copy-preset-section"><strong>Snelle starters</strong>
+          <button onClick={()=>setCopyDraft(newCopyBlock(stationSlug,"CTA","🎧 {cta}: luister naar {station}."))}>＋ CTA luisteren</button>
+          <button onClick={()=>setCopyDraft(newCopyBlock(stationSlug,"Hashtags","{station} #radio #music #onair"))}>＋ Hashtags</button>
+          <button onClick={()=>setCopyDraft(newCopyBlock(stationSlug,"Programma","🎙️ {program} met {presenter} — vandaag om {time} op {station}."))}>＋ Programmapromo</button>
+          <button onClick={()=>setCopyDraft(newCopyBlock(stationSlug,"Hitlijst","🏆 #{chart_position}: {artist} — {title}. Vorige week #{previous_position}."))}>＋ Hitlijst</button>
+        </div>
+      </section>
+
+      <section className="card social-copy-editor">
+        {!copyDraft?<div className="empty-live-state"><strong>Kies of maak een copyblok</strong><span>Copyblokken kunnen vanuit de Studio met één klik in je caption.</span></div>:<>
+          <div className="section-head"><div><h3>{copyDraft.name}</h3><p>Variabelen worden pas bij gebruik ingevuld met de actuele postdata.</p></div><div className="button-row"><button className="primary" disabled={busy} onClick={()=>void saveCopyBlock()}>Opslaan</button>{!copyDraft.id.startsWith("new-")&&<button className="ghost danger-text" onClick={()=>void removeCopyBlock()}>Verwijder</button>}</div></div>
+          <div className="copy-meta-grid"><label>Naam<input value={copyDraft.name} onChange={e=>setCopyDraft({...copyDraft,name:e.target.value})}/></label><label>Categorie<input value={copyDraft.category} onChange={e=>setCopyDraft({...copyDraft,category:e.target.value})}/></label></div>
+          <label className="field">Tekst<textarea className="input textarea copy-main-textarea" value={copyDraft.content} onChange={e=>setCopyDraft({...copyDraft,content:e.target.value})}/></label>
+          <div className="variable-strip">{variables.map(v=><button key={v} onClick={()=>setCopyDraft({...copyDraft,content:`${copyDraft.content}${copyDraft.content.endsWith(" ")?"":" "}${v}`})}>{v}</button>)}</div>
+          <div className="copy-preview"><span>Voorbeeld met huidige Studio-data</span><p>{replaceVars(copyDraft.content,ctx)}</p></div>
+          <button className="ghost" onClick={()=>insertCopyBlock(copyDraft)}>＋ Meteen in huidige caption invoegen</button>
+        </>}
+      </section>
+    </div>}
+
+    {tab==="assets"&&<div className="social-assets-layout">
+      <section className="card asset-upload-card"><div className="section-head"><div><h3>Asset library</h3><p>Alleen uploaden wanneer nodig. Dit gebruikt Supabase Storage.</p></div></div>
+        <label className="field">Tags<input className="input" value={assetTags} onChange={e=>setAssetTags(e.target.value)} placeholder="presentator, logo, zomer"/></label>
+        <label className={`social-dropzone ${assetUpload?"busy":""}`}>{assetUpload?"Uploaden…":"Klik om PNG/JPG/WEBP te uploaden (max. 5 MB)"}<input type="file" accept="image/png,image/jpeg,image/webp" disabled={assetUpload} onChange={e=>{const file=e.target.files?.[0];if(file)void handleAsset(file);e.currentTarget.value=""}}/></label>
+        <div className="usage-note compact"><strong>Zuinig</strong><span>Geen automatische uploads of thumbnails. Alleen bestanden die je bewust kiest gaan naar Storage.</span></div>
+      </section>
+      <section className="social-asset-grid-v16">{assets.map(asset=><article className="card" key={asset.id}><img src={asset.public_url} alt=""/><strong>{asset.name}</strong><small>{asset.tags?.join(" • ")||"geen tags"}</small><div className="button-row"><button className="ghost" onClick={()=>{if(templateDraft)patchVisual({artworkImage:asset.public_url});setTab("templates")}}>Gebruik</button><button className="mini-btn danger" onClick={()=>void removeAsset(asset)}>×</button></div></article>)}</section>
+    </div>}
+  </div>
 }

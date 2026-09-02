@@ -6,10 +6,14 @@ import { useHubStation } from "@/lib/radio/hub-stations";
 import { pathFor,radioRead,readIntegration,readMappings,readSecret,readStationCache,saveMappings,saveStationCache,type RadioMappingStore,type RadioStation } from "@/lib/radio/client-config";
 import { emitActivity } from "@/lib/collaboration/activity";
 import { hydrateSharedIntegrationSettings,loadSharedRadioMapping,saveSharedRadioMapping } from "@/lib/supabase/settings";
+import { hydrateIntegrationSecret } from "@/lib/supabase/secrets";
 import { loadSharedPlayoutStations,syncSharedPlayoutStations } from "@/lib/supabase/hub-data";
+import { loadEditorialWorkspace,saveEditorialWorkspace } from "@/lib/supabase/editorial";
+import EditorialPlaylistWorkspace from "@/components/modules/editorial-playlist-workspace";
+import EditorialTemplateStudio from "@/components/modules/editorial-template-studio";
 
-type EditorialType = "music" | "talk" | "imaging" | "promo" | "weather" | "traffic" | "news" | "commercial";
-type EditorialItem = {
+export type EditorialType = "music" | "talk" | "imaging" | "promo" | "weather" | "traffic" | "news" | "commercial" | "tease" | "link" | "browse";
+export type EditorialItem = {
   id: string;
   time: string;
   type: EditorialType;
@@ -21,6 +25,18 @@ type EditorialItem = {
   source: "Rotation One" | "Playout One" | "VLACORA";
   locked?: boolean;
   musicId?: string;
+
+  // Rotation One may expose one or more of these fields.
+  // They are intentionally preserved so template buttons can be built
+  // from categories that really occur in the fetched playlist.
+  category?: string;
+  categoryName?: string;
+  rotationMap?: string;
+  folder?: string;
+  folderName?: string;
+  musicCategory?: string;
+  playlistCategory?: string;
+  subtype?: string;
 };
 type TemplateBlock = {
   id: string;
@@ -99,7 +115,13 @@ const musicSeed: MusicSong[] = [
 function useStored<T>(key:string, initial:T) {
   const [value,setValue] = useState<T>(initial);
   const [ready,setReady] = useState(false);
-  useEffect(()=>{try{const raw=localStorage.getItem(key);if(raw)setValue(JSON.parse(raw))}catch{}setReady(true)},[key]);
+  useEffect(()=>{
+    setReady(false);
+    try{const raw=localStorage.getItem(key);setValue(raw?JSON.parse(raw):initial)}catch{setValue(initial)}
+    setReady(true);
+    // initial is intentionally a per-key fallback.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[key]);
   useEffect(()=>{if(ready)try{localStorage.setItem(key,JSON.stringify(value))}catch{}},[key,ready,value]);
   return [value,setValue] as const;
 }
@@ -113,8 +135,8 @@ function substitute(text:string, values:Record<string,string>) {
 export default function EditorialModule({stationSlug}:{stationSlug:string}) {
   const station = useHubStation(stationSlug);
   const [tab,setTab] = useState<"playlist"|"templates"|"koppeling">("playlist");
-  const [date,setDate] = useState("2026-09-01");
-  const [hour,setHour] = useState("16:00");
+  const [date,setDate] = useState(()=>new Date().toISOString().slice(0,10));
+  const [hour,setHour] = useState(()=>`${String(new Date().getHours()).padStart(2,"0")}:00`);
   const [program,setProgram] = useState("Drive");
   const [playlist,setPlaylist] = useStored<EditorialItem[]>(`vlacora:${station.slug}:editorial:playlist:${date}:${hour}`,[]);
   const [templates,setTemplates] = useStored<ProgramTemplate[]>(`vlacora:${station.slug}:editorial:templates`,seedTemplates);
@@ -130,6 +152,7 @@ export default function EditorialModule({stationSlug}:{stationSlug:string}) {
   const [playlistVersion,setPlaylistVersion] = useState<string>("—");
   const [programmingPrograms,setProgrammingPrograms] = useState<{name:string;host:string}[]>([]);
   const [busy,setBusy] = useState(false);
+  const [workspaceReady,setWorkspaceReady] = useState(false);
   useEffect(()=>{
     let alive=true;
     const refreshCaches=()=>{setRotationStations(readStationCache("rotation"));setPlayoutStations(readStationCache("playout"))};
@@ -139,11 +162,33 @@ export default function EditorialModule({stationSlug}:{stationSlug:string}) {
       const local=readMappings();const next=shared?{...local,[station.slug]:{...local[station.slug],...shared}}:local;setMappingsState(next);if(shared)saveMappings(next);
       if(readStationCache("playout").length===0){const sharedPlayout=await loadSharedPlayoutStations().catch(()=>[]);if(sharedPlayout.length)saveStationCache("playout",sharedPlayout)}
       refreshCaches();
-      const pc=readIntegration("playout");if(pc?.host&&readStationCache("playout").length===0&&readSecret("playout").apiKey){try{const result=await radioRead("playout",pc.stationPath,"stations");saveStationCache("playout",result.stations||[]);await syncSharedPlayoutStations(result.stations||[]).catch(()=>{});refreshCaches()}catch{}}
+      const pc=readIntegration("playout");if(!readSecret("playout").apiKey)await hydrateIntegrationSecret("playout").catch(()=>null);if(pc?.host&&readStationCache("playout").length===0&&readSecret("playout").apiKey){try{const result=await radioRead("playout",pc.stationPath,"stations");saveStationCache("playout",result.stations||[]);await syncSharedPlayoutStations(result.stations||[]).catch(()=>{});refreshCaches()}catch{}}
     })();
     const loadPrograms=()=>{try{const raw=localStorage.getItem(`vlacora:${station.slug}:programming:v10`);const items=raw?JSON.parse(raw):[];setProgrammingPrograms(Array.isArray(items)?items.filter((x:any)=>x?.active!==false).map((x:any)=>({name:String(x.name||"Programma"),host:String(x.host||"")})):[])}catch{setProgrammingPrograms([])}};
     loadPrograms();window.addEventListener("vlacora:programming-changed",loadPrograms as EventListener);window.addEventListener("vlacora:hub-stations-changed",refreshCaches as EventListener);return()=>{alive=false;window.removeEventListener("vlacora:programming-changed",loadPrograms as EventListener);window.removeEventListener("vlacora:hub-stations-changed",refreshCaches as EventListener)};
   },[station.slug]);
+
+  useEffect(()=>{
+    let alive=true;setWorkspaceReady(false);
+    (async()=>{
+      try{
+        const saved=await loadEditorialWorkspace(station.slug,date,Number(hour.slice(0,2)));
+        if(alive&&saved&&Array.isArray(saved.items)&&saved.items.length)setPlaylist(saved.items as EditorialItem[]);
+        if(alive&&saved?.source_revision)setPlaylistVersion(String(saved.source_revision));
+      }catch{}
+      finally{if(alive)setWorkspaceReady(true)}
+    })();
+    return()=>{alive=false};
+  },[station.slug,date,hour]);
+
+  useEffect(()=>{
+    if(!workspaceReady)return;
+    const timer=window.setTimeout(()=>{
+      void saveEditorialWorkspace(station.slug,date,Number(hour.slice(0,2)),playlist,playlistVersion).catch(()=>{});
+    },1200);
+    return()=>window.clearTimeout(timer);
+  },[workspaceReady,station.slug,date,hour,playlist,playlistVersion]);
+
   const mapping=mappings[station.slug]||{rotationId:station.rotationId||"",rotationName:station.rotationId?station.name:"",playoutId:"",playoutName:""};
   function setMapping(patch:Partial<typeof mapping>){const value={...mapping,...patch};const next={...mappings,[station.slug]:value};setMappingsState(next);saveMappings(next);void saveSharedRadioMapping(station.slug,value).catch(()=>{})}
 
@@ -198,7 +243,8 @@ async function fetchPlayoutStations(){
   try{
     await hydrateSharedIntegrationSettings(station.slug).catch(()=>false);
     const pc=readIntegration("playout");if(!pc?.host)throw new Error("Playout One is nog niet ingesteld.");
-    if(!readSecret("playout").apiKey)throw new Error("Playout One Bearer API-key ontbreekt in deze browsersessie. Vul hem opnieuw in bij Beheer → Integraties.");
+    if(!readSecret("playout").apiKey)await hydrateIntegrationSecret("playout").catch(()=>null);
+    if(!readSecret("playout").apiKey)throw new Error("Playout One Bearer API-key is nog niet centraal opgeslagen. Vul hem één keer in bij Beheer → Integraties en klik Opslaan.");
     const result=await radioRead("playout",pc.stationPath,"stations");const list=result.stations||[];
     setPlayoutStations(list);saveStationCache("playout",list);await syncSharedPlayoutStations(list).catch(()=>{});
     flash(`${list.length} Playout One station(s) vers opgehaald`);
@@ -218,81 +264,26 @@ async function testConnections(){
     </div>
 
     <div className="editorial-tabs">
-      <button className={tab==="playlist"?"active":""} onClick={()=>setTab("playlist")}>Playlist & teksten</button>
-      <button className={tab==="templates"?"active":""} onClick={()=>setTab("templates")}>Programmasjablonen</button>
+      <button className={tab==="playlist"?"active":""} onClick={()=>setTab("playlist")}>Playlist</button>
+      <button className={tab==="templates"?"active":""} onClick={()=>setTab("templates")}>Redactietemplates</button>
       <button className={tab==="koppeling"?"active":""} onClick={()=>setTab("koppeling")}>Rotation / Playout koppeling</button>
     </div>
     {notice&&<div className="inline-notice standalone">{notice}</div>}
 
-    {tab==="playlist"&&<>
-      <div className="card editorial-toolbar">
-        <label className="field">Datum<input className="input" type="date" value={date} onChange={e=>setDate(e.target.value)}/></label>
-        <label className="field">Uur<select className="select" value={hour} onChange={e=>setHour(e.target.value)}>{["06:00","07:00","08:00","09:00","10:00","11:00","12:00","13:00","14:00","15:00","16:00","17:00","18:00","19:00","20:00"].map(x=><option key={x}>{x}</option>)}</select></label>
-        <label className="field">Programma<select className="select" value={program} onChange={e=>setProgram(e.target.value)}>{programs.map(p=><option key={p}>{p}</option>)}</select></label>
-        <div className="linked-template-box"><span>Gekoppeld sjabloon</span><strong>{linkedTemplate?.name||"Geen"}</strong></div>
-        <button className="primary" onClick={applyTemplate}>+ Sjabloonitems</button>
-      </div>
+    {tab==="playlist"&&<EditorialPlaylistWorkspace
+      stationName={station.name}
+      stationSlug={station.slug}
+      date={date}
+      setDate={setDate}
+      hour={hour}
+      setHour={setHour}
+      playlist={playlist}
+      setPlaylist={setPlaylist}
+      onPull={pullRotation}
+      playlistVersion={playlistVersion}
+    />}
 
-      <div className="editorial-layout">
-        <div className="card editorial-playlist">
-          <div className="playlist-editor-head"><div><span className="eyebrow">PLAYLIST</span><h3>{station.name} • {date} • {hour}</h3></div><span className="version-badge">rev {playlistVersion}</span></div>
-          <div className="editorial-columns"><span></span><span>Tijd</span><span>Item</span><span>Bron</span><span></span></div>
-          {playlist.length===0&&<div className="empty-live-state"><strong>Nog geen playlist geladen</strong><span>Koppel een Rotation One-station en klik op “Echte playlist ophalen”. Er wordt geen demo-playlist meer getoond.</span></div>}
-          {playlist.map((item,index)=><button key={item.id} className={`editorial-row ${selected?.id===item.id?"selected":""} type-${item.type}`} onClick={()=>setSelectedId(item.id)}>
-            <span className="drag-mark">{item.locked?"🔒":"⋮⋮"}</span><span>{item.time}</span>
-            <div><strong>{item.artist?`${item.artist} — ${item.title}`:item.title}</strong><small>{item.type} • {item.duration}{item.presenterText?" • tekst aanwezig":""}</small></div>
-            <span className="source-pill">{item.source}</span>
-            <span className="editorial-actions"><button disabled={item.locked} onClick={e=>{e.stopPropagation();move(index,-1)}}>↑</button><button disabled={item.locked} onClick={e=>{e.stopPropagation();move(index,1)}}>↓</button></span>
-          </button>)}
-        </div>
-
-        <div className="editorial-side">
-          {selected&&<div className="card editorial-inspector">
-            <div className="module-title-row"><div><span className="eyebrow">REDACTIE ITEM</span><h3>{selected.artist?`${selected.artist} — ${selected.title}`:selected.title}</h3></div><span className={`type-badge ${selected.type}`}>{selected.type}</span></div>
-            <div className="two-form-cols">
-              <label className="field">Tijd<input className="input" value={selected.time} disabled={selected.locked} onChange={e=>updateSelected({time:e.target.value})}/></label>
-              <label className="field">Duur<input className="input" value={selected.duration} onChange={e=>updateSelected({duration:e.target.value})}/></label>
-            </div>
-            {selected.type==="music"&&<><label className="field">Artiest<input className="input" value={selected.artist||""} onChange={e=>updateSelected({artist:e.target.value})}/></label><label className="field">Titel<input className="input" value={selected.title} onChange={e=>updateSelected({title:e.target.value})}/></label></>}
-            <label className="field">Presentatietekst<textarea className="input editorial-textarea" value={selected.presenterText} onChange={e=>updateSelected({presenterText:e.target.value})} placeholder="Wat moet of kan de presentator hierbij zeggen?"/></label>
-            <div className="text-tools">
-              <button className="ghost" onClick={()=>updateSelected({presenterText:selected.type==="music"?`Dit is ${selected.artist} met ${selected.title}.`:`Je luistert naar ${station.name}.`})}>✨ Tekstvoorstel</button>
-              {selected.musicId&&<button className="ghost" onClick={()=>{const song=music.find(s=>s.id===selected.musicId);if(song)updateSelected({presenterText:song.presentationText||""})}}>Songtekst laden</button>}
-            </div>
-            <label className="field">Redactienotities<textarea className="input textarea" value={selected.notes} onChange={e=>updateSelected({notes:e.target.value})}/></label>
-            {!selected.locked&&<button className="ghost danger-text" onClick={()=>setPlaylist(playlist.filter(i=>i.id!==selected.id))}>Verwijder uit redactieplaylist</button>}
-          </div>}
-
-          <div className="card editorial-add">
-            <h3>Item toevoegen</h3>
-            <label className="field">Song uit muziekbibliotheek<select className="select" defaultValue="" onChange={e=>{if(e.target.value)addMusic(e.target.value);e.target.value=""}}><option value="">Kies een song…</option>{music.map(s=><option value={s.id} key={s.id}>{s.artist} — {s.title} • {s.rotationMap}</option>)}</select></label>
-            <div className="quick-add-grid">
-              {linkedTemplate?.blocks.map(b=><button key={b.id} onClick={()=>addBlock(b.type,b.name,substitute(b.text,{station:station.name,presenter:"Jasper",program,end:"18:00",next_program:"The Partyroom","song.artist":selected?.artist||"","song.title":selected?.title||""}))}><strong>{b.name}</strong><span>{b.type}</span></button>)}
-            </div>
-          </div>
-        </div>
-      </div>
-    </>}
-
-    {tab==="templates"&&<div className="template-management-layout">
-      <div className="card template-program-links">
-        <div className="module-title-row"><div><h3>Programma → sjabloon</h3><small>Per programma automatisch het juiste redactiesjabloon.</small></div></div>
-        {programs.map(p=>{
-          const link=links.find(l=>l.program===p);
-          return <div className="program-link-row" key={p}><div><strong>{p}</strong><small>{programmingPrograms.find(s=>s.name===p)?.host||"Programma"}</small></div><select className="select" value={link?.templateId||""} onChange={e=>setLinks([...links.filter(l=>l.program!==p),{program:p,templateId:e.target.value}])}><option value="">Geen sjabloon</option>{templates.filter(t=>t.station==="all"||t.station===station.slug).map(t=><option value={t.id} key={t.id}>{t.name}</option>)}</select></div>
-        })}
-      </div>
-      <div className="card template-editor">
-        <div className="module-title-row"><div><h3>Sjablonen</h3><small>Opening, closing en vaste redactie-items.</small></div><button className="primary tiny-btn" onClick={()=>{const n:ProgramTemplate={id:uid(),name:"Nieuw sjabloon",program:"Nieuw programma",station:station.slug,opening:"",closing:"",blocks:[]};setTemplates([...templates,n])}}>＋</button></div>
-        {templates.map(t=><details key={t.id} className="template-detail" open={t.id===linkedTemplate?.id}><summary><strong>{t.name}</strong><span>{t.program} • {t.blocks.length} items</span></summary><div className="template-edit-body">
-          <div className="two-form-cols"><label className="field">Naam<input className="input" value={t.name} onChange={e=>setTemplates(templates.map(x=>x.id===t.id?{...x,name:e.target.value}:x))}/></label><label className="field">Programma<input className="input" value={t.program} onChange={e=>setTemplates(templates.map(x=>x.id===t.id?{...x,program:e.target.value}:x))}/></label></div>
-          <label className="field">Opening<textarea className="input textarea" value={t.opening} onChange={e=>setTemplates(templates.map(x=>x.id===t.id?{...x,opening:e.target.value}:x))}/></label>
-          <label className="field">Closing<textarea className="input textarea" value={t.closing} onChange={e=>setTemplates(templates.map(x=>x.id===t.id?{...x,closing:e.target.value}:x))}/></label>
-          <div className="template-block-list">{t.blocks.map((b,index)=><div className="template-block" key={b.id}><div><strong>{b.name}</strong><span>{b.type}{b.required?" • verplicht":""}</span></div><input className="input" value={b.text} onChange={e=>setTemplates(templates.map(x=>x.id===t.id?{...x,blocks:x.blocks.map(y=>y.id===b.id?{...y,text:e.target.value}:y)}:x))}/><button className="mini-btn danger" onClick={()=>setTemplates(templates.map(x=>x.id===t.id?{...x,blocks:x.blocks.filter(y=>y.id!==b.id)}:x))}>×</button></div>)}</div>
-          <button className="ghost" onClick={()=>setTemplates(templates.map(x=>x.id===t.id?{...x,blocks:[...x.blocks,{id:uid(),type:"talk",name:"Nieuw item",text:"Nieuwe redactietekst",required:false}]}:x))}>+ Item</button>
-        </div></details>)}
-      </div>
-    </div>}
+    {tab==="templates"&&<EditorialTemplateStudio stationSlug={station.slug} playlist={playlist}/>}
 
     {tab==="koppeling"&&<div className="integration-grid">
       <div className="card">
@@ -306,7 +297,7 @@ async function testConnections(){
         <label className="field">Rotation One station<select className="select" value={mapping.rotationId} onChange={e=>{const x=rotationStations.find(s=>s.id===e.target.value);setMapping({rotationId:e.target.value,rotationName:x?.name||""})}}><option value="">Niet gekoppeld</option>{rotationStations.map(s=><option key={s.id} value={s.id}>{s.name} • {s.id}</option>)}</select></label>
         <label className="field">Playout One station<select className="select" value={mapping.playoutId} onChange={e=>{const x=playoutStations.find(s=>s.id===e.target.value);setMapping({playoutId:e.target.value,playoutName:x?.name||""})}}><option value="">Niet gekoppeld</option>{playoutStations.map(s=><option key={s.id} value={s.id}>{s.name} • {s.id}</option>)}</select></label>
         {rotationStations.length===0&&<p className="muted">Geen Rotation One-stations in cache. Ga naar Beheer → Integraties → Rotation One → Stations ophalen.</p>}
-        {playoutStations.length===0&&<div className="mapping-warning"><strong>Geen Playout One-stations zichtbaar</strong><span>{readIntegration("playout")?.host?(readSecret("playout").apiKey?"De API-key is aanwezig, maar de stationslijst is nog niet opgehaald.":"Playout One is ingesteld, maar de Bearer API-key ontbreekt in deze browsersessie."):"Playout One is nog niet ingesteld."}</span><button className="ghost" onClick={fetchPlayoutStations}>↻ Playout stations ophalen</button></div>}
+        {playoutStations.length===0&&<div className="mapping-warning"><strong>Geen Playout One-stations zichtbaar</strong><span>{readIntegration("playout")?.host?(readSecret("playout").apiKey?"De API-key is aanwezig, maar de stationslijst is nog niet opgehaald.":"Playout One is ingesteld, maar de Bearer API-key is nog niet centraal opgeslagen."):"Playout One is nog niet ingesteld."}</span><button className="ghost" onClick={fetchPlayoutStations}>↻ Playout stations ophalen</button></div>}
         <div className="mapping-service-block"><div className="mapping-service-head"><strong>SHOUTcast voor {station.name}</strong><span className={`mapping-pill ${readIntegration("shoutcast")?.host?"ok":"off"}`}>{readIntegration("shoutcast")?.host?"INGESTELD":"NIET INGESTELD"}</span></div>{readIntegration("shoutcast")?.host?<code className="mapping-endpoint">{`${readIntegration("shoutcast")?.protocol}://${readIntegration("shoutcast")?.host}:${readIntegration("shoutcast")?.port}${readIntegration("shoutcast")?.basePath||""}${readIntegration("shoutcast")?.statusPath||""}`}</code>:<small>Stel de SHOUTcast host, poort en SID per station in via Beheer → Integraties.</small>}</div>
         <button className="primary" onClick={testConnections}>Test Rotation + Playout + SHOUTcast</button>
       </div>

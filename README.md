@@ -619,3 +619,241 @@ Fix:
 - `const [busy,setBusy] = useState(false);` toegevoegd
 - dubbele refresh-clicks blijven daardoor geblokkeerd
 - de 0.14.3 refreshlogica blijft behouden
+
+
+## 0.14.7 — API-sleutels blijven eindelijk behouden
+
+Rotation One / Playout One API-keys werden vroeger bewust alleen in `sessionStorage`
+bewaard. Daardoor verdwenen ze na een browserherstart, nieuwe sessie of soms na een deploy.
+
+Vanaf 0.14.7:
+- API-sleutels worden versleuteld opgeslagen met **Supabase Vault**
+- ze staan niet in GitHub
+- ze staan niet in localStorage
+- ze staan niet als leesbare waarde in `hub_settings`
+- VLACORA laadt de sleutel automatisch terug wanneer Rotation/Playout een API-call nodig heeft
+- Header en Prefix worden mee centraal bewaard
+- superadmin/stationmanager kan een sleutel wijzigen of verwijderen
+- bestaande sleutel uit een nog actieve browsersessie wordt waar mogelijk éénmalig naar Vault gemigreerd
+
+De gekoppelde Supabase-productiedatabase heeft migration
+`018_persistent_api_secrets_vault.sql` al gekregen.
+
+Na deze update hoef je een sleutel die al uit sessionStorage verdwenen is nog **één keer**
+opnieuw in te vullen en op `Opslaan` te klikken. Daarna blijft hij centraal behouden.
+
+
+## 0.15.0 — TOPplaylist-stijl redactie + echte redactietemplates
+
+De redactieplaylist is opnieuw ontworpen als een echte live radiowerkplek:
+- datum vorige/volgende/vandaag
+- horizontale uren 00–23
+- LIVE-modus
+- filterchips Tease / Nummer / Reclame / Talk / Link / Browselist
+- zoeken + zichtbaar/verborgen teller
+- songs als compacte blauwe rijen
+- links/reclame als gele rijen
+- talks inline met naam, duur, inhoud, notities en herschikken
+- `+` na een playlistitem om onmiddellijk een talk toe te voegen
+- rechter snelbalk voor Weer, Nieuws, Redactie, Doorverwijs en Check bericht
+- echte Rotation One pull blijft de bron van muziek/playlist
+
+Redactietemplates zijn nu echte uurvolgordes:
+- onbeperkt Nummer / Link / Reclame / Browse List / Talk / Verplichte talk / Tease
+- drag & drop + omhoog/omlaag
+- talknaam, seconden, vaste inhoud, verplicht slot
+- toewijzingen per programma + weekdag + uur
+- toegewezen template wordt automatisch op de playlistpagina herkend
+- `Sjabloon toepassen` vult de echte Rotation items in de Nummer/Link/Reclame-slots en maakt de redactieslots ertussen
+
+Persistentie:
+- templates centraal in `hub_editorial_templates`
+- redactieplaylist/teksten per station/datum/uur centraal in `hub_editorial_workspaces`
+- save is gedebounced om Supabase-verbruik laag te houden
+- production migration `019_editorial_playlist_templates.sql` is al toegepast op het gekoppelde Supabase-project
+
+
+## 0.15.1 — echte playlistcategorieën als templateknoppen
+
+De templatebouwer toont nu niet langer alleen generieke `Nummer/Link/Reclame`-knoppen.
+
+Wanneer op het tabblad Playlist een echt Rotation One-uur is geladen, analyseert VLACORA
+de velden die Rotation One werkelijk terugstuurt, zoals:
+- rotatiemap
+- categorie
+- map/folder
+- muziekcategorie
+- playlistcategorie
+- subtype
+
+Alleen waarden die werkelijk in het geladen uur voorkomen worden als knop getoond,
+inclusief het aantal items in die categorie.
+
+Voorbeeld:
+`+ A-ROTATIE 8`
+`+ B-ROTATIE 5`
+`+ POWER CURRENT 3`
+`+ TOPHEADLINES 1`
+
+Een category-slot bewaart ook exact uit welk Rotation One-veld het kwam.
+Bij `Sjabloon toepassen` gebruikt VLACORA alleen een echt playlistitem dat aan die
+categorie voldoet. Als die categorie in een later uur ontbreekt, wordt dat expliciet
+als `Ontbreekt: <categorie>` zichtbaar en wordt niet stil een willekeurige song gekozen.
+
+De generieke Nummer/Link/Reclame-knoppen blijven onder een inklapbare fallback staan.
+
+
+## 0.15.2 — algemene playlisttypes in templates
+
+De 0.15.1-knoppen waren te specifiek (A-rotatie, mapnamen, subcategorieën enz.).
+
+Vanaf 0.15.2 analyseert VLACORA de echte Rotation One-playlist en toont alleen
+algemene types die werkelijk in dat uur voorkomen:
+
+- Muziek
+- Jingle / imaging
+- Advertentie
+- Nieuws
+- Weer
+- Verkeer
+- Talk
+- Tease
+- Browse list
+
+Dus als een uur alleen muziek, jingles en reclame bevat, krijg je in de templatebouwer
+precies die drie technische knoppen. Redactieslots zoals `Verplichte talk` blijven apart
+beschikbaar om zelf toe te voegen.
+
+Een templateslot `Muziek` gebruikt bij toepassen het eerstvolgende echte muziekitem;
+`Jingle / imaging` gebruikt een echt imaging/promo/link-item en `Advertentie` gebruikt
+een echt commercial-item. Er wordt niet naar specifieke Rotation One mapnamen gekeken.
+
+
+## 0.16.0 — Social Studio + algemene visuele polish
+
+### Social Studio
+Nieuwe centrale werkplek met vijf tabs:
+- Studio
+- Brand kit
+- Templates
+- Contentkalender
+- Assets
+
+Brand kit per station:
+- logo
+- primaire/secundaire/accentkleur
+- achtergrond- en tekstkleur
+- veilig systeemfont
+- standaard CTA
+- standaard hashtags
+
+Templates:
+- Now Playing
+- Straks in de show
+- Hitlijst positie
+- Presentator quote
+- Gast in de studio
+- Winactie
+- eigen templates
+
+Variabelen:
+`{station}`, `{artist}`, `{title}`, `{program}`, `{presenter}`, `{listeners}`,
+`{chart_position}`, `{previous_position}`, `{next_show}`, `{date}`, `{time}`, `{cta}`.
+
+`Vul live data in` vraagt alleen op expliciete klik:
+- Playout One NOW
+- SHOUTcast listeners
+- huidige programmering
+- recentste hitlijst
+
+Export:
+- 1:1
+- 4:5
+- 9:16
+- 16:9
+- één knop voor een pakket van alle vier
+
+Contentworkflow:
+Concept → Review → Goedgekeurd → Gepubliceerd → Archief.
+Automatisch publiceren naar Meta/TikTok is bewust nog niet toegevoegd omdat dit externe
+accounts/API-rechten vereist en extra complexiteit/verbruik kan veroorzaken.
+
+Assets:
+- PNG / JPG / WEBP
+- max. 5 MB
+- alleen upload op expliciete gebruikersactie
+- centrale Supabase Storage bucket `vlacora-social-assets`
+- metadata/tags in `hub_social_assets`
+
+### Verbruik
+Geen achtergrondrendering, geen image-render API en geen automatische uploads.
+PNG-export gebeurt client-side in de browser.
+Live radio-data wordt alleen opgehaald wanneer de gebruiker `Vul live data in` kiest.
+Dit houdt Vercel/Supabase-verbruik beperkt.
+
+### Algemene vormgeving
+- duidelijkere actieve navigatie
+- subtielere card shadows
+- glassy sticky topbar
+- sterkere dashboard metric cards
+- consistente typografische hiërarchie
+
+Supabase production migration `020_social_studio.sql` is al toegepast op het gekoppelde project.
+
+
+## 0.17.0 — Social Studio fase 2
+
+Fase 2 is volledig toegevoegd bovenop 0.16.0.
+
+### Contentkalender
+- echte maandweergave maandag–zondag
+- vorige / huidige / volgende maand
+- posts zichtbaar op hun geplande dag en uur
+- aparte rij voor nog niet ingeplande posts
+- tellers voor Concept / Review / Goedgekeurd / Gepubliceerd
+- publicatiemoment rechtstreeks in het reviewpaneel aanpassen
+
+### Review & goedkeuring
+Workflow:
+- Concept
+- Review gevraagd
+- Goedgekeurd
+- Aanpassing nodig → terug naar Concept
+- Gepubliceerd
+
+Elke belangrijke reviewactie wordt append-only opgeslagen in
+`hub_social_review_events`, inclusief opmerkingen en auteur.
+
+Bij review gevraagd, aanpassing nodig en goedkeuring maakt VLACORA ook een
+gewone teamnotificatie via het bestaande notificatiesysteem. Er is dus geen
+extra pollingdienst nodig.
+
+### Copyblokken
+Nieuwe tab `Copyblokken`:
+- eigen categorieën
+- CTA's
+- hashtags
+- programma-promo
+- hitlijstcopy
+- eigen vaste teksten
+- alle bestaande Social Studio-variabelen
+
+Vanuit Studio voeg je een opgeslagen copyblok met één klik toe aan de caption.
+
+### Multi-format export
+Je kiest nu zelf welke formaten in de exportset zitten:
+- 1:1
+- 4:5
+- 9:16
+- 16:9
+
+Rendering blijft client-side. Er is geen betaalde image-render API.
+
+### Verbruik
+- reviewhistoriek wordt alleen geladen voor de geselecteerde post
+- geen extra achtergrondpolling
+- geen server-side rendering van socialbeelden
+- copyblokken zijn kleine tekstrecords
+- kalender gebruikt reeds geladen postdata
+
+Supabase production migration `021_social_studio_phase2.sql` is al toegepast.
