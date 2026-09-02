@@ -1,0 +1,7 @@
+VLACORA HUB 0.19.5 validation
+[PASS] version 0.19.5
+[PASS] invalid source removed
+[PASS] valid source present
+[PASS] provider still visible
+[INFO] no database changes
+[INFO] no API changes

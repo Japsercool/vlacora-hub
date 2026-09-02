@@ -1183,3 +1183,11 @@ VLACORA gebruikt nu de publieke **DATEX II v3 full feed** van het Vlaams Verkeer
 - geen 24/7 polling wanneer niemand de Verkeer-pagina gebruikt.
 
 Geen database-migratie en geen betaalde verkeers-API nodig.
+
+
+## 0.19.5 — live traffic TypeScript build fix
+
+`EditorialItem.source` only accepts `Rotation One`, `Playout One` or `VLACORA`.
+The traffic item now uses `source: "VLACORA"`; the real provider remains visible in the notes as `Live Vlaams Verkeerscentrum • DATEX II`.
+
+No database migration and no API change.

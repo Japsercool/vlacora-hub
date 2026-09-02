@@ -153,7 +153,7 @@ export default function EditorialPlaylistWorkspace(props:Props){
     try{
       const trafficSettings=await loadTrafficSettings(stationSlug);
       const data=await fetchTrafficSnapshot(trafficSettings);
-      const item:EditorialItem={id:uid(),time:selected?.time||playlist[playlist.length-1]?.time||hour,type:"traffic",title:"Verkeer LIVE",duration:"00:30",presenterText:data.radioText,notes:`Live Vlaams Verkeerscentrum • DATEX II • update ${new Date(data.publicationTime||data.fetchedAt).toLocaleTimeString("nl-BE",{hour:"2-digit",minute:"2-digit"})}`,source:"Vlaams Verkeerscentrum"};
+      const item:EditorialItem={id:uid(),time:selected?.time||playlist[playlist.length-1]?.time||hour,type:"traffic",title:"Verkeer LIVE",duration:"00:30",presenterText:data.radioText,notes:`Live Vlaams Verkeerscentrum • DATEX II • update ${new Date(data.publicationTime||data.fetchedAt).toLocaleTimeString("nl-BE",{hour:"2-digit",minute:"2-digit"})}`,source:"VLACORA"};
       insertAfterSelection(item);setTrafficMessage(`${data.count} verkeersmelding(en) verwerkt`);
     }catch(e){
       const item:EditorialItem={id:uid(),time:selected?.time||playlist[playlist.length-1]?.time||hour,type:"traffic",title:"Verkeer",duration:"00:30",presenterText:"",notes:`Live verkeersfeed kon niet laden: ${e instanceof Error?e.message:"onbekende fout"}`,source:"VLACORA"};

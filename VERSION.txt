@@ -1,4 +1,4 @@
-VLACORA HUB 0.19.4
-Live traffic integration using the official Vlaams Verkeerscentrum DATEX II v3 full feed.
-Includes station road priorities, cached server-side feed access, radio-ready traffic text, live traffic page, and automatic traffic text in editorial templates/playlist slots.
-No database migration required; station traffic preferences reuse hub_settings.
+VLACORA HUB 0.19.5
+Build fix for live traffic editorial items.
+Traffic talks use EditorialItem.source="VLACORA"; the actual Vlaams Verkeerscentrum / DATEX II provider remains in the notes.
+No database or API changes.
