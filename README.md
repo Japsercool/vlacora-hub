@@ -857,3 +857,11 @@ Rendering blijft client-side. Er is geen betaalde image-render API.
 - kalender gebruikt reeds geladen postdata
 
 Supabase production migration `021_social_studio_phase2.sql` is al toegepast.
+
+## 0.17.1 — Radio fixes
+- Rotation One `Muziek` wordt correct als muziek weergegeven, niet als Talk.
+- AirTimeUtc en SourceHourStartUtc uit Rotation One 1.5.40 worden meegenomen.
+- Playout mapping gebruikt ook `rotation.station` uit de Playout One 0.11.19 heartbeat.
+- Een tijdelijk lege Playout Hub wist laatst bekende stations niet meer.
+- Handmatige Playout station-ID fallback toegevoegd.
+- Eigen VLACORA stationsnaam + korte badge toegevoegd, zonder Rotation One/Playout One te hernoemen.

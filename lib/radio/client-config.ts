@@ -128,3 +128,15 @@ export async function radioWrite(kind:IntegrationKind,path:string,method:"POST"|
   if(!res.ok)throw new Error(data?.error||data?.message||`HTTP ${res.status}`);
   return data;
 }
+
+export type StationDiscoveryResult={stations:RadioStation[];sourcePath:string;usedCache:boolean;attempts:Array<{path:string;ok:boolean;count:number;error?:string}>};
+function uniqueStations(items:RadioStation[]){const m=new Map<string,RadioStation>();for(const x of items){const id=String(x?.id||"").trim();if(!id)continue;const old=m.get(id);m.set(id,{...old,...x,id,name:String(x.name||old?.name||id)})}return[...m.values()].sort((a,b)=>a.name.localeCompare(b.name,"nl"))}
+export function mergeStationCache(kind:IntegrationKind,incoming:RadioStation[]){const merged=uniqueStations([...readStationCache(kind),...incoming]);if(merged.length)saveStationCache(kind,merged);return merged}
+export function playoutRotationStation(station:RadioStation){const r=station.raw as any;return String(r?.rotation?.station??r?.Rotation?.Station??r?.rotationStation??r?.RotationStation??"").trim()}
+export async function discoverPlayoutStations():Promise<StationDiscoveryResult>{
+ const cfg=readIntegration("playout");if(!cfg?.host)throw new Error("Playout One is nog niet ingesteld.");
+ const paths=[cfg.stationPath,"/api/v1/integration/stations","/api/v1/integration/revisions"].filter((v,i,a)=>Boolean(v)&&a.indexOf(v)===i) as string[];
+ const attempts:Array<{path:string;ok:boolean;count:number;error?:string}>=[];
+ for(const path of paths){try{const r=await radioRead("playout",path,"stations");const s=uniqueStations(r.stations||[]);attempts.push({path,ok:true,count:s.length});if(s.length)return{stations:mergeStationCache("playout",s),sourcePath:path,usedCache:false,attempts}}catch(e){attempts.push({path,ok:false,count:0,error:e instanceof Error?e.message:String(e)})}}
+ const cached=uniqueStations(readStationCache("playout"));return{stations:cached,sourcePath:"cache",usedCache:cached.length>0,attempts};
+}

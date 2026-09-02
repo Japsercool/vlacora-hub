@@ -3,6 +3,7 @@
 import { useEffect,useMemo,useState } from "react";
 import type { EditorialItem,EditorialType } from "@/components/modules/editorial-module";
 import { loadEditorialTemplates,type EditorialTemplateRecord,type EditorialTemplateSlot } from "@/lib/supabase/editorial";
+import { broadPlaylistLabel,canonicalPlaylistType } from "@/lib/radio/item-types";
 
 const uid=()=>Math.random().toString(36).slice(2)+Date.now().toString(36);
 const pad=(n:number)=>String(n).padStart(2,"0");
@@ -42,25 +43,9 @@ function durationSeconds(value:string){
   return Number(value)||0;
 }
 function durationText(seconds:number){return `${pad(Math.floor(seconds/60))}:${pad(Math.max(0,seconds%60))}`}
-function normalizedType(item:EditorialItem){
-  if(item.type==="music")return"number";
-  if(item.type==="commercial")return"commercial";
-  if(["imaging","promo","link"].includes(item.type))return"link";
-  if(item.type==="tease")return"tease";
-  if(item.type==="browse")return"browse";
-  return"talk";
-}
-function badgeLabel(item:EditorialItem){
-  if(item.type==="music")return"Nummer";
-  if(item.type==="commercial")return"Reclame";
-  if(item.type==="traffic")return"Verkeer";
-  if(item.type==="weather")return"Weer";
-  if(item.type==="news")return"Nieuws";
-  if(item.type==="browse")return"Browse List";
-  if(item.type==="tease")return"Tease";
-  if(["imaging","promo","link"].includes(item.type))return"Link";
-  return"Talk";
-}
+function itemKind(item:EditorialItem){return canonicalPlaylistType({type:item.type,rawType:(item as any).rawType,category:(item as any).category,externalKind:(item as any).externalKind,artist:item.artist,musicId:item.musicId,isSweeper:(item as any).isSweeper})}
+function normalizedType(item:EditorialItem){const k=itemKind(item);if(k==="music")return"number";if(k==="commercial")return"commercial";if(["imaging","promo","link"].includes(k))return"link";if(k==="tease")return"tease";if(k==="browse")return"browse";return"talk"}
+function badgeLabel(item:EditorialItem){const k=itemKind(item);if(k==="music")return"Nummer";if(k==="commercial")return"Reclame";if(k==="traffic")return"Verkeer";if(k==="weather")return"Weer";if(k==="news")return"Nieuws";if(k==="browse")return"Browse List";if(k==="tease")return"Tease";if(["imaging","promo","link"].includes(k))return"Jingle";return k==="talk"?"Talk":broadPlaylistLabel(k)}
 function manualType(slot:EditorialTemplateSlot):EditorialType{
   if(slot.type==="tease")return"tease";
   if(slot.type==="browse")return"browse";
@@ -69,17 +54,7 @@ function manualType(slot:EditorialTemplateSlot):EditorialType{
   return"talk";
 }
 
-function generalPlaylistType(item:EditorialItem){
-  if(item.type==="music")return"music";
-  if(item.type==="commercial")return"commercial";
-  if(item.type==="news")return"news";
-  if(item.type==="weather")return"weather";
-  if(item.type==="traffic")return"traffic";
-  if(item.type==="tease")return"tease";
-  if(item.type==="browse")return"browse";
-  if(["imaging","promo","link"].includes(item.type))return"jingle";
-  return"talk";
-}
+function generalPlaylistType(item:EditorialItem){const k=itemKind(item);return ["imaging","promo","link"].includes(k)?"jingle":k}
 
 export default function EditorialPlaylistWorkspace(props:Props){
   const{stationName,stationSlug,date,setDate,hour,setHour,playlist,setPlaylist,onPull,playlistVersion}=props;
@@ -163,11 +138,11 @@ export default function EditorialPlaylistWorkspace(props:Props){
       if(slot.type==="category"&&slot.categoryKey){
         item=consume(candidate=>slot.categoryKey===`general::${generalPlaylistType(candidate)}`);
       }else if(slot.type==="number"){
-        item=consume(candidate=>candidate.type==="music");
+        item=consume(candidate=>itemKind(candidate)==="music");
       }else if(slot.type==="commercial"){
-        item=consume(candidate=>candidate.type==="commercial");
+        item=consume(candidate=>itemKind(candidate)==="commercial");
       }else if(slot.type==="link"){
-        item=consume(candidate=>["link","imaging","promo"].includes(candidate.type));
+        item=consume(candidate=>["link","imaging","promo"].includes(itemKind(candidate)));
       }
 
       if(item){
@@ -251,8 +226,8 @@ export default function EditorialPlaylistWorkspace(props:Props){
         <div className="topplaylist-list">
           {visible.length===0&&<div className="topplaylist-empty"><strong>Nog niets zichtbaar</strong><span>Haal de echte Rotation One-playlist op of pas een redactietemplate toe.</span></div>}
           {visible.map(item=>{
-            const isTalk=!["music","commercial","imaging","promo","link"].includes(item.type);
-            const isYellow=["commercial","imaging","promo","link"].includes(item.type);
+            const kind=itemKind(item);\n            const isTalk=!["music","commercial","imaging","promo","link"].includes(kind);
+            const isYellow=["commercial","imaging","promo","link"].includes(kind);
             const sec=durationSeconds(item.duration);
             return <div key={item.id}
               className={`topplaylist-row ${isTalk?"talk-row":isYellow?"link-row":"music-row"} ${selectedId===item.id?"selected":""}`}

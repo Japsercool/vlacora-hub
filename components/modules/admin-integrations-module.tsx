@@ -4,13 +4,13 @@ import { useEffect,useMemo,useState } from "react";
 import { isSupabaseBrowserConfigured } from "@/lib/supabase/client";
 import { syncSharedPlayoutStations,syncSharedRotationStations } from "@/lib/supabase/hub-data";
 import {
-  CONFIG_KEY,readIntegrationStore,readSecret,saveStationCache,sessionKey,writeIntegrationStore,
+  CONFIG_KEY,mergeStationCache,readIntegrationStore,readSecret,saveStationCache,sessionKey,writeIntegrationStore,
   type ClientIntegrationConfig,type IntegrationKind,type IntegrationStore,type Protocol
 } from "@/lib/radio/client-config";
 import {
   loadSharedIntegrationStore,loadSharedSetting,saveSharedIntegrationStore,saveSharedSetting
 } from "@/lib/supabase/settings";
-import { deletePersistedIntegrationSecret,hydrateIntegrationSecret,migrateSessionSecretToVault,savePersistedIntegrationSecret } from "@/lib/supabase/secrets";
+import { deletePersistedIntegrationSecret,hydrateIntegrationSecret,migrateSessionSecretToVault,savePersistedIntegrationSecret } from "@/lib/supabase/secrets";\nimport { readStationAliases,saveStationAlias } from "@/lib/radio/hub-stations";
 
 type StationSettings={timezone:string;active:boolean;playlistWarnings:boolean;newsCheck:boolean;socialReminders:boolean};
 
@@ -37,7 +37,7 @@ export default function AdminIntegrationsModule({stationName,stationSlug}:{stati
   const[busy,setBusy]=useState(false);
   const[diagnostic,setDiagnostic]=useState<any>(null);
   const[loaded,setLoaded]=useState(false);
-  const[secretState,setSecretState]=useState<"idle"|"loading"|"stored"|"session"|"none">("idle");
+  const[secretState,setSecretState]=useState<"idle"|"loading"|"stored"|"session"|"none">("idle");\n  const[localStationName,setLocalStationName]=useState(stationName);\n  const[localStationShort,setLocalStationShort]=useState("");
   const supabaseConfigured=useMemo(()=>isSupabaseBrowserConfigured(),[]);
   const cfg=selected?configs[selected]:null;
 
@@ -59,7 +59,7 @@ export default function AdminIntegrationsModule({stationName,stationSlug}:{stati
         }
       }
       if(!alive)return;
-      setConfigs(merged);writeIntegrationStore(merged);setLoaded(true);
+      setConfigs(merged);writeIntegrationStore(merged);const alias=readStationAliases()[stationSlug];setLocalStationName(alias?.name||stationName);setLocalStationShort(alias?.short||"");setLoaded(true);
       if(supabaseConfigured){
         void Promise.all((["rotation","playout","shoutcast"] as IntegrationKind[]).map(kind=>migrateSessionSecretToVault(kind))).catch(()=>{});
       }
@@ -121,10 +121,7 @@ export default function AdminIntegrationsModule({stationName,stationSlug}:{stati
     finally{setBusy(false)}
   }
   async function saveStationSettings(){
-    try{
-      if(supabaseConfigured){await saveSharedSetting(`station:${stationSlug}`,"station-settings",stationSettings);flash("Stationinstellingen centraal opgeslagen")}
-      else{localStorage.setItem(`vlacora:station-settings:${stationSlug}`,JSON.stringify(stationSettings));flash("Stationinstellingen lokaal opgeslagen")}
-    }catch(e){flash(e instanceof Error?e.message:"Opslaan mislukt")}
+    try{saveStationAlias(stationSlug,{name:localStationName,short:localStationShort});if(supabaseConfigured){await Promise.all([saveSharedSetting(`station:${stationSlug}`,"station-settings",stationSettings),saveSharedSetting(`station:${stationSlug}`,"station-alias",{name:localStationName.trim(),short:localStationShort.trim().toUpperCase().slice(0,4)})]);flash("Stationinstellingen en VLACORA-naam opgeslagen")}else{localStorage.setItem(`vlacora:station-settings:${stationSlug}`,JSON.stringify(stationSettings));flash("Stationinstellingen en lokale naam opgeslagen")}}catch(e){flash(e instanceof Error?e.message:"Opslaan mislukt")}
   }
   async function clearSecret(){
     if(!selected)return;
@@ -157,7 +154,7 @@ export default function AdminIntegrationsModule({stationName,stationSlug}:{stati
       if(action==="stations"){
         const read=await fetch("/api/radio/manual/read",{method:"POST",cache:"no-store",headers:{"Content-Type":"application/json","Cache-Control":"no-cache"},body:JSON.stringify({kind,action:"stations",path:c.stationPath,config:c,apiKey:secret,apiKeyHeader:header,apiKeyPrefix:prefix,requestId:`admin-${Date.now()}`})});
         const list=await read.json();if(!read.ok)throw new Error(list.error||"Stations ophalen mislukt");
-        saveStationCache(kind,list.stations||[]);if(kind==="rotation")await syncSharedRotationStations(list.stations||[]).catch(()=>{});if(kind==="playout")await syncSharedPlayoutStations(list.stations||[]).catch(()=>{});
+        const incoming=list.stations||[];if(kind==="rotation"){saveStationCache(kind,incoming);await syncSharedRotationStations(incoming).catch(()=>{})}if(kind==="playout"&&incoming.length){const merged=mergeStationCache("playout",incoming);await syncSharedPlayoutStations(merged).catch(()=>{})}
       }
       const changed={...configs,[kind]:{...configs[kind],enabled:true,lastOk:new Date().toLocaleString("nl-BE"),lastError:""}};
       setConfigs(changed);writeIntegrationStore(changed);
@@ -178,7 +175,7 @@ export default function AdminIntegrationsModule({stationName,stationSlug}:{stati
     <div className="settings-grid admin-v8-grid">
       <div className="card">
         <h3>Stationinstellingen</h3>
-        <label className="field">Naam<input className="input" value={stationName} disabled/></label>
+        <label className="field">VLACORA naam<input className="input" value={localStationName} onChange={e=>setLocalStationName(e.target.value)} placeholder={stationName}/><small>Alleen de naam in VLACORA. Rotation One blijft ongewijzigd.</small></label><label className="field">Korte naam / badge<input className="input" maxLength={4} value={localStationShort} onChange={e=>setLocalStationShort(e.target.value.toUpperCase())} placeholder="bv. VH"/></label>
         <label className="field">Tijdzone<select className="select" value={stationSettings.timezone} onChange={e=>setStationSettings({...stationSettings,timezone:e.target.value})}><option>Europe/Brussels</option><option>Europe/Amsterdam</option></select></label>
         <label className="toggle-row"><div><strong>Actief station</strong><small>Toon in VLACORA</small></div><input type="checkbox" checked={stationSettings.active} onChange={e=>setStationSettings({...stationSettings,active:e.target.checked})}/></label>
         <button className="primary wide" onClick={saveStationSettings}>Stationinstellingen opslaan</button>

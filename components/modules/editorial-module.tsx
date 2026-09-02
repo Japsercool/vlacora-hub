@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { MusicSong } from "@/components/modules/music-library-module";
 import { useHubStation } from "@/lib/radio/hub-stations";
-import { pathFor,radioRead,readIntegration,readMappings,readSecret,readStationCache,saveMappings,saveStationCache,type RadioMappingStore,type RadioStation } from "@/lib/radio/client-config";
+import { discoverPlayoutStations,mergeStationCache,pathFor,radioRead,readIntegration,readMappings,readSecret,readStationCache,saveMappings,saveStationCache,type RadioMappingStore,type RadioStation } from "@/lib/radio/client-config";
 import { emitActivity } from "@/lib/collaboration/activity";
 import { hydrateSharedIntegrationSettings,loadSharedRadioMapping,saveSharedRadioMapping } from "@/lib/supabase/settings";
 import { hydrateIntegrationSecret } from "@/lib/supabase/secrets";
@@ -37,6 +37,11 @@ export type EditorialItem = {
   musicCategory?: string;
   playlistCategory?: string;
   subtype?: string;
+  rawType?: string;
+  externalKind?: string;
+  airTimeUtc?: string;
+  sourceHourStartUtc?: string;
+  isSweeper?: boolean;
 };
 type TemplateBlock = {
   id: string;
@@ -153,6 +158,8 @@ export default function EditorialModule({stationSlug}:{stationSlug:string}) {
   const [programmingPrograms,setProgrammingPrograms] = useState<{name:string;host:string}[]>([]);
   const [busy,setBusy] = useState(false);
   const [workspaceReady,setWorkspaceReady] = useState(false);
+  const [manualPlayoutId,setManualPlayoutId] = useState("");
+  const [manualPlayoutName,setManualPlayoutName] = useState("");
   useEffect(()=>{
     let alive=true;
     const refreshCaches=()=>{setRotationStations(readStationCache("rotation"));setPlayoutStations(readStationCache("playout"))};
@@ -162,7 +169,7 @@ export default function EditorialModule({stationSlug}:{stationSlug:string}) {
       const local=readMappings();const next=shared?{...local,[station.slug]:{...local[station.slug],...shared}}:local;setMappingsState(next);if(shared)saveMappings(next);
       if(readStationCache("playout").length===0){const sharedPlayout=await loadSharedPlayoutStations().catch(()=>[]);if(sharedPlayout.length)saveStationCache("playout",sharedPlayout)}
       refreshCaches();
-      const pc=readIntegration("playout");if(!readSecret("playout").apiKey)await hydrateIntegrationSecret("playout").catch(()=>null);if(pc?.host&&readStationCache("playout").length===0&&readSecret("playout").apiKey){try{const result=await radioRead("playout",pc.stationPath,"stations");saveStationCache("playout",result.stations||[]);await syncSharedPlayoutStations(result.stations||[]).catch(()=>{});refreshCaches()}catch{}}
+      const pc=readIntegration("playout");if(!readSecret("playout").apiKey)await hydrateIntegrationSecret("playout").catch(()=>null);if(pc?.host&&readStationCache("playout").length===0&&readSecret("playout").apiKey){try{const result=await discoverPlayoutStations();if(result.stations.length){saveStationCache("playout",result.stations);await syncSharedPlayoutStations(result.stations).catch(()=>{});refreshCaches()}}catch{}}
     })();
     const loadPrograms=()=>{try{const raw=localStorage.getItem(`vlacora:${station.slug}:programming:v10`);const items=raw?JSON.parse(raw):[];setProgrammingPrograms(Array.isArray(items)?items.filter((x:any)=>x?.active!==false).map((x:any)=>({name:String(x.name||"Programma"),host:String(x.host||"")})):[])}catch{setProgrammingPrograms([])}};
     loadPrograms();window.addEventListener("vlacora:programming-changed",loadPrograms as EventListener);window.addEventListener("vlacora:hub-stations-changed",refreshCaches as EventListener);return()=>{alive=false;window.removeEventListener("vlacora:programming-changed",loadPrograms as EventListener);window.removeEventListener("vlacora:hub-stations-changed",refreshCaches as EventListener)};
@@ -244,14 +251,16 @@ async function fetchPlayoutStations(){
     await hydrateSharedIntegrationSettings(station.slug).catch(()=>false);
     const pc=readIntegration("playout");if(!pc?.host)throw new Error("Playout One is nog niet ingesteld.");
     if(!readSecret("playout").apiKey)await hydrateIntegrationSecret("playout").catch(()=>null);
-    if(!readSecret("playout").apiKey)throw new Error("Playout One Bearer API-key is nog niet centraal opgeslagen. Vul hem één keer in bij Beheer → Integraties en klik Opslaan.");
-    const result=await radioRead("playout",pc.stationPath,"stations");const list=result.stations||[];
-    setPlayoutStations(list);saveStationCache("playout",list);await syncSharedPlayoutStations(list).catch(()=>{});
-    flash(`${list.length} Playout One station(s) vers opgehaald`);
-  }catch(e){
-    const m=e instanceof Error?e.message:"Playout stations ophalen mislukt";
-    flash(m.includes("401")?"HTTP 401: controleer de Playout One Bearer API-key.":m);
-  }finally{setBusy(false)}
+    if(!readSecret("playout").apiKey)throw new Error("Playout One Bearer API-key is nog niet centraal opgeslagen.");
+    const result=await discoverPlayoutStations(),list=result.stations;
+    if(list.length){setPlayoutStations(list);saveStationCache("playout",list);await syncSharedPlayoutStations(list).catch(()=>{})}
+    flash(result.usedCache?`Hub gaf nu geen stations. ${list.length} laatst bekende station(s) behouden.`:`${list.length} Playout One station(s) opgehaald`);
+  }catch(e){const m=e instanceof Error?e.message:"Playout stations ophalen mislukt";flash(m.includes("401")?"HTTP 401: API-key moet minstens stations.read (of legacy monitor) hebben.":m)}
+  finally{setBusy(false)}
+}
+async function connectManualPlayout(){
+ const id=manualPlayoutId.trim();if(!id)return flash("Vul eerst een Playout station-ID in, bv. hits.");
+ const s:RadioStation={id,name:manualPlayoutName.trim()||id},list=mergeStationCache("playout",[s]);setPlayoutStations(list);await syncSharedPlayoutStations([s]).catch(()=>{});setMapping({playoutId:id,playoutName:s.name});flash(`Playout ${s.name} gekoppeld`);
 }
 async function testConnections(){
   try{await hydrateSharedIntegrationSettings(station.slug).catch(()=>false);const rc=readIntegration("rotation"),pc=readIntegration("playout"),sc=readIntegration("shoutcast");const parts:string[]=[];if(rc?.host){await radioRead("rotation",rc.statusPath,"raw");parts.push("Rotation online")}else parts.push("Rotation niet ingesteld");if(pc?.host){await radioRead("playout",pc.statusPath,"raw");parts.push("Playout online")}else parts.push("Playout niet ingesteld");if(sc?.host){const s=await radioRead("shoutcast",sc.statusPath||"/stats?sid=1&json=1","raw");const raw=s.raw||{};const x=raw.streams?.[0]||raw.stream||raw.stats||raw;const listeners=Number(x.currentlisteners??x.currentListeners??x.listeners??0);parts.push(`SHOUTcast online${Number.isFinite(listeners)?` • ${listeners} luisteraar(s)`:""}`)}else parts.push("SHOUTcast niet ingesteld");setLastStatus(parts.join(" • "));flash(parts.join(" • "))}catch(e){setLastStatus(e instanceof Error?e.message:"Statuscontrole mislukt");flash(e instanceof Error?e.message:"Statuscontrole mislukt")}
@@ -295,7 +304,7 @@ async function testConnections(){
         <div className="module-title-row"><div><h3>Station mapping</h3><small>VLACORA herkent welk station bij welke API-station-ID hoort.</small></div></div>
         <label className="field">VLACORA station<input className="input" value={station.name} disabled/></label>
         <label className="field">Rotation One station<select className="select" value={mapping.rotationId} onChange={e=>{const x=rotationStations.find(s=>s.id===e.target.value);setMapping({rotationId:e.target.value,rotationName:x?.name||""})}}><option value="">Niet gekoppeld</option>{rotationStations.map(s=><option key={s.id} value={s.id}>{s.name} • {s.id}</option>)}</select></label>
-        <label className="field">Playout One station<select className="select" value={mapping.playoutId} onChange={e=>{const x=playoutStations.find(s=>s.id===e.target.value);setMapping({playoutId:e.target.value,playoutName:x?.name||""})}}><option value="">Niet gekoppeld</option>{playoutStations.map(s=><option key={s.id} value={s.id}>{s.name} • {s.id}</option>)}</select></label>
+        <label className="field">Playout One station<select className="select" value={mapping.playoutId} onChange={e=>{const x=playoutStations.find(s=>s.id===e.target.value);setMapping({playoutId:e.target.value,playoutName:x?.name||""})}}><option value="">Niet gekoppeld</option>{playoutStations.map(s=><option key={s.id} value={s.id}>{s.name} • {s.id}</option>)}</select></label><div className="manual-playout-link"><div><input className="input" value={manualPlayoutId} onChange={e=>setManualPlayoutId(e.target.value)} placeholder="Station-ID, bv. hits"/><input className="input" value={manualPlayoutName} onChange={e=>setManualPlayoutName(e.target.value)} placeholder="Naam (optioneel)"/></div><button className="ghost" onClick={()=>void connectManualPlayout()}>Koppel station-ID</button><small>Fallback wanneer de Hub tijdelijk geen stationlijst toont.</small></div>
         {rotationStations.length===0&&<p className="muted">Geen Rotation One-stations in cache. Ga naar Beheer → Integraties → Rotation One → Stations ophalen.</p>}
         {playoutStations.length===0&&<div className="mapping-warning"><strong>Geen Playout One-stations zichtbaar</strong><span>{readIntegration("playout")?.host?(readSecret("playout").apiKey?"De API-key is aanwezig, maar de stationslijst is nog niet opgehaald.":"Playout One is ingesteld, maar de Bearer API-key is nog niet centraal opgeslagen."):"Playout One is nog niet ingesteld."}</span><button className="ghost" onClick={fetchPlayoutStations}>↻ Playout stations ophalen</button></div>}
         <div className="mapping-service-block"><div className="mapping-service-head"><strong>SHOUTcast voor {station.name}</strong><span className={`mapping-pill ${readIntegration("shoutcast")?.host?"ok":"off"}`}>{readIntegration("shoutcast")?.host?"INGESTELD":"NIET INGESTELD"}</span></div>{readIntegration("shoutcast")?.host?<code className="mapping-endpoint">{`${readIntegration("shoutcast")?.protocol}://${readIntegration("shoutcast")?.host}:${readIntegration("shoutcast")?.port}${readIntegration("shoutcast")?.basePath||""}${readIntegration("shoutcast")?.statusPath||""}`}</code>:<small>Stel de SHOUTcast host, poort en SID per station in via Beheer → Integraties.</small>}</div>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect,useMemo,useState } from "react";
-import type { EditorialItem } from "@/components/modules/editorial-module";
+import type { EditorialItem } from "@/components/modules/editorial-module";\nimport { canonicalPlaylistType } from "@/lib/radio/item-types";
 import { deleteEditorialTemplate,loadEditorialTemplates,saveEditorialTemplate,type EditorialTemplateAssignment,type EditorialTemplateRecord,type EditorialTemplateSlot } from "@/lib/supabase/editorial";
 import { isSupabaseBrowserConfigured } from "@/lib/supabase/client";
 
@@ -27,17 +27,7 @@ const GENERAL_PLAYLIST_TYPES=[
   {key:"browse",label:"Browse list"}
 ] as const;
 
-function generalPlaylistType(item:EditorialItem){
-  if(item.type==="music")return"music";
-  if(item.type==="commercial")return"commercial";
-  if(item.type==="news")return"news";
-  if(item.type==="weather")return"weather";
-  if(item.type==="traffic")return"traffic";
-  if(item.type==="tease")return"tease";
-  if(item.type==="browse")return"browse";
-  if(["imaging","promo","link"].includes(item.type))return"jingle";
-  return"talk";
-}
+function generalPlaylistType(item:EditorialItem){const k=canonicalPlaylistType({type:item.type,rawType:(item as any).rawType,category:(item as any).category,externalKind:(item as any).externalKind,artist:item.artist,musicId:item.musicId,isSweeper:(item as any).isSweeper});return["imaging","promo","link"].includes(k)?"jingle":k}
 
 function derivePlaylistCategories(playlist:EditorialItem[]):PlaylistCategoryOption[]{
   const counts=new Map<string,PlaylistCategoryOption>();

@@ -19,12 +19,13 @@ import IncidentModule,{IncidentSummaryCard} from "@/components/modules/incident-
 import TemplatesModule from "@/components/modules/templates-module";
 import ShoutcastStatsModule,{ListenerNowCard} from "@/components/modules/shoutcast-stats-module";
 import { hydrateSharedIntegrationSettings } from "@/lib/supabase/settings";
-import { HUB_STATIONS_EVENT, allHubStation, readHubStations, type HubStation } from "@/lib/radio/hub-stations";
+import { HUB_STATIONS_EVENT, allHubStation, readHubStations, saveStationAlias, type HubStation, type HubStationAlias } from "@/lib/radio/hub-stations";
 import AccountWidget from "@/components/auth/account-widget";
 import { loadSharedRotationStations } from "@/lib/supabase/hub-data";
 import { saveStationCache } from "@/lib/radio/client-config";
 import { CollaborationProvider,useCollaboration } from "@/components/collaboration/collaboration-provider";
 import {
+import { loadSharedSetting } from "@/lib/supabase/settings";
   MandatoryNotificationModal,NotificationBell,NotificationDrawer,NotificationsPage,
   PresenceButton,PresencePanel,TodayCollaboration
 } from "@/components/collaboration/collaboration-ui";
@@ -94,7 +95,7 @@ function HubAppInner({ stationSlug, moduleSlug }: Props) {
     window.addEventListener("storage",refresh);
     return()=>{alive=false;window.removeEventListener(HUB_STATIONS_EVENT,refresh as EventListener);window.removeEventListener("storage",refresh)};
   },[]);
-  useEffect(()=>{void hydrateSharedIntegrationSettings(stationSlug)},[stationSlug]);
+  useEffect(()=>{void hydrateSharedIntegrationSettings(stationSlug)},[stationSlug]);\n  useEffect(()=>{if(stationSlug==="all")return;void loadSharedSetting<HubStationAlias>(`station:${stationSlug}`,"station-alias").then(a=>{if(a?.name||a?.short)saveStationAlias(stationSlug,a)}).catch(()=>{})},[stationSlug]);
   const station = hubStations.find((s) => s.slug === stationSlug) || (stationSlug==="all"?allHubStation():{slug:stationSlug,name:"Station laden…",short:"…",accent:"#26269f",source:"rotation" as const});
   const storagePrefix = `vlacora:${stationSlug}`;
 

@@ -1,3 +1,5 @@
+import { canonicalPlaylistType } from "@/lib/radio/item-types";
+
 export type NormalizedStation = {
   id: string;
   name: string;
@@ -17,6 +19,12 @@ export type NormalizedPlaylistItem = {
   source: "Rotation One" | "Playout One" | "VLACORA";
   locked?: boolean;
   musicId?: string;
+  category?: string;
+  rawType?: string;
+  externalKind?: string;
+  airTimeUtc?: string;
+  sourceHourStartUtc?: string;
+  isSweeper?: boolean;
   raw?: unknown;
 };
 
@@ -51,6 +59,14 @@ function clock(value: any) {
   const m = s.match(/(\d{1,2}:\d{2}(?::\d{2})?)/);
   return m ? m[1] : s;
 }
+function scheduleClock(value:any){
+  const s=String(value||"");if(!s)return"";
+  if(/T/.test(s)&&/(Z|[+-]\d{2}:?\d{2})$/i.test(s)){
+    const d=new Date(s);
+    if(!Number.isNaN(d.getTime()))return new Intl.DateTimeFormat("nl-BE",{timeZone:"Europe/Brussels",hour:"2-digit",minute:"2-digit",hour12:false}).format(d);
+  }
+  return clock(s).slice(0,5);
+}
 
 export function normalizeStations(body: unknown): NormalizedStation[] {
   return arrayCandidate(body, ["stations","Stations","data","Data","items","Items","results","Results"]).map((value,index)=>{
@@ -66,34 +82,30 @@ export function normalizePlaylist(body: unknown) {
   const root=rec(body);
   const arr=arrayCandidate(body,["items","Items","playlist","Playlist","entries","Entries","data","Data"]);
   const version=first(root,["version","Version","playlistVersion","PlaylistVersion","revision","Revision"],undefined);
-  return {
-    version,
-    items:arr.map((value,index)=>{
-      const obj=rec(value);
-      const artist=String(first(obj,["artist","Artist","artistName","ArtistName","performer","Performer"],""));
-      const title=String(first(obj,["title","Title","name","Name","trackTitle","TrackTitle"],artist?"Onbekende titel":"Item"));
-      const rawType=String(first(obj,["type","Type","itemType","ItemType","category","Category"],artist?"music":"item")).toLowerCase();
-      const type=rawType.includes("music")||rawType.includes("song")?"music":
-        rawType.includes("commercial")||rawType.includes("advert")?"commercial":
-        rawType.includes("news")?"news":
-        rawType.includes("jingle")||rawType.includes("imaging")||rawType.includes("sweeper")?"imaging":
-        rawType.includes("promo")?"promo":rawType||"item";
-      return {
-        id:String(first(obj,["id","Id","itemId","ItemId","playlistItemId","PlaylistItemId","guid","Guid"],`item-${index}`)),
-        time:clock(first(obj,["time","Time","scheduledAt","ScheduledAt","startTime","StartTime","plannedAt","PlannedAt"],"")),
-        type,
-        artist:artist||undefined,
-        title,
-        duration:duration(first(obj,["duration","Duration","durationSeconds","DurationSeconds","length","Length"],0)),
-        presenterText:String(first(obj,["presenterText","PresenterText","editorialText","EditorialText","text","Text"],"")),
-        notes:String(first(obj,["notes","Notes","comment","Comment","categoryName","CategoryName"],"")),
-        source:"Rotation One" as const,
-        locked:["commercial","news"].includes(type)||Boolean(first(obj,["locked","Locked","isLocked","IsLocked"],false)),
-        musicId:first(obj,["musicId","MusicId","trackId","TrackId","databaseId","DatabaseId"],undefined)?.toString(),
-        raw:value
-      };
-    })
-  };
+  return{version,items:arr.map((value,index)=>{
+    const obj=rec(value);
+    const artist=String(first(obj,["artist","Artist","artistName","ArtistName","performer","Performer"],""));
+    const title=String(first(obj,["title","Title","name","Name","trackTitle","TrackTitle"],artist?"Onbekende titel":"Item"));
+    const rawType=String(first(obj,["type","Type","itemType","ItemType"],""));
+    const category=String(first(obj,["category","Category","categoryName","CategoryName"],""));
+    const externalKind=String(first(obj,["externalKind","ExternalKind"],""));
+    const songId=first(obj,["songId","SongId","musicId","MusicId","trackId","TrackId","databaseId","DatabaseId"],undefined);
+    const isSweeper=Boolean(first(obj,["isSweeper","IsSweeper"],false));
+    const type=canonicalPlaylistType({rawType,category,externalKind,artist,songId,isSweeper});
+    const airTime=first(obj,["airTimeUtc","AirTimeUtc","airTime","AirTime","scheduledAt","ScheduledAt","startTime","StartTime","plannedAt","PlannedAt","start","Start","time","Time"],"");
+    const sourceHour=first(obj,["sourceHourStartUtc","SourceHourStartUtc","sourceHourStart","SourceHourStart"],"");
+    return{
+      id:String(first(obj,["id","Id","itemId","ItemId","playlistItemId","PlaylistItemId","guid","Guid"],`item-${index}`)),
+      time:scheduleClock(airTime),type,artist:artist||undefined,title,
+      duration:duration(first(obj,["duration","Duration","durationSeconds","DurationSeconds","length","Length"],0)),
+      presenterText:String(first(obj,["presenterText","PresenterText","editorialText","EditorialText","text","Text"],"")),
+      notes:String(first(obj,["notes","Notes","comment","Comment"],category||externalKind||"")),
+      source:"Rotation One" as const,
+      locked:["commercial","news"].includes(type)||Boolean(first(obj,["locked","Locked","isLocked","IsLocked"],false)),
+      musicId:songId==null?undefined:String(songId),category:category||undefined,rawType:rawType||undefined,externalKind:externalKind||undefined,
+      airTimeUtc:airTime?String(airTime):undefined,sourceHourStartUtc:sourceHour?String(sourceHour):undefined,isSweeper,raw:value
+    };
+  })};
 }
 
 export function normalizeNow(body: unknown) {
