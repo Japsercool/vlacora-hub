@@ -1129,3 +1129,13 @@ Deze versie is veilig als pure UI-refresh.
 - In **Redactietemplates** kun je nu ook meteen zulke vaste talks toevoegen en via **Toewijzingen** koppelen aan een bepaalde weekdag en uur.
 
 Geen databasewijzigingen. Geen API-wijzigingen.
+
+
+## 0.19.2 — playlist dichter bij TOPplaylist + template bovenaan
+
+- De playlistweergave is opnieuw dichter gebracht bij de screenshot van **TOPplaylist**.
+- **Template kiezen** staat nu duidelijk **bovenaan** de playlist in plaats van naast het uurblok.
+- De actiebalk staat niet meer als storende rechterkolom, maar **onderaan** de playlist.
+- De lijst zelf krijgt opnieuw meer ruimte en een rustiger, cleaner overzicht.
+
+Geen databasewijzigingen. Geen API-wijzigingen.

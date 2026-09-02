@@ -71,6 +71,7 @@ export default function EditorialPlaylistWorkspace(props:Props){
   const[selectedId,setSelectedId]=useState("");
   const[live,setLive]=useState(false);
   const[dragId,setDragId]=useState("");
+  const[templates,setTemplates]=useState<EditorialTemplateRecord[]>([]);
   const[template,setTemplate]=useState<EditorialTemplateRecord|null>(null);
   const[templateMessage,setTemplateMessage]=useState("");
   const hourNumber=Number(hour.slice(0,2));
@@ -81,11 +82,12 @@ export default function EditorialPlaylistWorkspace(props:Props){
       try{
         const all=await loadEditorialTemplates(stationSlug);
         if(!alive)return;
+        setTemplates(all.filter(t=>t.active));
         const weekday=new Date(`${date}T12:00:00`).getDay();
         const match=all.find(t=>t.active&&t.assignments.some(a=>Number(a.weekday)===weekday&&Number(a.hour)===hourNumber));
-        setTemplate(match||null);
+        setTemplate(match||all.find(t=>t.active)||null);
         setTemplateMessage(match?`${match.name} • ${match.sequence.length} slots`:"Geen redactietemplate toegewezen aan dit uur");
-      }catch{if(alive){setTemplate(null);setTemplateMessage("Templates konden niet geladen worden")}}
+      }catch{if(alive){setTemplates([]);setTemplate(null);setTemplateMessage("Templates konden niet geladen worden")}}
     })();
     return()=>{alive=false};
   },[stationSlug,date,hourNumber]);
@@ -99,6 +101,12 @@ export default function EditorialPlaylistWorkspace(props:Props){
 
   const hidden=Math.max(0,playlist.length-visible.length);
   const selected=playlist.find(x=>x.id===selectedId);
+
+  function chooseTemplate(value:string){
+    const next=templates.find(x=>x.id===value)||null;
+    setTemplate(next);
+    setTemplateMessage(next?`${next.name} • ${next.sequence.length} slots`:"Geen redactietemplate geselecteerd");
+  }
 
   function toggleFilter(key:string){
     const next=new Set(enabled);
@@ -220,9 +228,19 @@ export default function EditorialPlaylistWorkspace(props:Props){
       {filters.map(f=><button key={f.key} className={`filter-chip filter-${f.key} ${enabled.has(f.key)?"active":"muted"}`} onClick={()=>toggleFilter(f.key)}>{f.label}</button>)}
     </div>
 
-    <div className="topplaylist-templatebar">
-      <div><strong>{template?template.name:"Geen uurtemplate"}</strong><span>{syncLabel||templateMessage}</span></div>
-      <div className="button-row"><button className="ghost" onClick={()=>void onPull()}>↻ Rotation One</button><button className="primary soft" disabled={!template} onClick={applyTemplate}>Sjabloon toepassen</button><span className="version-badge">rev {playlistVersion}</span></div>
+    <div className="topplaylist-templatebar topplaylist-templatebar-top">
+      <div className="template-picker-block">
+        <label className="template-picker-label">Template bovenaan</label>
+        <div className="template-picker-row">
+          <select className="template-picker" value={template?.id||""} onChange={e=>chooseTemplate(e.target.value)}>
+            <option value="">Geen template</option>
+            {templates.map(t=><option key={t.id} value={t.id}>{t.name}</option>)}
+          </select>
+          <button className="primary soft" disabled={!template} onClick={applyTemplate}>Sjabloon toepassen</button>
+        </div>
+        <span className="template-picker-meta">{syncLabel||templateMessage}</span>
+      </div>
+      <div className="button-row"><button className="ghost" onClick={()=>void onPull()}>↻ Rotation One</button><span className="version-badge">rev {playlistVersion}</span></div>
     </div>
 
     <div className="topplaylist-main">

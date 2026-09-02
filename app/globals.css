@@ -1181,3 +1181,25 @@ hr{border:0;border-top:1px solid var(--border);margin:22px 0}
 .template-hour-hint{margin:8px 0 0;color:#67708b;font-size:13px}
 .special-talk-buttons{margin-top:8px}
 @media(max-width:1050px){.topplaylist-main{grid-template-columns:1fr}.topplaylist-actions{border-left:0;border-top:1px solid var(--border);flex-direction:row;flex-wrap:wrap}.topplaylist-side-info{margin-top:0;width:auto}.talk-row-inner{grid-template-columns:22px 60px auto 1fr auto auto}.talk-row-inner>.slot-kind,.talk-row-inner>.slot-duration,.talk-row-inner>.row-icon{display:none}.talk-content-panel{grid-column:1/-1}.topplaylist-header{grid-template-columns:1fr auto}.topplaylist-date-nav{grid-row:2;grid-column:1/-1}.station-bubble{grid-column:2}.topplaylist-date-label{grid-column:1/-1}.topplaylist-searchrow{flex-wrap:wrap}}
+
+
+/* VLACORA 0.19.2 — closer TOPplaylist restore with template chooser on top */
+.topplaylist-templatebar-top{display:flex;justify-content:space-between;align-items:flex-end;gap:18px;padding:14px 24px;background:#fff;border-bottom:1px solid var(--border)}
+.template-picker-block{display:grid;gap:8px}
+.template-picker-label{font-size:13px;font-weight:800;color:#6f7390;text-transform:uppercase;letter-spacing:.06em}
+.template-picker-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.template-picker{min-width:300px;min-height:46px;padding:0 14px;border:1px solid var(--border);border-radius:16px;background:#fff;color:#1f2338;font-weight:700}
+.template-picker-meta{color:#727895;font-size:14px}
+.topplaylist-main{display:block}
+.topplaylist-center{display:block}
+.topplaylist-actions{display:flex;flex-wrap:wrap;gap:10px;padding:16px 24px;border-top:1px solid var(--border);border-left:0;background:#fff}
+.topplaylist-actions .topplaylist-side-info{flex:1 1 280px;min-width:280px}
+.topplaylist-list{padding:14px 24px 28px;background:transparent}
+.topplaylist-row{border-radius:22px;margin:10px 0;overflow:hidden}
+.music-row,.link-row{grid-template-columns:110px 1fr auto auto;padding:0 20px;min-height:62px}
+.music-row .row-time,.link-row .row-time{font-size:18px}
+.topplaylist-searchrow{padding:14px 24px;background:#fff;border-bottom:1px solid var(--border)}
+.topplaylist-hourbar{padding:12px 24px;background:#fff}
+.topplaylist-filters{padding:14px 24px;background:#fff}
+.add-talk-after{width:42px;height:42px;font-size:22px;font-weight:700}
+@media(max-width:900px){.topplaylist-templatebar-top{align-items:stretch;flex-direction:column}.template-picker{width:100%;min-width:0}.topplaylist-list{padding:10px 12px 22px}.music-row,.link-row{grid-template-columns:78px 1fr auto auto;padding:0 14px}.music-row .row-time,.link-row .row-time{font-size:16px}}

@@ -1,4 +1,4 @@
-VLACORA HUB 0.19.1
-Playlist style partly rolled back to the cleaner 0.18.5 layout.
-Improved add-talk plus button alignment.
-Added quick actions for sold/sponsored talks and contest talks in playlist and template studio.
+VLACORA HUB 0.19.2
+Playlist restored closer to the cleaner TOPplaylist reference.
+Template chooser moved to the top of the playlist view.
+Playlist actions moved below the list instead of a right sidebar.
