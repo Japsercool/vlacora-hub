@@ -1,2 +1,2 @@
-VLACORA HUB 0.18.2
-Playout One live monitor, real Messenger users, logical-hour Rotation playlists, editable SHOUTcast SID/endpoint, and selectable music meetings with song adding/reviews.
+VLACORA HUB 0.18.3
+Build fix: Playout One imports loadSharedRadioMapping from lib/supabase/settings, where it is actually exported.

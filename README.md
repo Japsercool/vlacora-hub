@@ -1036,3 +1036,11 @@ zijn chatmembership wordt ook verwijderd en een verweesde directe chat wordt aut
 - realtime centrale opslag
 
 Production migrations voor Messenger en Muziekmeetings zijn al toegepast.
+
+
+## 0.18.3 — Playout One Vercel build fix
+`loadSharedRadioMapping` was incorrectly imported from `lib/supabase/hub-data`.
+The existing function actually lives in `lib/supabase/settings`.
+The Playout One module now imports it from the same source as Radio API Control.
+
+All 0.18.2 functionality remains unchanged.
