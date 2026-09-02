@@ -21,6 +21,7 @@ export type EditorialItem = {
   title: string;
   duration: string;
   presenterText: string;
+  presenterHtml?: string;
   notes: string;
   source: "Rotation One" | "Playout One" | "VLACORA";
   locked?: boolean;
@@ -262,7 +263,7 @@ async function pullRotation(silent=false){
     const airtime=all.filter((i:any)=>brusselsHourKey(i.airTimeUtc)===targetKey);
     const source=logical.length?logical:airtime;
     const previous=new Map<string,EditorialItem>(playlist.map(i=>[i.id,i]));
-    const incoming:EditorialItem[]=source.map((i:any)=>({...i,presenterText:previous.get(i.id)?.presenterText||i.presenterText||"",notes:previous.get(i.id)?.notes||i.notes||""}));
+    const incoming:EditorialItem[]=source.map((i:any)=>({...i,presenterText:previous.get(i.id)?.presenterText||i.presenterText||"",presenterHtml:previous.get(i.id)?.presenterHtml||i.presenterHtml||"",notes:previous.get(i.id)?.notes||i.notes||""}));
     setPlaylist(incoming);setSelectedId(incoming[0]?.id||"");setLastPull(new Date().toLocaleTimeString("nl-BE"));setPlaylistVersion(String(data.version||"—"));
     const mode=logical.length?"logisch Rotation-uur":"airtime fallback";
     setLastStatus(`Rotation One: ${incoming.length} items • ${mode} • ${all.length} items rond dit uur`);

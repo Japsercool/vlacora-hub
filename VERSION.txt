@@ -1,5 +1,6 @@
-VLACORA HUB 0.19.6
-Traffic template source TypeScript build fix.
-Both manually inserted traffic talks and traffic talks generated from editorial templates now use source='VLACORA'.
-The actual provider remains visible in notes/API metadata as Vlaams Verkeerscentrum / DATEX II.
-No database or API changes.
+VLACORA HUB 0.19.8
+Admin requests / suggestions inbox.
+Team members can submit requested additions, ideas, traffic requests, editorial requests or technical requests directly to administration.
+Admins can review, set status, respond, and the requester receives a notification.
+Includes 0.19.7 rich talk editor, live edit presence and on-demand-only traffic.
+Supabase migration admin_requests is present and verified in the connected project.

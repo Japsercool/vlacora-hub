@@ -38,18 +38,6 @@ export default function TrafficModule({stationSlug}:{stationSlug:string}){
     return()=>{alive=false};
   },[stationSlug]);
 
-  useEffect(()=>{
-    if(stationSlug==="all")return;
-    const timer=window.setTimeout(()=>void refresh(true),250);
-    return()=>window.clearTimeout(timer);
-  },[stationSlug,settings.roads.join(","),settings.allFlanders,settings.includeIncidents,settings.includeCongestion,settings.includeRoadworks,settings.maxItems]);
-
-  useEffect(()=>{
-    if(stationSlug==="all")return;
-    const timer=window.setInterval(()=>{if(!document.hidden)void refresh(true)},settings.autoRefreshMinutes*60_000);
-    return()=>window.clearInterval(timer);
-  },[refresh,settings.autoRefreshMinutes,stationSlug]);
-
   const roadSet=useMemo(()=>new Set(settings.roads),[settings.roads]);
   function toggleRoad(road:string){setSettings(s=>({...s,allFlanders:false,roads:roadSet.has(road)?s.roads.filter(x=>x!==road):[...s.roads,road]}))}
   function addRoad(){const road=roadDraft.trim().toUpperCase().replace(/[\s-]+/g,"");if(!road)return;if(!settings.roads.includes(road))setSettings(s=>({...s,allFlanders:false,roads:[...s.roads,road]}));setRoadDraft("")}
@@ -60,7 +48,7 @@ export default function TrafficModule({stationSlug}:{stationSlug:string}){
 
   return <div className="traffic-page">
     <div className="page-intro traffic-intro">
-      <div><span className="eyebrow">VLAAMS VERKEERSCENTRUM • DATEX II V3</span><h2>Live verkeer</h2><p>Actuele files, incidenten en wegenwerken. VLACORA maakt er meteen een korte radiotekst van.</p></div>
+      <div><span className="eyebrow">VLAAMS VERKEERSCENTRUM • DATEX II V3</span><h2>Live verkeer</h2><p>Actuele files, incidenten en wegenwerken. VLACORA haalt de feed alleen op wanneer iemand expliciet live verkeersinfo vraagt.</p></div>
       <div className="button-row"><button className="ghost" disabled={saving} onClick={()=>void save()}>{saving?"Opslaan…":"Instellingen opslaan"}</button><button className="primary" disabled={busy} onClick={()=>void refresh(false)}>↻ {busy?"Laden…":"Vernieuw live"}</button></div>
     </div>
     {notice&&<div className="inline-notice standalone">{notice}</div>}
@@ -76,13 +64,13 @@ export default function TrafficModule({stationSlug}:{stationSlug:string}){
           <label><input type="checkbox" checked={settings.includeIncidents} onChange={e=>setSettings(s=>({...s,includeIncidents:e.target.checked}))}/> Ongevallen & incidenten</label>
           <label><input type="checkbox" checked={settings.includeCongestion} onChange={e=>setSettings(s=>({...s,includeCongestion:e.target.checked}))}/> Files / vertraagd verkeer</label>
           <label><input type="checkbox" checked={settings.includeRoadworks} onChange={e=>setSettings(s=>({...s,includeRoadworks:e.target.checked}))}/> Wegenwerken</label>
-          <label>Auto-refresh<select value={settings.autoRefreshMinutes} onChange={e=>setSettings(s=>({...s,autoRefreshMinutes:Number(e.target.value)}))}><option value={1}>1 min</option><option value={2}>2 min</option><option value={5}>5 min</option><option value={10}>10 min</option></select></label>
+          <div className="traffic-on-demand-note"><strong>Op aanvraag</strong><span>Geen achtergrondrefresh. Verkeer wordt alleen opgehaald via “Vernieuw live” of vanuit een verkeers-talk.</span></div>
         </div>
       </section>
 
       <section className="card traffic-radio-card">
         <div className="section-head"><div><span className="eyebrow">RADIO READY</span><h3>Verkeerstekst</h3><p>Automatisch samengesteld uit de actuele relevante meldingen.</p></div><span className={`traffic-live-badge ${snapshot?.ok?"online":""}`}>● LIVE</span></div>
-        <textarea className="traffic-radio-text" value={radioText} onChange={e=>setRadioText(e.target.value)} placeholder="Live verkeersinfo verschijnt hier…"/>
+        <textarea className="traffic-radio-text" value={radioText} onChange={e=>setRadioText(e.target.value)} placeholder="Klik bovenaan op ‘Vernieuw live’ om nu verkeersinfo op te halen…"/>
         <div className="traffic-radio-footer"><div><strong>Feed update</strong><span>{fmtTime(snapshot?.publicationTime||"")}</span></div><div><strong>VLACORA opgehaald</strong><span>{fmtTime(snapshot?.fetchedAt||"")}</span></div><button className="primary soft" onClick={()=>void copyText()}>Kopieer tekst</button></div>
       </section>
     </div>

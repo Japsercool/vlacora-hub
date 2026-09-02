@@ -1380,3 +1380,425 @@ hr{border:0;border-top:1px solid var(--border);margin:22px 0}
 /* VLACORA 0.19.4 — live traffic from Vlaams Verkeerscentrum */
 .traffic-page{display:grid;gap:16px}.traffic-intro{background:linear-gradient(135deg,#fff 0%,#f4f8ff 100%)}.traffic-grid{display:grid;grid-template-columns:minmax(320px,.85fr) minmax(420px,1.15fr);gap:16px}.traffic-settings-card,.traffic-radio-card,.traffic-list-card{border-radius:26px}.traffic-all-toggle{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:800;color:#596079}.traffic-road-chips{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0}.traffic-road-chips button{min-width:58px;min-height:38px;padding:0 12px;border-radius:999px;border:1px solid #dce1ef;background:#fff;color:#616983;font-weight:900}.traffic-road-chips button.active{background:#312db0;color:#fff;border-color:#312db0;box-shadow:0 8px 18px rgba(49,45,176,.18)}.traffic-road-add{display:grid;grid-template-columns:1fr auto;gap:8px}.traffic-selected-roads{display:flex;flex-wrap:wrap;gap:7px;margin-top:10px}.traffic-selected-roads>span{display:flex;align-items:center;gap:6px;padding:6px 9px;border-radius:999px;background:#f0f2fb;color:#3f4665;font-size:11px;font-weight:900}.traffic-selected-roads button{border:0;background:transparent;color:#8a90a6;cursor:pointer}.traffic-options{display:grid;gap:10px;margin-top:16px;padding-top:14px;border-top:1px solid var(--border)}.traffic-options label{display:flex;align-items:center;gap:9px;font-size:12px;color:#596079;font-weight:700}.traffic-options label:last-child{justify-content:space-between}.traffic-options select{min-height:36px;border:1px solid #dbe0ef;border-radius:12px;background:#fff;padding:0 10px}.traffic-live-badge{display:inline-flex;align-items:center;gap:6px;padding:7px 10px;border-radius:999px;background:#eef0f5;color:#8a90a2;font-size:10px;font-weight:950}.traffic-live-badge.online{background:#e4f8eb;color:#26804c}.traffic-radio-text{width:100%;min-height:250px;resize:vertical;border:1px solid #dce1ef;border-radius:20px;padding:18px 20px;background:#fbfcff;color:#161a2c;font:700 18px/1.6 inherit;outline:none}.traffic-radio-text:focus{border-color:#a9b0e6;box-shadow:0 0 0 3px rgba(49,45,176,.08)}.traffic-radio-footer{display:grid;grid-template-columns:1fr 1fr auto;gap:12px;align-items:center;margin-top:12px}.traffic-radio-footer>div{display:flex;flex-direction:column}.traffic-radio-footer strong{font-size:9px;text-transform:uppercase;letter-spacing:.04em;color:#8a90a7}.traffic-radio-footer span{font-size:12px;color:#4f566f;font-weight:800}.traffic-source{font-size:10px;color:#717892;font-weight:800}.traffic-list{display:grid;gap:8px}.traffic-item{display:grid;grid-template-columns:12px minmax(0,1fr);gap:12px;padding:14px 16px;border:1px solid #e2e6f0;border-radius:18px;background:#fff}.traffic-severity-dot{width:10px;height:10px;margin-top:6px;border-radius:999px;background:#aab0bf}.traffic-item.severity-high .traffic-severity-dot{background:#e04b58;box-shadow:0 0 0 5px #fdecef}.traffic-item.severity-medium .traffic-severity-dot{background:#e89a18;box-shadow:0 0 0 5px #fff4df}.traffic-item.severity-low .traffic-severity-dot{background:#7d879a}.traffic-item-main{display:grid;gap:5px}.traffic-item-main>strong{font-size:14px;color:#171b2d;line-height:1.45}.traffic-item-main>small{font-size:10px;color:#858ba1}.traffic-item-meta{display:flex;flex-wrap:wrap;gap:7px;align-items:center}.traffic-item-meta b{font-size:12px;color:#2f2ca4}.traffic-item-meta span{padding:4px 7px;border-radius:999px;background:#f1f3f9;color:#626980;font-size:9px;font-weight:850}.traffic-inline-status{color:#2f2ca4!important;font-weight:850}.topplaylist-actions button:disabled{opacity:.6;cursor:wait}
 @media(max-width:1050px){.traffic-grid{grid-template-columns:1fr}.traffic-radio-footer{grid-template-columns:1fr 1fr}.traffic-radio-footer button{grid-column:1/-1}.traffic-road-add{grid-template-columns:1fr}}@media(max-width:700px){.traffic-radio-footer{grid-template-columns:1fr}.traffic-radio-footer button{grid-column:auto}.traffic-radio-text{font-size:15px;min-height:220px}}
+
+
+/* VLACORA 0.19.7 — compact talk editor, no giant green frame */
+.topplaylist-row.talk-row{
+  background:transparent!important;
+  border:0!important;
+  box-shadow:none!important;
+  overflow:visible!important;
+}
+.talk-row-head{
+  display:grid;
+  grid-template-columns:22px 70px auto minmax(180px,1fr) auto auto auto auto auto auto auto;
+  align-items:center;
+  gap:9px;
+  min-height:54px;
+  padding:9px 12px;
+  border:1px solid #dce9dc;
+  border-radius:16px;
+  background:#f4fbf4;
+}
+.topplaylist-row.talk-row.selected .talk-row-head{
+  border-color:#c8dfc8;
+  box-shadow:0 0 0 2px rgba(68,140,79,.06);
+}
+.talk-content-panel{
+  grid-column:auto!important;
+  display:block!important;
+  padding:6px 0 2px!important;
+  background:transparent!important;
+  border:0!important;
+}
+.talk-editor-caption{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  min-height:28px;
+  padding:0 8px 5px;
+  color:#777f98;
+  font-size:11px;
+}
+.talk-editor-caption strong{
+  color:#48516a;
+  font-size:12px;
+}
+.talk-editor-caption span{
+  color:#8c93aa;
+}
+.talk-rich-editor{
+  overflow:hidden;
+  border:1px solid #dfe4ef;
+  border-radius:14px;
+  background:#fff;
+  box-shadow:0 5px 18px rgba(34,39,78,.04);
+}
+.talk-rich-toolbar{
+  display:flex;
+  align-items:center;
+  gap:7px;
+  flex-wrap:wrap;
+  min-height:42px;
+  padding:6px 8px;
+  border-bottom:1px solid #e7eaf2;
+  background:#fafbfe;
+}
+.rich-format-group{
+  display:flex;
+  align-items:center;
+  gap:3px;
+}
+.rich-format-group button,
+.traffic-request-button{
+  min-width:32px;
+  height:30px;
+  border:1px solid #d9deea;
+  border-radius:8px;
+  background:#fff;
+  color:#4f5670;
+  font-weight:800;
+}
+.rich-format-group button:hover,
+.traffic-request-button:hover{
+  background:#f1f3fb;
+  color:#2f2ca4;
+}
+.rich-size,.rich-color{
+  display:flex;
+  align-items:center;
+  gap:5px;
+  color:#747b94;
+  font-size:10px;
+  font-weight:700;
+}
+.rich-size select{
+  height:30px;
+  border:1px solid #d9deea;
+  border-radius:8px;
+  background:#fff;
+  padding:0 7px;
+  color:#4f5670;
+  font-size:11px;
+}
+.rich-color input{
+  width:32px;
+  height:30px;
+  padding:3px;
+  border:1px solid #d9deea;
+  border-radius:8px;
+  background:#fff;
+}
+.traffic-request-button{
+  padding:0 10px;
+  min-width:auto;
+  color:#287a4c;
+  border-color:#cfe6d7;
+  background:#f3fbf5;
+}
+.traffic-request-button:disabled{
+  opacity:.55;
+  cursor:wait;
+}
+.talk-editor-presence{
+  margin-left:auto;
+  display:flex;
+  align-items:center;
+  gap:5px;
+  min-height:30px;
+  padding:0 7px;
+  color:#7a8197;
+  font-size:10px;
+}
+.talk-editor-presence strong{
+  color:#3f7d50;
+  font-size:10px;
+}
+.presence-dot{
+  width:7px;
+  height:7px;
+  border-radius:999px;
+  background:#43ae69;
+  box-shadow:0 0 0 3px rgba(67,174,105,.12);
+}
+.presence-dot.idle{
+  background:#b8bfce;
+  box-shadow:none;
+}
+.talk-editor-avatars{
+  display:flex;
+  align-items:center;
+}
+.talk-editor-avatars span{
+  width:23px;
+  height:23px;
+  margin-left:-4px;
+  border:2px solid #fff;
+  border-radius:999px;
+  display:grid;
+  place-items:center;
+  background:#302da6;
+  color:#fff;
+  font-size:8px;
+  font-weight:900;
+}
+.talk-editor-avatars span:first-child{margin-left:0}
+.talk-rich-content{
+  min-height:115px;
+  padding:14px 16px;
+  outline:none;
+  color:#182039;
+  font-size:15px;
+  line-height:1.55;
+  white-space:pre-wrap;
+}
+.talk-rich-content:empty:before{
+  content:attr(data-placeholder);
+  color:#9aa0b2;
+  pointer-events:none;
+}
+.talk-rich-content ul,.talk-rich-content ol{
+  margin:6px 0 6px 22px;
+}
+.traffic-talk-meta{
+  padding:7px 12px;
+  border-top:1px solid #edf0f5;
+  background:#f7faf8;
+  color:#728078;
+  font-size:10px;
+}
+.traffic-on-demand-note{
+  display:grid;
+  gap:2px;
+  padding:8px 10px;
+  border-radius:10px;
+  background:#f5f7fb;
+  color:#6c738b;
+  font-size:10px;
+}
+.traffic-on-demand-note strong{color:#34394d}
+@media(max-width:1100px){
+  .talk-row-head{
+    grid-template-columns:20px 58px auto minmax(140px,1fr) auto auto;
+  }
+  .talk-row-head>.slot-kind,
+  .talk-row-head>.slot-duration,
+  .talk-row-head>.row-icon{
+    display:none;
+  }
+  .talk-editor-presence{
+    width:100%;
+    margin-left:0;
+  }
+}
+
+
+/* VLACORA 0.19.7 — requests to administration */
+.admin-requests-page{display:grid;gap:18px}
+.request-filter-switch{display:flex;gap:6px;padding:5px;border-radius:14px;background:#f0f2f8}
+.request-filter-switch button{min-height:38px;padding:0 14px;border:0;border-radius:10px;background:transparent;color:#6a7089;font-weight:800}
+.request-filter-switch button.active{background:#fff;color:#27269f;box-shadow:0 4px 12px rgba(34,38,83,.08)}
+.admin-request-layout{display:grid;grid-template-columns:minmax(300px,.8fr) minmax(0,1.7fr);gap:18px;align-items:start}
+.request-compose-card{position:sticky;top:96px;padding:20px;display:grid;gap:13px}
+.request-compose-card h3{margin:0}.request-compose-card p{margin:0;color:var(--muted)}
+.request-compose-card label,.admin-request-admin label{display:grid;gap:6px;color:#555c75;font-size:11px;font-weight:800}
+.request-compose-card input,.request-compose-card select,.request-compose-card textarea,
+.admin-request-admin select,.admin-request-admin textarea{
+  width:100%;border:1px solid #dce1ed;border-radius:12px;background:#fff;padding:10px 12px;color:#20243a
+}
+.request-compose-card textarea{min-height:130px;resize:vertical}
+.request-list{display:grid;gap:12px}
+.admin-request-card{padding:18px;border-radius:20px}
+.admin-request-card.status-new{border-left:4px solid #5279ff}
+.admin-request-card.status-reviewing{border-left:4px solid #ef9b17}
+.admin-request-card.status-planned{border-left:4px solid #8c62dc}
+.admin-request-card.status-done{border-left:4px solid #46a66d}
+.admin-request-card.status-rejected{border-left:4px solid #aeb5c7}
+.admin-request-head{display:flex;justify-content:space-between;gap:16px;align-items:flex-start}
+.admin-request-head h3{margin:8px 0 3px;font-size:18px}.admin-request-head small{color:var(--muted)}
+.request-tags{display:flex;gap:7px;flex-wrap:wrap}.request-tags>span{padding:5px 9px;border-radius:999px;background:#f1f3f9;color:#646b83;font-size:10px;font-weight:850}
+.request-status.status-new{background:#eaf0ff;color:#3f65d4}.request-status.status-reviewing{background:#fff2d8;color:#a66b08}.request-status.status-planned{background:#f1eaff;color:#7250b4}.request-status.status-done{background:#e6f5eb;color:#398257}.request-status.status-rejected{background:#f0f1f5;color:#7d8393}
+.admin-request-card>p{color:#51586f;line-height:1.55;white-space:pre-wrap}
+.admin-request-admin{display:grid;grid-template-columns:180px minmax(0,1fr);gap:12px;padding-top:12px;border-top:1px solid #edf0f6}
+.admin-request-admin textarea{min-height:78px;resize:vertical}
+.request-admin-note{margin-top:12px;padding:12px 14px;border-radius:13px;background:#f5f7fb;display:grid;gap:4px}
+.request-admin-note strong{font-size:11px;color:#454c66}.request-admin-note span{color:#6b7288;font-size:12px}
+@media(max-width:1000px){.admin-request-layout{grid-template-columns:1fr}.request-compose-card{position:static}.admin-request-admin{grid-template-columns:1fr}}
+
+
+/* VLACORA 0.19.7 — single rich talk editor + inline traffic source */
+.talk-content-panel{
+  grid-column:4/-1 !important;
+  display:block !important;
+  padding-top:8px !important;
+}
+.talk-rich-editor{
+  display:grid;
+  gap:8px;
+  width:100%;
+}
+.traffic-talk-meta-inline{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  min-width:0;
+  color:#6c738d;
+  font-size:11px;
+  line-height:1.35;
+  padding:0 2px;
+}
+.traffic-talk-meta-inline span{
+  flex:0 0 auto;
+  padding:4px 8px;
+  border-radius:999px;
+  background:#e7f7e9;
+  color:#438150;
+  font-weight:900;
+  text-transform:uppercase;
+  letter-spacing:.04em;
+}
+.traffic-talk-meta-inline strong{
+  min-width:0;
+  overflow:hidden;
+  white-space:nowrap;
+  text-overflow:ellipsis;
+  font-weight:700;
+  color:#737990;
+}
+.talk-rich-toolbar{
+  display:flex;
+  align-items:center;
+  flex-wrap:wrap;
+  gap:8px;
+  min-height:44px;
+  padding:7px 9px;
+  border:1px solid #d9deea;
+  border-bottom:0;
+  border-radius:14px 14px 0 0;
+  background:#f8f9fd;
+}
+.rich-format-group{
+  display:flex;
+  align-items:center;
+  gap:4px;
+}
+.rich-format-group button,
+.traffic-request-button{
+  min-width:34px;
+  min-height:32px;
+  border:1px solid #d7dce9;
+  border-radius:9px;
+  background:#fff;
+  color:#555c76;
+  font-weight:800;
+}
+.rich-format-group button:hover,
+.traffic-request-button:hover{
+  background:#f1f3fb;
+}
+.rich-size,.rich-color{
+  display:flex;
+  align-items:center;
+  gap:6px;
+  color:#71778e;
+  font-size:11px;
+  font-weight:800;
+}
+.rich-size select{
+  min-height:32px;
+  border:1px solid #d7dce9;
+  border-radius:9px;
+  background:#fff;
+  padding:0 8px;
+  color:#34394f;
+}
+.rich-color input{
+  width:34px;
+  height:32px;
+  padding:2px;
+  border:1px solid #d7dce9;
+  border-radius:9px;
+  background:#fff;
+}
+.traffic-request-button{
+  padding:0 10px;
+  color:#347849;
+  border-color:#cfe5d3;
+  background:#f2fbf3;
+}
+.talk-editor-presence{
+  margin-left:auto;
+  display:flex;
+  align-items:center;
+  gap:6px;
+  min-width:0;
+  color:#70768d;
+  font-size:11px;
+}
+.talk-editor-presence strong{color:#3e7650}
+.presence-dot{
+  width:8px;
+  height:8px;
+  border-radius:999px;
+  background:#42ad69;
+  box-shadow:0 0 0 3px rgba(66,173,105,.12);
+}
+.presence-dot.idle{
+  background:#b9becc;
+  box-shadow:none;
+}
+.talk-editor-avatars{
+  display:flex;
+  align-items:center;
+}
+.talk-editor-avatars span{
+  width:25px;
+  height:25px;
+  margin-left:-5px;
+  border:2px solid #fff;
+  border-radius:999px;
+  display:grid;
+  place-items:center;
+  background:#302da8;
+  color:#fff;
+  font-size:9px;
+  font-weight:900;
+}
+.talk-rich-content{
+  min-height:180px;
+  padding:16px 18px;
+  border:1px solid #d9deea;
+  border-radius:0 0 14px 14px;
+  background:#fff;
+  color:#161a29;
+  line-height:1.55;
+  outline:none;
+  overflow-wrap:anywhere;
+}
+.talk-rich-content:empty:before{
+  content:attr(data-placeholder);
+  color:#9298ab;
+  pointer-events:none;
+}
+.talk-rich-content:focus{
+  border-color:#aaaee6;
+  box-shadow:0 0 0 2px rgba(48,43,159,.08);
+}
+.traffic-on-demand-note{
+  display:grid;
+  gap:2px;
+  padding:10px 12px;
+  border-radius:12px;
+  background:#f6f7fb;
+  color:#737990;
+}
+.traffic-on-demand-note strong{color:#252a42}
+.traffic-on-demand-note span{font-size:11px}
+
+@media(max-width:1050px){
+  .talk-editor-presence{
+    width:100%;
+    margin-left:0;
+  }
+  .talk-rich-content{min-height:150px}
+}

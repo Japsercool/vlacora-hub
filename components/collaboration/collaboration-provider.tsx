@@ -34,6 +34,8 @@ export type PresencePerson={
   moduleSlug:string;
   moduleLabel:string;
   detail:string;
+  entityType:string;
+  entityId:string;
   onlineAt:string;
   isMe:boolean;
 };
@@ -72,7 +74,7 @@ type CollaborationContextValue={
 const CollaborationContext=createContext<CollaborationContextValue|null>(null);
 
 const MODULES:Record<string,string>={
-  dashboard:"TODAY",stations:"Stations",meldingen:"Meldingen",taken:"Taken",meldpunt:"Meldpunt",
+  dashboard:"TODAY",stations:"Stations",meldingen:"Meldingen",taken:"Taken",meldpunt:"Meldpunt",aanvragen:"Aanvragen",
   messenger:"Messenger",communicatie:"Communicatie",muziekmappen:"Muziekmappen PDF",kalender:"Kalender",
   programmering:"Programmering",sjablonen:"Sjablonen",muziek:"Muziek",meetings:"Muziekmeeting",redactie:"Redactie",verkeer:"Verkeer",
   playlists:"Playlists",hitlijsten:"Hitlijsten",presentatie:"Presentatie",social:"Social Studio",
@@ -121,6 +123,8 @@ export function CollaborationProvider({
   const [notificationsOpen,setNotificationsOpen]=useState(false);
   const [presenceOpen,setPresenceOpen]=useState(false);
   const [activityDetail,setActivityDetail]=useState("");
+  const [activityEntityType,setActivityEntityType]=useState("");
+  const [activityEntityId,setActivityEntityId]=useState("");
   const supabaseRef=useRef<any>(null);
   const channelRef=useRef<any>(null);
   const localChannelRef=useRef<BroadcastChannel|null>(null);
@@ -130,14 +134,18 @@ export function CollaborationProvider({
   const moduleLabel=MODULES[moduleSlug]||moduleSlug;
   const activityPayload=useMemo(()=>({
     stationSlug,moduleSlug,moduleLabel,
-    detail:activityDetail||moduleLabel
-  }),[stationSlug,moduleSlug,moduleLabel,activityDetail]);
+    detail:activityDetail||moduleLabel,
+    entityType:activityEntityType,
+    entityId:activityEntityId
+  }),[stationSlug,moduleSlug,moduleLabel,activityDetail,activityEntityType,activityEntityId]);
 
-  useEffect(()=>{setActivityDetail("")},[moduleSlug,stationSlug]);
+  useEffect(()=>{setActivityDetail("");setActivityEntityType("");setActivityEntityId("")},[moduleSlug,stationSlug]);
   useEffect(()=>{
     const handler=(event:Event)=>{
       const signal=(event as CustomEvent<ActivitySignal>).detail;
       if(signal?.detail)setActivityDetail(signal.detail);
+      setActivityEntityType(signal?.entityType||"");
+      setActivityEntityId(signal?.entityId||"");
     };
     window.addEventListener(VLACORA_ACTIVITY_EVENT,handler);
     return()=>window.removeEventListener(VLACORA_ACTIVITY_EVENT,handler);
@@ -213,7 +221,9 @@ export function CollaborationProvider({
               email:String(value.email||""),initials:String(value.initials||initials(value.name||"V")),
               role:String(value.role||""),stationSlug:String(value.stationSlug||"all"),
               moduleSlug:String(value.moduleSlug||"dashboard"),moduleLabel:String(value.moduleLabel||"HUB"),
-              detail:String(value.detail||value.moduleLabel||"HUB"),onlineAt:String(value.onlineAt||new Date().toISOString()),
+              detail:String(value.detail||value.moduleLabel||"HUB"),
+              entityType:String(value.entityType||""),entityId:String(value.entityId||""),
+              onlineAt:String(value.onlineAt||new Date().toISOString()),
               isMe:String(value.userId||key)===user.id
             });
           });

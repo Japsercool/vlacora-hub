@@ -1,0 +1,17 @@
+VLACORA HUB 0.19.8 validation
+[PASS] version 0.19.8
+[PASS] Aanvragen nav
+[PASS] Hub route
+[PASS] AdminRequests import
+[PASS] requests module mapping
+[PASS] request table migration
+[PASS] request submit
+[PASS] admin status
+[PASS] requester notifications
+[PASS] requester name
+[PASS] rich talk preserved
+[PASS] traffic on demand preserved
+[PASS] touched TS/TSX files parser/name sanity
+[PASS] Supabase migration admin_requests verified in connected project
+[INFO] no background polling added for requests
+[INFO] traffic remains explicit/on-demand only

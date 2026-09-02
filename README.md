@@ -1207,3 +1207,48 @@ De echte bron blijft zichtbaar in `notes` en in de verkeers-API metadata:
 `Vlaams Verkeerscentrum • DATEX II`.
 
 Geen database- of API-wijzigingen.
+
+
+## 0.19.7 — talk-editor + verkeer alleen op aanvraag
+
+- De oude twee grote invoervakken bij een talk zijn vervangen door één editor.
+- Presentatietekst ondersteunt vet, cursief, onderlijnen, opsommingen,
+  tekstgrootte, tekstkleur en uitlijning.
+- De verkeersbron/update staat als één korte regel boven de editor en niet
+  meer in een apart kader.
+- Presence toont live wie dezelfde talk aan het bewerken is.
+- Traffic slots uit een template halen niet meer automatisch de DATEX-feed op.
+- De Verkeer-module doet geen automatische achtergrondrefresh meer.
+- Live verkeer wordt alleen opgehaald wanneer iemand expliciet op
+  `Live verkeer ophalen` in de verkeers-talk of `Vernieuw live` in Verkeer klikt.
+
+Geen nieuwe database-migratie.
+
+
+## 0.19.8 — Aanvragen & ideeën naar beheer
+
+Nieuw menu **Aanvragen** voor teamleden en admins.
+
+Teamleden kunnen rechtstreeks naar beheer sturen:
+- nieuwe functie / verbetering;
+- extra verkeerswens;
+- redactie- of contentidee;
+- station- of technisch verzoek;
+- overige toevoegingen.
+
+De medewerker ziet de eigen aanvragen en status terug. Beheer krijgt een
+centrale inbox met afzender, station, categorie, status en antwoordveld.
+
+Statussen:
+- Nieuw
+- Bekijken
+- Gepland
+- Uitgevoerd
+- Niet gepland
+
+Wanneer beheer de status wijzigt of een antwoord schrijft, krijgt de
+aanvrager een VLACORA-notificatie.
+
+De bestaande Supabase-migratie `admin_requests` is gecontroleerd op het
+verbonden project. Deze release behoudt ook de 0.19.7 rich-text talkeditor,
+live Presence per talk en verkeer uitsluitend op expliciete aanvraag.

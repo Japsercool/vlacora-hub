@@ -12,6 +12,7 @@ import EditorialModule from "@/components/modules/editorial-module";
 import RadioApiModule from "@/components/modules/radio-api-module";
 import PlayoutOneModule from "@/components/modules/playout-one-module";
 import TrafficModule from "@/components/modules/traffic-module";
+import AdminRequestsModule from "@/components/modules/admin-requests-module";
 import MusicMeetingsModule from "@/components/modules/music-meetings-module";
 import TeamRightsModule from "@/components/modules/team-rights-module";
 import AdminIntegrationsModule from "@/components/modules/admin-integrations-module";
@@ -235,6 +236,8 @@ function HubAppInner({ stationSlug, moduleSlug }: Props) {
           {moduleSlug === "taken" && <TasksModule stationSlug={station.slug} />}
 
           {moduleSlug === "meldpunt" && <IncidentModule stationSlug={station.slug} publishNotification={collaboration.publishNotification} />}
+
+          {moduleSlug === "aanvragen" && <AdminRequestsModule stationSlug={station.slug} />}
 
           {moduleSlug === "messenger" && <MessengerModule stationSlug={station.slug} />}
 

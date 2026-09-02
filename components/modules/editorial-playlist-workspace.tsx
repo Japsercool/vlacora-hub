@@ -1,10 +1,12 @@
 "use client";
 
-import { useEffect,useMemo,useState } from "react";
+import { useEffect,useMemo,useRef,useState } from "react";
 import type { EditorialItem,EditorialType } from "@/components/modules/editorial-module";
 import { loadEditorialTemplates,type EditorialTemplateRecord,type EditorialTemplateSlot } from "@/lib/supabase/editorial";
 import { broadPlaylistLabel,canonicalPlaylistType } from "@/lib/radio/item-types";
 import { fetchTrafficSnapshot,loadTrafficSettings } from "@/lib/traffic/client";
+import { useCollaboration } from "@/components/collaboration/collaboration-provider";
+import { emitActivity } from "@/lib/collaboration/activity";
 
 const uid=()=>Math.random().toString(36).slice(2)+Date.now().toString(36);
 const pad=(n:number)=>String(n).padStart(2,"0");
@@ -66,8 +68,105 @@ function defaultNotes(type:EditorialType,label:string){
   if(text.includes("actie")||text.includes("sponsor")||text.includes("wedstrijd"))return"Verkochte actie / sponsor";
   if(type==="news")return"Nieuws";
   if(type==="weather")return"Weer";
-  if(type==="traffic")return"Live Vlaams Verkeerscentrum";
+  if(type==="traffic")return"Verkeersslot • live data nog niet opgehaald";
   return"Redactie";
+}
+
+
+function escapeHtml(value:string){
+  return value.replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;").replaceAll("'","&#039;").replace(/\n/g,"<br>");
+}
+
+function TalkRichTextEditor({
+  item,stationSlug,onChange,onRequestTraffic,trafficBusy
+}:{
+  item:EditorialItem;
+  stationSlug:string;
+  onChange:(patch:Partial<EditorialItem>)=>void;
+  onRequestTraffic?:()=>void;
+  trafficBusy?:boolean;
+}){
+  const editorRef=useRef<HTMLDivElement|null>(null);
+  const focusedRef=useRef(false);
+  const collaboration=useCollaboration();
+  const editors=collaboration.presence.filter(p=>
+    p.stationSlug===stationSlug&&p.moduleSlug==="redactie"&&p.entityType==="talk-editor"&&p.entityId===item.id
+  );
+
+  useEffect(()=>{
+    const editor=editorRef.current;
+    if(!editor||focusedRef.current)return;
+    const wanted=item.presenterHtml||escapeHtml(item.presenterText||"");
+    if(editor.innerHTML!==wanted)editor.innerHTML=wanted;
+  },[item.id,item.presenterHtml,item.presenterText]);
+
+  function publish(){
+    const editor=editorRef.current;
+    if(!editor)return;
+    onChange({presenterText:editor.innerText,presenterHtml:editor.innerHTML});
+  }
+  function command(name:string,value?:string){
+    const editor=editorRef.current;
+    if(!editor)return;
+    editor.focus();
+    try{document.execCommand("styleWithCSS",false,"true")}catch{}
+    document.execCommand(name,false,value);
+    publish();
+  }
+  function size(value:string){
+    command("fontSize",value);
+  }
+  function focus(){
+    focusedRef.current=true;
+    emitActivity({detail:`Bewerkt talk • ${item.title}`,entityType:"talk-editor",entityId:item.id});
+  }
+  function blur(){
+    focusedRef.current=false;
+    publish();
+    emitActivity({detail:`Redactie • ${item.time} • ${item.title}`,entityType:"playlist-item",entityId:item.id});
+  }
+
+  const trafficMeta=item.type==="traffic"?(item.notes||"Live verkeersdata nog niet opgehaald"):"";
+  return <div className="talk-rich-editor" onClick={e=>e.stopPropagation()}>
+    {item.type==="traffic"&&<div className="traffic-talk-meta-inline"><span>Verkeer</span><strong>{trafficMeta}</strong></div>}
+    <div className="talk-rich-toolbar">
+      <div className="rich-format-group">
+        <button type="button" title="Vet" onMouseDown={e=>e.preventDefault()} onClick={()=>command("bold")}><b>B</b></button>
+        <button type="button" title="Cursief" onMouseDown={e=>e.preventDefault()} onClick={()=>command("italic")}><i>I</i></button>
+        <button type="button" title="Onderlijnen" onMouseDown={e=>e.preventDefault()} onClick={()=>command("underline")}><u>U</u></button>
+        <button type="button" title="Opsomming" onMouseDown={e=>e.preventDefault()} onClick={()=>command("insertUnorderedList")}>•≡</button>
+      </div>
+      <label className="rich-size">Grootte
+        <select defaultValue="3" onChange={e=>size(e.target.value)}>
+          <option value="2">Klein</option>
+          <option value="3">Normaal</option>
+          <option value="4">Groot</option>
+          <option value="5">Extra groot</option>
+        </select>
+      </label>
+      <label className="rich-color">Kleur
+        <input type="color" defaultValue="#111827" onChange={e=>command("foreColor",e.target.value)}/>
+      </label>
+      <div className="rich-format-group">
+        <button type="button" title="Links" onMouseDown={e=>e.preventDefault()} onClick={()=>command("justifyLeft")}>≡</button>
+        <button type="button" title="Centreren" onMouseDown={e=>e.preventDefault()} onClick={()=>command("justifyCenter")}>≣</button>
+      </div>
+      {item.type==="traffic"&&<button type="button" className="traffic-request-button" disabled={trafficBusy} onClick={onRequestTraffic}>↻ {trafficBusy?"Verkeer laden…":"Live verkeer ophalen"}</button>}
+      <div className="talk-editor-presence">
+        {editors.length>0?<><span className="presence-dot"/><strong>{editors.some(p=>p.isMe)?"Live aan het bewerken":"Wordt live bewerkt"}</strong><div className="talk-editor-avatars">{editors.slice(0,4).map(p=><span key={`${p.key}-${p.userId}`} title={p.name}>{p.initials}</span>)}</div><small>{editors.map(p=>p.isMe?"jij":p.name).join(", ")}</small></>:<><span className="presence-dot idle"/><small>Niemand anders bewerkt deze talk</small></>}
+      </div>
+    </div>
+    <div
+      ref={editorRef}
+      className="talk-rich-content"
+      contentEditable
+      suppressContentEditableWarning
+      data-placeholder="Schrijf hier de presentatietekst…"
+      onFocus={focus}
+      onBlur={blur}
+      onInput={publish}
+    />
+  </div>
 }
 
 export default function EditorialPlaylistWorkspace(props:Props){
@@ -148,34 +247,25 @@ export default function EditorialPlaylistWorkspace(props:Props){
     if(!after){setPlaylist([item]);setSelectedId(item.id);return}
     const idx=playlist.findIndex(x=>x.id===after);const next=[...playlist];next.splice(idx<0?next.length:idx+1,0,item);setPlaylist(next);setSelectedId(item.id);
   }
-  async function quickAddLiveTraffic(){
+  async function fetchTrafficForItem(itemId:string){
     setTrafficBusy(true);setTrafficMessage("");
     try{
       const trafficSettings=await loadTrafficSettings(stationSlug);
       const data=await fetchTrafficSnapshot(trafficSettings);
-      const item:EditorialItem={id:uid(),time:selected?.time||playlist[playlist.length-1]?.time||hour,type:"traffic",title:"Verkeer LIVE",duration:"00:30",presenterText:data.radioText,notes:`Live Vlaams Verkeerscentrum • DATEX II • update ${new Date(data.publicationTime||data.fetchedAt).toLocaleTimeString("nl-BE",{hour:"2-digit",minute:"2-digit"})}`,source:"VLACORA"};
-      insertAfterSelection(item);setTrafficMessage(`${data.count} verkeersmelding(en) verwerkt`);
+      const updateTime=new Date(data.publicationTime||data.fetchedAt).toLocaleTimeString("nl-BE",{hour:"2-digit",minute:"2-digit"});
+      patchItem(itemId,{
+        presenterText:data.radioText,
+        presenterHtml:undefined,
+        notes:`Live Vlaams Verkeerscentrum • DATEX II • update ${updateTime}`
+      });
+      setTrafficMessage(`${data.count} verkeersmelding(en) opgehaald voor deze talk`);
     }catch(e){
-      const item:EditorialItem={id:uid(),time:selected?.time||playlist[playlist.length-1]?.time||hour,type:"traffic",title:"Verkeer",duration:"00:30",presenterText:"",notes:`Live verkeersfeed kon niet laden: ${e instanceof Error?e.message:"onbekende fout"}`,source:"VLACORA"};
-      insertAfterSelection(item);setTrafficMessage("Verkeersslot toegevoegd; live feed kon niet laden");
+      setTrafficMessage(`Verkeer kon niet worden opgehaald: ${e instanceof Error?e.message:"onbekende fout"}`);
     }finally{setTrafficBusy(false)}
   }
 
   async function applyTemplate(){
     if(!template)return setTemplateMessage("Geen redactietemplate toegewezen aan dit uur.");
-
-    let liveTrafficText="",liveTrafficNote="";
-    if(template.sequence.some(slot=>slot.type==="traffic"||/verkeer|traffic/i.test(slot.label||""))){
-      setTrafficBusy(true);
-      try{
-        const trafficSettings=await loadTrafficSettings(stationSlug);
-        const data=await fetchTrafficSnapshot(trafficSettings);
-        liveTrafficText=data.radioText;
-        liveTrafficNote=`Live Vlaams Verkeerscentrum • DATEX II • update ${new Date(data.publicationTime||data.fetchedAt).toLocaleTimeString("nl-BE",{hour:"2-digit",minute:"2-digit"})}`;
-        setTrafficMessage(`${data.count} verkeersmelding(en) automatisch in template verwerkt`);
-      }catch(e){setTrafficMessage(`Verkeer in template kon niet live worden ingevuld: ${e instanceof Error?e.message:"fout"}`)}
-      finally{setTrafficBusy(false)}
-    }
 
     const unused=new Set(playlist.map(item=>item.id));
     const next:EditorialItem[]=[];
@@ -212,8 +302,8 @@ export default function EditorialPlaylistWorkspace(props:Props){
           type:slotType,
           title:slot.label||"Redactieslot",
           duration:durationText(slot.durationSec||20),
-          presenterText:isTraffic&&liveTrafficText?liveTrafficText:(slot.content||""),
-          notes:isTraffic&&liveTrafficNote?liveTrafficNote:(slot.required?"Verplicht redactieslot":"Redactieslot"),
+          presenterText:slot.content||"",
+          notes:isTraffic?"Verkeersslot • live data nog niet opgehaald":(slot.required?"Verplicht redactieslot":"Redactieslot"),
           source:"VLACORA"
         });
       }else if(slot.type==="category"){
@@ -275,7 +365,7 @@ export default function EditorialPlaylistWorkspace(props:Props){
             <option value="">Geen template</option>
             {templates.map(t=><option key={t.id} value={t.id}>{t.name}</option>)}
           </select>
-          <button className="primary soft" disabled={!template||trafficBusy} onClick={()=>void applyTemplate()}>{trafficBusy?"Live data laden…":"Sjabloon toepassen"}</button>
+          <button className="primary soft" disabled={!template} onClick={()=>void applyTemplate()}>Sjabloon toepassen</button>
         </div>
         <span className="template-picker-meta">{syncLabel||templateMessage}</span>
       </div>
@@ -302,19 +392,21 @@ export default function EditorialPlaylistWorkspace(props:Props){
               onDragOver={e=>e.preventDefault()}
               onDrop={()=>{if(dragId)moveItem(dragId,item.id);setDragId("")}}
               onClick={()=>setSelectedId(item.id)}>
-              {isTalk?<div className="talk-row-inner">
-                <span className="drag-dots">⠿</span><span className="row-time">{item.time}</span>
-                <span className={`slot-pill slot-${normalizedType(item)}`}>{badgeLabel(item)}</span>
-                <input className="slot-title-input" value={item.title} onChange={e=>patchItem(item.id,{title:e.target.value})} onClick={e=>e.stopPropagation()}/>
-                <span className="slot-kind">Talk</span>
-                <label className="slot-duration"><input type="number" min="0" value={Math.floor(sec/60)} onChange={e=>patchItem(item.id,{duration:durationText(Number(e.target.value)*60+(sec%60))})}/> min</label>
-                <label className="slot-duration"><input type="number" min="0" max="59" value={sec%60} onChange={e=>patchItem(item.id,{duration:durationText(Math.floor(sec/60)*60+Number(e.target.value))})}/> sec</label>
-                <button className={`content-button ${item.presenterText?"filled":""}`} onClick={e=>{e.stopPropagation();setSelectedId(item.id)}}>✎ Inhoud{item.presenterText?" ✓":""}</button>
-                <button className="row-icon" title="Omhoog" onClick={e=>{e.stopPropagation();const idx=playlist.findIndex(x=>x.id===item.id);if(idx>0)moveItem(item.id,playlist[idx-1].id)}}>⌃</button>
-                <button className="row-icon" title="Omlaag" onClick={e=>{e.stopPropagation();const idx=playlist.findIndex(x=>x.id===item.id);if(idx<playlist.length-1)moveItem(item.id,playlist[idx+1].id)}}>⌄</button>
-                <button className="row-icon danger" onClick={e=>{e.stopPropagation();removeItem(item.id)}}>⌫</button>
-                {selectedId===item.id&&<div className="talk-content-panel"><textarea value={item.presenterText} onChange={e=>patchItem(item.id,{presenterText:e.target.value})} placeholder="Inhoud / presentatietekst voor dit slot…"/><input value={item.notes} onChange={e=>patchItem(item.id,{notes:e.target.value})} placeholder="Notitie of bron…"/></div>}
-              </div>:<>
+              {isTalk?<>
+                <div className="talk-row-head">
+                  <span className="drag-dots">⠿</span><span className="row-time">{item.time}</span>
+                  <span className={`slot-pill slot-${normalizedType(item)}`}>{badgeLabel(item)}</span>
+                  <input className="slot-title-input" value={item.title} onChange={e=>patchItem(item.id,{title:e.target.value})} onClick={e=>e.stopPropagation()}/>
+                  <span className="slot-kind">Talk</span>
+                  <label className="slot-duration"><input type="number" min="0" value={Math.floor(sec/60)} onChange={e=>patchItem(item.id,{duration:durationText(Number(e.target.value)*60+(sec%60))})}/> min</label>
+                  <label className="slot-duration"><input type="number" min="0" max="59" value={sec%60} onChange={e=>patchItem(item.id,{duration:durationText(Math.floor(sec/60)*60+Number(e.target.value))})}/> sec</label>
+                  <button className={`content-button ${item.presenterText?"filled":""}`} onClick={e=>{e.stopPropagation();setSelectedId(item.id)}}>✎ Inhoud{item.presenterText?" ✓":""}</button>
+                  <button className="row-icon" title="Omhoog" onClick={e=>{e.stopPropagation();const idx=playlist.findIndex(x=>x.id===item.id);if(idx>0)moveItem(item.id,playlist[idx-1].id)}}>⌃</button>
+                  <button className="row-icon" title="Omlaag" onClick={e=>{e.stopPropagation();const idx=playlist.findIndex(x=>x.id===item.id);if(idx<playlist.length-1)moveItem(item.id,playlist[idx+1].id)}}>⌄</button>
+                  <button className="row-icon danger" onClick={e=>{e.stopPropagation();removeItem(item.id)}}>⌫</button>
+                </div>
+                {selectedId===item.id&&<div className="talk-content-panel"><div className="talk-editor-caption"><strong>{badgeLabel(item)} bewerken</strong><span>{item.type==="traffic"?"Live verkeer alleen op aanvraag":"Presentatietekst voor dit moment"}</span></div><TalkRichTextEditor item={item} stationSlug={stationSlug} trafficBusy={trafficBusy} onRequestTraffic={item.type==="traffic"?()=>void fetchTrafficForItem(item.id):undefined} onChange={patch=>patchItem(item.id,patch)}/></div>}
+              </>:<>
                 <span className="row-time">{item.time}</span>
                 <div className="music-main">{item.artist&&<span className="music-artist">{item.artist}</span>}<strong>{item.title}</strong></div>
                 <span className="music-duration">{item.duration}</span>
@@ -327,14 +419,14 @@ export default function EditorialPlaylistWorkspace(props:Props){
 
       <aside className="topplaylist-actions">
         <button onClick={()=>quickAdd("weather","Weer")}><span>☁</span> WEER</button>
-        <button disabled={trafficBusy} onClick={()=>void quickAddLiveTraffic()}><span>⇄</span> {trafficBusy?"VERKEER LADEN…":"VERKEER LIVE"}</button>
+        <button onClick={()=>quickAdd("traffic","Verkeer")}><span>⇄</span> VERKEER</button>
         <button onClick={()=>quickAdd("news","Nieuws")}><span>▣</span> NIEUWS</button>
         <button onClick={()=>quickAdd("talk","Redactie")}><span>✎</span> REDACTIE</button>
         <button onClick={()=>quickAdd("talk","Verkochte actie")}><span>★</span> ACTIE</button>
         <button onClick={()=>quickAdd("talk","Wedstrijd / sponsoractie")}><span>✓</span> WEDSTRIJD</button>
         <button onClick={()=>quickAdd("talk","Doorverwijs")}><span>➤</span> DOORVERWIJS</button>
         <button onClick={()=>quickAdd("talk","Check bericht")}><span>⌕</span> CHECK BERICHT</button>
-        <div className="topplaylist-side-info"><strong>Uur {pad(hourNumber)}</strong><span>{playlist.length} items</span><span>{template?`Template: ${template.name}`:"Geen template"}</span><span>Gebruik toewijzingen in sjablonen om verkochte acties en verkeer automatisch op vaste uren te tonen.</span>{trafficMessage&&<span className="traffic-inline-status">{trafficMessage}</span>}</div>
+        <div className="topplaylist-side-info"><strong>Uur {pad(hourNumber)}</strong><span>{playlist.length} items</span><span>{template?`Template: ${template.name}`:"Geen template"}</span><span>Verkeersslots kunnen via sjablonen op vaste uren staan; live verkeersdata wordt pas opgehaald wanneer iemand dat in de talk vraagt.</span>{trafficMessage&&<span className="traffic-inline-status">{trafficMessage}</span>}</div>
       </aside>
     </div>
   </div>

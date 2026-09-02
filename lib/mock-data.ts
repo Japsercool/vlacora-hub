@@ -11,6 +11,7 @@ export const navItems = [
   ["stations", "◉", "Stations"],
   ["taken", "✓", "Taken"],
   ["meldpunt", "!", "Meldpunt"],
+  ["aanvragen", "＋", "Aanvragen"],
   ["messenger", "✉", "Messenger"],
   ["communicatie", "▣", "Communicatie"],
   ["muziekmappen", "▦", "Muziekmappen PDF"],
