@@ -1,2 +1,2 @@
-VLACORA HUB 0.17.1
-Playlist classification + Playout station mapping + editable VLACORA station names.
+VLACORA HUB 0.17.2
+Vercel build fix for malformed hub-app import plus escaped-newline cleanup in 0.17.1 radio files.

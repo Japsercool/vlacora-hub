@@ -865,3 +865,22 @@ Supabase production migration `021_social_studio_phase2.sql` is al toegepast.
 - Een tijdelijk lege Playout Hub wist laatst bekende stations niet meer.
 - Handmatige Playout station-ID fallback toegevoegd.
 - Eigen VLACORA stationsnaam + korte badge toegevoegd, zonder Rotation One/Playout One te hernoemen.
+
+
+## 0.17.2 — Vercel build fix
+
+Oorzaak van de webpack syntaxfout:
+`loadSharedSetting` was per ongeluk midden in de importlijst van
+`collaboration-ui` terechtgekomen in `components/hub-app.tsx`.
+
+Daarnaast zijn drie 0.17.1-bestanden opgeschoond waarin door de generator
+letterlijke `\n` tokens tussen TypeScript-statements waren terechtgekomen:
+- admin-integrations-module.tsx
+- editorial-playlist-workspace.tsx
+- editorial-template-studio.tsx
+
+Alle 0.17.1-functionaliteit blijft behouden:
+- Rotation One playlist classificatie
+- Playout One station mapping / handmatige fallback
+- eigen VLACORA stationnaam en korte badge
+- Social Studio fase 2

@@ -226,7 +226,8 @@ export default function EditorialPlaylistWorkspace(props:Props){
         <div className="topplaylist-list">
           {visible.length===0&&<div className="topplaylist-empty"><strong>Nog niets zichtbaar</strong><span>Haal de echte Rotation One-playlist op of pas een redactietemplate toe.</span></div>}
           {visible.map(item=>{
-            const kind=itemKind(item);\n            const isTalk=!["music","commercial","imaging","promo","link"].includes(kind);
+            const kind=itemKind(item);
+            const isTalk=!["music","commercial","imaging","promo","link"].includes(kind);
             const isYellow=["commercial","imaging","promo","link"].includes(kind);
             const sec=durationSeconds(item.duration);
             return <div key={item.id}

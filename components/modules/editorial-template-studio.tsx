@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect,useMemo,useState } from "react";
-import type { EditorialItem } from "@/components/modules/editorial-module";\nimport { canonicalPlaylistType } from "@/lib/radio/item-types";
+import type { EditorialItem } from "@/components/modules/editorial-module";
+import { canonicalPlaylistType } from "@/lib/radio/item-types";
 import { deleteEditorialTemplate,loadEditorialTemplates,saveEditorialTemplate,type EditorialTemplateAssignment,type EditorialTemplateRecord,type EditorialTemplateSlot } from "@/lib/supabase/editorial";
 import { isSupabaseBrowserConfigured } from "@/lib/supabase/client";
 

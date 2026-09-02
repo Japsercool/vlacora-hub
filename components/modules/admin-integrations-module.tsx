@@ -10,7 +10,8 @@ import {
 import {
   loadSharedIntegrationStore,loadSharedSetting,saveSharedIntegrationStore,saveSharedSetting
 } from "@/lib/supabase/settings";
-import { deletePersistedIntegrationSecret,hydrateIntegrationSecret,migrateSessionSecretToVault,savePersistedIntegrationSecret } from "@/lib/supabase/secrets";\nimport { readStationAliases,saveStationAlias } from "@/lib/radio/hub-stations";
+import { deletePersistedIntegrationSecret,hydrateIntegrationSecret,migrateSessionSecretToVault,savePersistedIntegrationSecret } from "@/lib/supabase/secrets";
+import { readStationAliases,saveStationAlias } from "@/lib/radio/hub-stations";
 
 type StationSettings={timezone:string;active:boolean;playlistWarnings:boolean;newsCheck:boolean;socialReminders:boolean};
 
@@ -37,7 +38,9 @@ export default function AdminIntegrationsModule({stationName,stationSlug}:{stati
   const[busy,setBusy]=useState(false);
   const[diagnostic,setDiagnostic]=useState<any>(null);
   const[loaded,setLoaded]=useState(false);
-  const[secretState,setSecretState]=useState<"idle"|"loading"|"stored"|"session"|"none">("idle");\n  const[localStationName,setLocalStationName]=useState(stationName);\n  const[localStationShort,setLocalStationShort]=useState("");
+  const[secretState,setSecretState]=useState<"idle"|"loading"|"stored"|"session"|"none">("idle");
+  const[localStationName,setLocalStationName]=useState(stationName);
+  const[localStationShort,setLocalStationShort]=useState("");
   const supabaseConfigured=useMemo(()=>isSupabaseBrowserConfigured(),[]);
   const cfg=selected?configs[selected]:null;
 
