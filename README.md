@@ -1191,3 +1191,19 @@ Geen database-migratie en geen betaalde verkeers-API nodig.
 The traffic item now uses `source: "VLACORA"`; the real provider remains visible in the notes as `Live Vlaams Verkeerscentrum • DATEX II`.
 
 No database migration and no API change.
+
+
+## 0.19.6 — tweede verkeers-source buildfix
+
+In 0.19.5 was de handmatig toegevoegde verkeers-talk gecorrigeerd, maar
+de templategenerator had nog een tweede `EditorialItem.source` die
+`Vlaams Verkeerscentrum` kon teruggeven.
+
+Ook template-verkeer gebruikt nu altijd:
+
+`source: "VLACORA"`
+
+De echte bron blijft zichtbaar in `notes` en in de verkeers-API metadata:
+`Vlaams Verkeerscentrum • DATEX II`.
+
+Geen database- of API-wijzigingen.

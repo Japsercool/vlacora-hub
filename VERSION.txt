@@ -1,4 +1,5 @@
-VLACORA HUB 0.19.5
-Build fix for live traffic editorial items.
-Traffic talks use EditorialItem.source="VLACORA"; the actual Vlaams Verkeerscentrum / DATEX II provider remains in the notes.
+VLACORA HUB 0.19.6
+Traffic template source TypeScript build fix.
+Both manually inserted traffic talks and traffic talks generated from editorial templates now use source='VLACORA'.
+The actual provider remains visible in notes/API metadata as Vlaams Verkeerscentrum / DATEX II.
 No database or API changes.

@@ -214,7 +214,7 @@ export default function EditorialPlaylistWorkspace(props:Props){
           duration:durationText(slot.durationSec||20),
           presenterText:isTraffic&&liveTrafficText?liveTrafficText:(slot.content||""),
           notes:isTraffic&&liveTrafficNote?liveTrafficNote:(slot.required?"Verplicht redactieslot":"Redactieslot"),
-          source:isTraffic&&liveTrafficText?"Vlaams Verkeerscentrum":"VLACORA"
+          source:"VLACORA"
         });
       }else if(slot.type==="category"){
         // Keep the missing category visible in the editorial workspace,
