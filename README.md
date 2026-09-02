@@ -1139,3 +1139,16 @@ Geen databasewijzigingen. Geen API-wijzigingen.
 - De lijst zelf krijgt opnieuw meer ruimte en een rustiger, cleaner overzicht.
 
 Geen databasewijzigingen. Geen API-wijzigingen.
+
+
+## 0.19.3 — compacte playlist zoals TOPplaylist
+
+- De playlistsecties staan nu direct tegen elkaar, zonder grote card-gaps.
+- Uren, filters, zoeken, templatekeuze en playlist vormen visueel één geheel.
+- Playlistitems hebben nog maar een kleine tussenruimte.
+- Muziek/jingle-rijen zijn compacter.
+- Het groene `+`-knopje is kleiner en exact verticaal gecentreerd.
+- Talk-rijen blijven compact zolang de inhoud niet openstaat.
+- De template-selector blijft bovenaan beschikbaar.
+
+Geen databasewijzigingen en geen API-wijzigingen.

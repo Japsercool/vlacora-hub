@@ -1,0 +1,10 @@
+VLACORA HUB 0.19.3 validation
+[PASS] package version 0.19.3
+[PASS] topplaylist shell gap forced to 0
+[PASS] playlist row gap reduced to 5px
+[PASS] playlist row margins removed
+[PASS] add-talk button centered vertically
+[PASS] template chooser retained at top
+[INFO] CSS-only UI change plus version/docs
+[INFO] no database changes
+[INFO] no API changes

@@ -1,4 +1,5 @@
-VLACORA HUB 0.19.2
-Playlist restored closer to the cleaner TOPplaylist reference.
-Template chooser moved to the top of the playlist view.
-Playlist actions moved below the list instead of a right sidebar.
+VLACORA HUB 0.19.3
+Compact TOPplaylist spacing.
+Playlist sections now sit directly against each other, playlist rows have only a small 5px gap, and the green add-talk button is vertically centered.
+Template chooser remains at the top.
+No database or API changes.
