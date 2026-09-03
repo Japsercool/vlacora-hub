@@ -94,7 +94,7 @@ export function resolvePermissions(role:string,value:any):PermissionMap {
   return {...preset,...(value&&typeof value==="object"?value:{})} as PermissionMap;
 }
 
-export const modulePermission: Record<string,PermissionKey|null> = {
+export const modulePermission: Partial<Record<string,PermissionKey|null>> = {
   dashboard:"dashboard", "voor-mij":"voor_mij", "mijn-uitzending":"mijn_uitzending", meldingen:"meldingen",
   stations:"stations", taken:"taken", meldpunt:"meldpunt", aanvragen:"beheer", "content-inbox":"redactie",
   messenger:"messenger", communicatie:"communicatie", kalender:"kalender", programmering:"programmering",
@@ -102,3 +102,11 @@ export const modulePermission: Record<string,PermissionKey|null> = {
   muziek:"muziek", "muziek-voorstellen":"muziek_voorstellen", meetings:"meetings", redactie:"redactie", verkeer:"verkeer", hitlijsten:"hitlijsten",
   presentatie:"presentatie", social:"social_content", "social-beheer":"social_templates", "social-templatebouwer":"social_template_builder", "hitlijst-beheer":"hitlijsten", team:"team", beheer:"beheer"
 };
+
+export function canViewModule(permissions: PermissionMap | null | undefined, moduleSlug: string) {
+  if (!permissions) return false;
+  const key = modulePermission[moduleSlug];
+  if (key === null) return true;
+  if (!key) return false;
+  return can(permissions[key], "view");
+}

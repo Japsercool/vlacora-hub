@@ -1,8 +1,8 @@
-# VLACORA HUB 0.24.0
+# VLACORA HUB 0.24.1
 
 VLACORA HUB is de zelfstandige organisatie-, programmatie-, redactie- en social-HUB. Deze editie werkt **zonder Playout One, Rotation One, SHOUTcast/listenerstatistieken of een andere playout-engine**.
 
-Zie `VERSION.txt` voor de release-inhoud en `VALIDATION_0.24.0.txt` voor de uitgevoerde controles.
+Zie `VERSION.txt` voor de release-inhoud en `VALIDATION_0.24.1.txt` voor de uitgevoerde controles.
 
 ## Belangrijkste modules
 
@@ -94,7 +94,7 @@ Zie `docs/ARCHITECTURE.md`.
 
 `npm run build` voert eerst `scripts/prebuild-check.mjs` uit. Die controleert alle App Router `route.ts`-handlers op de expliciete native `globalThis.Request` signature en controleert de bekende Autoprefixer `start/end` valkuil.
 
-## 0.24.0 — Hitlijst Sheet, Beheercentrum en Social Template Builder
+## 0.24.1 — Hitlijst Sheet, Beheercentrum en Social Template Builder
 
 De hitlijstmodule werkt nu als een compacte spreadsheet: rechtstreeks rijen bewerken, verslepen en songs opnieuw kiezen uit een centraal songgeheugen. Het geheugen combineert eerdere hitlijsten en de VLACORA muziekbibliotheek en wordt persistent opgeslagen per station.
 

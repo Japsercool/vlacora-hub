@@ -6,7 +6,7 @@ import { HUB_STATIONS_EVENT,hydrateHubStations,readHubStations,type HubStation }
 import { adminNavSlugs,navItems } from "@/lib/mock-data";
 import { uploadProfileAvatar } from "@/lib/supabase/operations";
 import {
-  PermissionKey,PermissionLevel,PermissionMap,permissionLabels,permissionLevels,permissionGroups,rolePresets,modulePermission,can
+  PermissionKey,PermissionLevel,PermissionMap,permissionLabels,permissionLevels,permissionGroups,rolePresets,canViewModule
 } from "@/lib/permissions";
 
 type TeamUser={
@@ -67,7 +67,7 @@ export default function TeamRightsModule({stationSlug}:{stationSlug:string}){
   useEffect(()=>{const u=users.find(x=>x.id===selectedId);if(u)setDraft(JSON.parse(JSON.stringify(u)))},[selectedId,users]);
 
   const filtered=useMemo(()=>users.filter(u=>{const q=query.toLowerCase();return(!q||`${u.name} ${u.email} ${u.role}`.toLowerCase().includes(q))&&(roleFilter==="Alle"||u.role===roleFilter)&&(stationFilter==="Alle"||u.stations.includes(stationFilter))}),[users,query,roleFilter,stationFilter]);
-  const menuPreview=useMemo(()=>{if(!draft)return{main:[],admin:[]};const visible=navItems.filter(([slug])=>{const key=modulePermission[slug];return key===null||can(draft.permissions[key],"view")});return{main:visible.filter(([slug])=>!adminNavSlugs.includes(slug as any)),admin:visible.filter(([slug])=>adminNavSlugs.includes(slug as any))}},[draft]);
+  const menuPreview=useMemo(()=>{if(!draft)return{main:[],admin:[]};const visible=navItems.filter(([slug])=>canViewModule(draft.permissions,slug));return{main:visible.filter(([slug])=>!adminNavSlugs.includes(slug as any)),admin:visible.filter(([slug])=>adminNavSlugs.includes(slug as any))}},[draft]);
   function patch(p:Partial<TeamUser>){if(draft)setDraft({...draft,...p,...(p.name?{initials:initials(p.name)}:{})})}
   function setRole(role:string){if(!draft)return;patch({role,jobTitle:draft.jobTitle||role,permissions:{...(rolePresets[role]||draft.permissions)}})}
   function setPermission(key:PermissionKey,level:PermissionLevel){if(draft)patch({permissions:{...draft.permissions,[key]:level}})}

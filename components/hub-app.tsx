@@ -35,7 +35,7 @@ import { HUB_STATIONS_EVENT, allHubStation, hydrateHubStations, readHubStations,
 import AccountWidget from "@/components/auth/account-widget";
 import { runOperationalChecks } from "@/lib/supabase/operations";
 import { createClient,isSupabaseBrowserConfigured } from "@/lib/supabase/client";
-import { can,modulePermission,resolvePermissions,type PermissionMap } from "@/lib/permissions";
+import { canViewModule,resolvePermissions,type PermissionMap } from "@/lib/permissions";
 import { CollaborationProvider,useCollaboration } from "@/components/collaboration/collaboration-provider";
 import {
   MandatoryNotificationModal,NotificationBell,NotificationDrawer,NotificationsPage,
@@ -79,10 +79,9 @@ function HubAppInner({ stationSlug, moduleSlug }: Props) {
     return()=>{alive=false};
   },[]);
 
-  const visibleNavItems=useMemo(()=>permissions?navItems.filter(([slug])=>!adminNavSlugs.includes(slug as any)).filter(([slug])=>{const key=modulePermission[slug];return key===null||can(permissions[key],"view")}):[],[permissions]);
-  const visibleAdminItems=useMemo(()=>permissions?navItems.filter(([slug])=>adminNavSlugs.includes(slug as any)).filter(([slug])=>{const key=modulePermission[slug];return key===null||can(permissions[key],"view")}):[],[permissions]);
-  const currentPermissionKey=modulePermission[moduleSlug];
-  const hasModuleAccess=Boolean(permissions)&&(currentPermissionKey===null||can(permissions[currentPermissionKey],"view"));
+  const visibleNavItems=useMemo(()=>navItems.filter(([slug])=>!adminNavSlugs.includes(slug as any)).filter(([slug])=>canViewModule(permissions,slug)),[permissions]);
+  const visibleAdminItems=useMemo(()=>navItems.filter(([slug])=>adminNavSlugs.includes(slug as any)).filter(([slug])=>canViewModule(permissions,slug)),[permissions]);
+  const hasModuleAccess=canViewModule(permissions,moduleSlug);
   const moduleName = useMemo(() => navItems.find((n) => n[0] === moduleSlug)?.[2] || "Dashboard", [moduleSlug]);
 
 

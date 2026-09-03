@@ -1,0 +1,18 @@
+VLACORA HUB 0.24.1 — menu permissions strict-type fix
+
+Validation performed in artifact environment:
+- PASS: fixed nullable permissions access in components/hub-app.tsx.
+- PASS: menu visibility/access logic centralized in canViewModule().
+- PASS: modulePermission now models unknown slugs as possibly undefined and fails closed.
+- PASS: Team & rights menu preview uses the same canViewModule() logic as the real sidebar.
+- PASS: lib/permissions.ts compiles with TypeScript --strict.
+- PASS: 71 TS/TSX implementation files syntax-transpiled with TypeScript; 0 syntax errors.
+- PASS: local import scan; 0 missing local imports.
+- PASS: npm prebuild guard; 2 App Router route.ts files checked.
+- PASS: no NextRequest route-handler signatures detected by prebuild guard.
+- PASS: no external-stubs.d.ts or tsbuildinfo included.
+- PASS: stale external-stubs self-heal remains enabled.
+
+Environment note:
+- Full dependency-backed next build could not be completed here because npm install timed out on network access.
+- The exact TypeScript failure reported by Vercel (permissions possibly null) is removed structurally, rather than suppressed with a cast.
