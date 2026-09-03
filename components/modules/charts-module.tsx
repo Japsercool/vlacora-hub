@@ -125,6 +125,77 @@ export default function ChartsModule({stationSlug,stationName}:{stationSlug:stri
     }
     setEntries(entries);setBulkText("");flash(`${added} songs toegevoegd${skipped?` • ${skipped} overgeslagen`:""}`);
   }
+  function exportCsv(){
+    if(!selected)return;
+    const rows=[
+      ["Positie","Vorige","Artiest","Titel","Trend","Weken","Peak","Notitie"],
+      ...selected.entries.map((e,i)=>[
+        String(i+1),
+        e.previousPosition==null?"NEW":String(e.previousPosition),
+        e.artist,
+        e.title,
+        trendText(e,i),
+        String(e.weeks),
+        String(e.peak),
+        e.notes
+      ])
+    ];
+    const csv=rows.map(r=>r.map(v=>`"${String(v).replaceAll('"','""')}"`).join(";")).join("\r\n");
+    const blob=new Blob(["\ufeff"+csv],{type:"text/csv;charset=utf-8"});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement("a");
+    a.href=url;
+    a.download=`${selected.name}-${selected.editionLabel}.csv`.replace(/[^a-z0-9.-]+/gi,"-").toLowerCase();
+    a.click();
+    URL.revokeObjectURL(url);
+    flash("CSV geëxporteerd");
+  }
+
+  function exportPdf(){
+    if(!selected||!selected.entries.length)return flash("Deze hitlijst bevat nog geen songs.");
+    const doc=new jsPDF({unit:"mm",format:"a4"});
+    let page=1,y=48;
+    const W=210,margin=14;
+    const header=()=>{
+      doc.setFillColor(31,31,117);
+      doc.rect(0,0,210,297,"F");
+      doc.setFillColor(83,56,229);
+      doc.circle(184,25,46,"F");
+      doc.setTextColor(255,255,255);
+      doc.setFont("helvetica","bold");
+      doc.setFontSize(20);
+      doc.text("VLACORA",margin,18);
+      doc.setFontSize(8);
+      doc.setFont("helvetica","normal");
+      doc.text(`${stationName.toUpperCase()} • HITLIJST`,margin,24);
+      doc.text(`Pagina ${page}`,W-margin,287,{align:"right"});
+      doc.setFont("helvetica","bold");
+      doc.setFontSize(19);
+      doc.text(selected.name,margin,36);
+      doc.setFont("helvetica","normal");
+      doc.setFontSize(9);
+      doc.text(`${selected.editionLabel} • ${selected.validFrom} t/m ${selected.validTo}${selected.programName?` • ${selected.programName}`:""}`,margin,42);
+    };
+    header();
+    selected.entries.forEach((e,i)=>{
+      if(y>271){doc.addPage();page++;y=38;header()}
+      if(i%2===0){doc.setFillColor(47,47,137);doc.roundedRect(margin,y-5,W-margin*2,9,1,1,"F")}
+      doc.setTextColor(255,255,255);
+      doc.setFontSize(10);
+      doc.setFont("helvetica","bold");
+      doc.text(String(i+1),margin+2,y);
+      doc.text(e.artist||"—",margin+15,y);
+      doc.setFont("helvetica","normal");
+      doc.text(e.title||"—",84,y);
+      doc.setTextColor(200,205,255);
+      doc.setFontSize(8);
+      doc.text(`${e.previousPosition==null?"NEW":`vorige ${e.previousPosition}`} • ${trendText(e,i)} • ${e.weeks} wk`,W-margin-2,y,{align:"right"});
+      y+=10;
+    });
+    doc.save(`${selected.name}-${selected.editionLabel}.pdf`.replace(/[^a-z0-9.-]+/gi,"-").toLowerCase());
+    flash("Hitlijst-PDF gemaakt");
+  }
+
   function trendText(e:HitlistEntry,index:number){if(e.previousPosition==null)return "NEW";const d=e.previousPosition-(index+1);return d>0?`▲ ${d}`:d<0?`▼ ${Math.abs(d)}`:"—"}
 
   const metrics=useMemo(()=>{

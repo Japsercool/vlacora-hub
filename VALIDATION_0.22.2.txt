@@ -1,0 +1,22 @@
+VLACORA HUB 0.22.2 validation notes
+
+PASS: TypeScript/TSX syntax parse across 61 app/components/lib/middleware files: 0 syntax errors.
+PASS: charts-module.tsx defines exportCsv and exportPdf before both JSX references.
+PASS: Editorial workspace load/save now uses a typed EditorialWorkspaceRecord and no longer reads .revision from a boolean.
+PASS: Editorial source_revision is normalized to revision in the Supabase data layer.
+PASS: Social review author lookup uses Map<string,string>, removing a strict TypeScript author_name error.
+PASS: No Playout One / Rotation One application modules or API clients remain in the standalone app/components/lib source tree.
+PASS: No listener/stream statistics implementation remains. Migration 029 only contains cleanup statements that remove legacy listener/API secrets.
+PASS: Central calendar route and PostgreSQL persistence are present.
+PASS: Calendar supports personal, station and organisation scopes plus invitees.
+PASS: Social Studio workflow metadata is persisted through Supabase/PostgreSQL.
+PASS: Existing social-post edit flow preserves the selected post.
+PASS: Upgrade instructions include migration 029 + 030 for 0.20.x and only 030 for 0.21.x.
+
+IMPORTANT BUILD NOTE:
+A completely clean `npm install && npm run build` could not be executed inside the artifact container because npm dependency installation timed out before dependencies were available. A stricter local TypeScript audit with external-framework stubs was therefore used to find internal type errors; the two real internal errors discovered in 0.22.1 were fixed in 0.22.2.
+
+Before production deployment, the definitive gate remains:
+1. npm install
+2. npm run build
+3. deploy only when Next.js exits with code 0

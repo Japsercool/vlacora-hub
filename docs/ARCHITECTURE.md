@@ -1,6 +1,6 @@
 # VLACORA HUB architecture — standalone edition
 
-VLACORA HUB 0.22.0 is a standalone editorial and organisation platform. It has no dependency on a playout engine, rotation engine, encoder, stream or listener-statistics provider.
+VLACORA HUB 0.22.2 is a standalone editorial and organisation platform. It has no dependency on a playout engine, rotation engine, encoder, stream or listener-statistics provider.
 
 ## Current architecture
 
@@ -61,7 +61,7 @@ Intended migration flow:
 6. Activate the new backend from the superadmin migration workflow.
 7. Keep rollback information until validation is complete.
 
-Version 0.22.0 keeps Supabase active. The data model is deliberately PostgreSQL-oriented and avoids making core team data dependent on a playout engine or an external social provider.
+Version 0.22.2 keeps Supabase active. The data model is deliberately PostgreSQL-oriented and avoids making core team data dependent on a playout engine or an external social provider.
 
 ## Cost / usage rule
 
