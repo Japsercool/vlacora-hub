@@ -30,6 +30,8 @@ export default function CalendarModule({stationSlug}:{stationSlug:string}){
   const[selectedId,setSelectedId]=useState<string>("");
   const[editor,setEditor]=useState<Partial<CalendarEvent>|null>(null);
   const[attendees,setAttendees]=useState<string[]>([]);
+  const[inviteSearch,setInviteSearch]=useState("");
+  const[inviteOpen,setInviteOpen]=useState(false);
   const[busy,setBusy]=useState(false);const[notice,setNotice]=useState("");
   const range=useMemo(()=>endOfMonthRange(month),[month]);
   const cells=useMemo(()=>monthCells(month),[month]);
@@ -51,6 +53,12 @@ export default function CalendarModule({stationSlug}:{stationSlug:string}){
   }),[events,scope,stationSlug,collaboration.currentUser?.id]);
   const showSources=scope==="station"||scope==="organization";
   const selected=events.find(e=>e.id===selectedId)||null;
+  const invitePeople=useMemo(()=>{
+    const q=inviteSearch.trim().toLowerCase();
+    const me=collaboration.currentUser?.id||"";
+    return people.filter(p=>p.id!==me&&(!q||`${p.name} ${p.email} ${p.jobTitle}`.toLowerCase().includes(q)));
+  },[people,inviteSearch,collaboration.currentUser?.id]);
+  const invitedPeople=useMemo(()=>attendees.map(id=>people.find(p=>p.id===id)).filter(Boolean) as CalendarPerson[],[attendees,people]);
   const upcoming=useMemo(()=>{
     const now=Date.now();
     return [...visibleEvents.map(e=>({id:e.id,title:e.title,startsAt:e.startsAt,subtitle:`${e.scope==="personal"?(e.ownerName||"Persoonlijk"):e.scope==="station"?e.stationSlug:"VLACORA"} • ${e.eventType}`,path:"",source:false})),...(showSources?sources.map(s=>({...s,source:true})):[])].filter(x=>new Date(x.startsAt).getTime()>=now-86400000).sort((a,b)=>a.startsAt.localeCompare(b.startsAt)).slice(0,12);
@@ -58,12 +66,21 @@ export default function CalendarModule({stationSlug}:{stationSlug:string}){
 
   function newEvent(targetScope:CalendarScope){
     const start=new Date();start.setMinutes(Math.ceil(start.getMinutes()/15)*15,0,0);const end=new Date(start.getTime()+60*60_000);
-    setSelectedId("");setAttendees([]);setEditor({id:`new-${Date.now()}`,scope:targetScope,stationSlug:stationSlug==="all"?"all":stationSlug,ownerUserId:targetScope==="personal"?(collaboration.currentUser?.id||null):null,title:"",description:"",eventType:"meeting",startsAt:start.toISOString(),endsAt:end.toISOString(),allDay:false,location:""});
+    setSelectedId("");setAttendees([]);setInviteSearch("");setInviteOpen(false);setEditor({id:`new-${Date.now()}`,scope:targetScope,stationSlug:stationSlug==="all"?"all":stationSlug,ownerUserId:targetScope==="personal"?(collaboration.currentUser?.id||null):null,title:"",description:"",eventType:"meeting",startsAt:start.toISOString(),endsAt:end.toISOString(),allDay:false,location:""});
   }
-  function editEvent(e:CalendarEvent){setSelectedId(e.id);setEditor({...e});setAttendees(e.attendeeIds)}
+  function editEvent(e:CalendarEvent){setSelectedId(e.id);setEditor({...e});setAttendees(e.attendeeIds);setInviteSearch("");setInviteOpen(false)}
+  function toggleAttendee(id:string){setAttendees(current=>current.includes(id)?current.filter(x=>x!==id):[...current,id])}
   async function persist(){
     if(!editor?.title?.trim()||!editor.startsAt||!editor.scope)return flash("Vul minstens titel en startmoment in.");
-    setBusy(true);try{const id=await saveCalendarEvent({...(editor as any),stationSlug:editor.stationSlug||stationSlug},attendees);flash("Agenda-item opgeslagen");setEditor(null);setSelectedId(id);await load()}catch(e){flash(e instanceof Error?e.message:"Opslaan mislukt")}finally{setBusy(false)}
+    const previousIds=new Set(selected?.attendeeIds||[]);
+    const newInvitees=editor.scope==="personal"?[]:attendees.filter(id=>!previousIds.has(id));
+    setBusy(true);try{
+      const id=await saveCalendarEvent({...(editor as any),stationSlug:editor.stationSlug||stationSlug},attendees);
+      for(const userId of newInvitees){
+        try{await collaboration.publishNotification({stationSlug:editor.scope==="station"?(editor.stationSlug||stationSlug):null,title:`Uitnodiging: ${editor.title.trim()}`,body:`Je bent uitgenodigd voor ${new Date(editor.startsAt).toLocaleString("nl-BE",{weekday:"short",day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit"})}${editor.location?` • ${editor.location}`:""}.`,category:"Agenda",severity:"info",actionPath:`/hub/${stationSlug}/kalender`,recipientUserId:userId})}catch{}
+      }
+      flash(newInvitees.length?`Agenda-item opgeslagen • ${newInvitees.length} uitnodiging(en) verstuurd`:"Agenda-item opgeslagen");setEditor(null);setSelectedId(id);setInviteSearch("");setInviteOpen(false);await load()
+    }catch(e){flash(e instanceof Error?e.message:"Opslaan mislukt")}finally{setBusy(false)}
   }
   async function remove(){if(!selected||!confirm(`“${selected.title}” verwijderen?`))return;setBusy(true);try{await deleteCalendarEvent(selected.id);setEditor(null);setSelectedId("");flash("Agenda-item verwijderd");await load()}catch(e){flash(e instanceof Error?e.message:"Verwijderen mislukt")}finally{setBusy(false)}
   }
@@ -85,7 +102,7 @@ export default function CalendarModule({stationSlug}:{stationSlug:string}){
           const key=localKey(day),outside=day.getMonth()!==month.getMonth(),today=key===localKey(new Date());
           const dayEvents=visibleEvents.filter(e=>localKey(new Date(e.startsAt))===key);
           const daySources=showSources?sources.filter(e=>localKey(new Date(e.startsAt))===key):[];
-          return <div className={`calendar-v22-day ${outside?"outside":""} ${today?"today":""}`} key={key}><div className="calendar-v22-dayhead"><b>{day.getDate()}</b>{today&&<span>vandaag</span>}<button onClick={()=>{const start=new Date(day);start.setHours(10,0,0,0);const end=new Date(start.getTime()+3600000);setAttendees([]);setEditor({id:`new-${Date.now()}`,scope:scope==="organization"?"organization":scope==="station"?"station":"personal",stationSlug,ownerUserId:collaboration.currentUser?.id||null,title:"",eventType:"meeting",startsAt:start.toISOString(),endsAt:end.toISOString(),description:"",location:""})}}>＋</button></div><div className="calendar-v22-items">
+          return <div className={`calendar-v22-day ${outside?"outside":""} ${today?"today":""}`} key={key}><div className="calendar-v22-dayhead"><b>{day.getDate()}</b>{today&&<span>vandaag</span>}<button onClick={()=>{const start=new Date(day);start.setHours(10,0,0,0);const end=new Date(start.getTime()+3600000);setAttendees([]);setInviteSearch("");setInviteOpen(false);setEditor({id:`new-${Date.now()}`,scope:scope==="organization"?"organization":scope==="station"?"station":"personal",stationSlug,ownerUserId:collaboration.currentUser?.id||null,title:"",eventType:"meeting",startsAt:start.toISOString(),endsAt:end.toISOString(),description:"",location:""})}}>＋</button></div><div className="calendar-v22-items">
             {dayEvents.slice(0,4).map(e=><button className={`calendar-event-chip type-${e.eventType}`} key={e.id} onClick={()=>editEvent(e)}><span>{e.allDay?"hele dag":new Date(e.startsAt).toLocaleTimeString("nl-BE",{hour:"2-digit",minute:"2-digit"})}</span><strong>{e.title}</strong></button>)}
             {daySources.slice(0,3).map(s=><button className={`calendar-event-chip source-${s.kind}`} key={s.id} onClick={()=>router.push(s.path)}><span>{new Date(s.startsAt).toLocaleTimeString("nl-BE",{hour:"2-digit",minute:"2-digit"})}</span><strong>{s.title}</strong></button>)}
             {dayEvents.length+daySources.length>7&&<small>+{dayEvents.length+daySources.length-7} meer</small>}
@@ -107,7 +124,11 @@ export default function CalendarModule({stationSlug}:{stationSlug:string}){
       <label className="required-notification-toggle"><input type="checkbox" checked={Boolean(editor.allDay)} onChange={e=>setEditor({...editor,allDay:e.target.checked})}/><div><strong>Hele dag</strong><span>Toon zonder specifiek uur.</span></div></label>
       <label className="field">Locatie<input className="input" value={editor.location||""} onChange={e=>setEditor({...editor,location:e.target.value})} placeholder="Studio, vergaderzaal, online…"/></label>
       <label className="field">Beschrijving<textarea className="input textarea" value={editor.description||""} onChange={e=>setEditor({...editor,description:e.target.value})}/></label>
-      {editor.scope!=="personal"&&<label className="field">Uitgenodigde teamleden<select className="input calendar-multi-select" multiple value={attendees} onChange={e=>setAttendees(Array.from(e.currentTarget.selectedOptions as HTMLCollectionOf<HTMLOptionElement>).map(o=>o.value))}>{people.map(p=><option value={p.id} key={p.id}>{p.name}</option>)}</select></label>}
+      {editor.scope!=="personal"&&<div className="field calendar-invite-field"><span>Mensen uitnodigen</span><div className="calendar-invite-box">
+        {invitedPeople.length>0&&<div className="calendar-invite-chips">{invitedPeople.map(person=><button type="button" key={person.id} className="calendar-invite-chip" onClick={()=>toggleAttendee(person.id)}>{person.avatarUrl?<img src={person.avatarUrl} alt=""/>:<b>{person.name.split(/\s+/).slice(0,2).map(x=>x[0]).join("").toUpperCase()}</b>}<span>{person.name}</span><i>×</i></button>)}</div>}
+        <button type="button" className="calendar-invite-trigger" onClick={()=>setInviteOpen(v=>!v)}><span>＋ {attendees.length?"Nog iemand uitnodigen":"Teamleden kiezen"}</span><b>{attendees.length} geselecteerd ▾</b></button>
+        {inviteOpen&&<div className="calendar-invite-popover"><input autoFocus className="input" value={inviteSearch} onChange={e=>setInviteSearch(e.target.value)} placeholder="Zoek op naam, e-mail of functie…"/><div className="calendar-invite-list">{invitePeople.length===0?<div className="calendar-invite-empty">Geen teamleden gevonden.</div>:invitePeople.map(person=>{const checked=attendees.includes(person.id);return <button type="button" key={person.id} className={checked?"selected":""} onClick={()=>toggleAttendee(person.id)}>{person.avatarUrl?<img src={person.avatarUrl} alt=""/>:<b>{person.name.split(/\s+/).slice(0,2).map(x=>x[0]).join("").toUpperCase()}</b>}<span><strong>{person.name}</strong><small>{person.jobTitle||person.email}</small></span><i>{checked?"✓":"＋"}</i></button>})}</div><div className="calendar-invite-popover-foot"><span>{attendees.length} persoon/personen uitgenodigd</span><button type="button" className="ghost" onClick={()=>setInviteOpen(false)}>Klaar</button></div></div>}
+      </div><small>Uitgenodigde accounts krijgen na opslaan een VLACORA-melding. Persoonlijke afspraken kunnen niemand uitnodigen.</small></div>}
       <div className="button-row"><button className="primary" disabled={busy} onClick={()=>void persist()}>Opslaan</button>{selected&&<button className="ghost danger-text" disabled={busy} onClick={()=>void remove()}>Verwijderen</button>}</div>
     </div></div></div>}
   </div>;

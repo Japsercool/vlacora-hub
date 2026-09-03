@@ -1,8 +1,8 @@
-# VLACORA HUB 0.24.2
+# VLACORA HUB 0.24.3
 
 VLACORA HUB is de zelfstandige organisatie-, programmatie-, redactie- en social-HUB. Deze editie werkt **zonder Playout One, Rotation One, SHOUTcast/listenerstatistieken of een andere playout-engine**.
 
-Zie `VERSION.txt` voor de release-inhoud en `VALIDATION_0.24.2.txt` voor de uitgevoerde controles.
+Zie `VERSION.txt` voor de release-inhoud en `VALIDATION_0.24.3.txt` voor de uitgevoerde controles.
 
 ## Belangrijkste modules
 
@@ -108,3 +108,26 @@ Voor een bestaande database voer je `supabase/migrations/037_hitlist_song_memory
 ### 0.24.2 build hardening
 
 De Templatebouwer gebruikt één generieke pointer-handler voor canvaslagen en resize-handles, zodat DIV- en SPAN-events typeveilig dezelfde drag/resize-logica kunnen gebruiken. De prebuild voert op een normale installatie/Vercel bovendien eerst `tsc --noEmit` uit. Zo worden alle TypeScript-fouten in één controle gemeld vóór Next.js aan de productiebuild begint.
+
+
+## 0.24.3 — Hitlijstwerkblad v2, account-uitnodigingen en direct-image builder
+
+Het hitlijstwerkblad gebruikt geen losse Songgeheugen-kolom meer. Artiest en titel worden rechtstreeks in één geïntegreerde songcel bewerkt; via de compacte dropdown kies je songs uit eerdere edities, VLACORA Muziek en het centrale PostgreSQL-songgeheugen. De vorige editie wordt standaard automatisch binnen dezelfde reeks gekoppeld en historie matcht ook op song-ID wanneer die beschikbaar is.
+
+In de agenda is de oude native multi-select vervangen door een zoekbare account-picker met avatars/chips. Nieuwe genodigden krijgen na opslaan een VLACORA-melding. Persoonlijke afspraken blijven strikt privé en hebben geen genodigden.
+
+De Social Templatebouwer kan nu een echte afbeelding als laag uploaden en rechtstreeks vanuit de computer op het canvas droppen. Achtergrondafbeeldingen blijven een aparte canvasinstelling. De sidebar heeft tegelijk een duidelijker WERKPLEK/BEHEER-onderscheid en een eigen scrollgebied.
+
+Voor 0.24.3 is geen nieuwe Supabase-migratie nodig.
+
+## 0.24.3 — werkblad, agenda-uitnodigingen, navigatie en social canvas
+
+De hitlijsteditor gebruikt nu één geïntegreerde **Song**-werkcel per positie. Artiest en titel zijn rechtstreeks bewerkbaar; de compacte dropdown in dezelfde cel zoekt in het centrale songgeheugen, VLACORA Muziek en eerdere edities. Historiek wordt per reeks op datum teruggevonden zodat vorige positie, trend, weken en peak automatisch kunnen worden herberekend.
+
+Bij niet-persoonlijke agenda-items kunnen teamleden via hun echte Supabase-account worden uitgenodigd. De picker ondersteunt zoeken, avatars en meerdere personen. Nieuwe genodigden krijgen een VLACORA-melding. Persoonlijke afspraken blijven uitgesloten van uitnodigingen en blijven via RLS uitsluitend zichtbaar voor de eigenaar.
+
+In de zijbalk staat **WERKPLEK** altijd vóór **BEHEER**. Beide zitten in één centrale scrollzone, waardoor beheerfuncties pas lager in het menu verschijnen en het normale werkmenu niet meer wordt samengedrukt. Het accountblok blijft onderaan bereikbaar.
+
+De Social Templatebouwer ondersteunt nu ook directe afbeeldinglagen: upload via de toolbar of sleep een PNG/JPG/WebP rechtstreeks op het canvas. Een canvasachtergrond uploaden is een aparte actie, zodat een achtergrond niet meer per ongeluk als gewone laag wordt toegevoegd.
+
+0.24.3 introduceert geen nieuwe database-migratie bovenop `037_hitlist_song_memory.sql`.

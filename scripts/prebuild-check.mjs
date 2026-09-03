@@ -64,6 +64,46 @@ if (fs.existsSync(builderFile)) {
   }
 }
 
+
+// 0.24.3 regressions: the hitlijst workblad must use the integrated song picker,
+// and agenda invitations must use the account picker instead of a native multi-select.
+const chartsFile = path.join(root, "components", "modules", "charts-module.tsx");
+if (fs.existsSync(chartsFile)) {
+  const chartsSource = fs.readFileSync(chartsFile, "utf8");
+  if (chartsSource.includes(">Songgeheugen<") || chartsSource.includes("chart-memory-select")) {
+    problems.push("Hitlijstwerkblad bevat opnieuw de oude losse Songgeheugen-kolom/select.");
+  }
+  if (/onClick=\{addBlankEntry\}/.test(chartsSource)) {
+    problems.push("Hitlijstwerkblad geeft addBlankEntry rechtstreeks als click-handler door; dit kan MouseEvent/boolean typefouten veroorzaken.");
+  }
+}
+const calendarFile = path.join(root, "components", "modules", "calendar-module.tsx");
+if (fs.existsSync(calendarFile)) {
+  const calendarSource = fs.readFileSync(calendarFile, "utf8");
+  if (calendarSource.includes("calendar-multi-select")) {
+    problems.push("Agenda gebruikt opnieuw de oude native multi-select in plaats van de account-uitnodiger.");
+  }
+  if (!calendarSource.includes("calendar-invite-popover") || !calendarSource.includes("publishNotification")) {
+    problems.push("Agenda-accountuitnodigingen of uitnodigingsmelding ontbreken.");
+  }
+}
+
+
+// 0.24.3 navigation + social builder regressions.
+const hubAppFile = path.join(root, "components", "hub-app.tsx");
+if (fs.existsSync(hubAppFile)) {
+  const hubSource = fs.readFileSync(hubAppFile, "utf8");
+  if (!hubSource.includes("sidebar-menu-scroll") || !hubSource.includes("workspace-nav")) {
+    problems.push("Zijbalk mist de gedeelde scrollzone: BEHEER mag het gewone werkmenu niet wegdrukken.");
+  }
+}
+if (fs.existsSync(builderFile)) {
+  const builderSource = fs.readFileSync(builderFile, "utf8");
+  if (!builderSource.includes("dropImage") || !builderSource.includes("builder-toolbar-upload")) {
+    problems.push("Templatebouwer mist direct afbeelding uploaden/drag-and-drop op het canvas.");
+  }
+}
+
 // Cleanup must have succeeded: none may remain in the source tree.
 const remainingStubs = walk(root).filter((file) => path.basename(file) === "external-stubs.d.ts");
 for (const file of remainingStubs) {

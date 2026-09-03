@@ -1,0 +1,38 @@
+VLACORA HUB 0.24.3 — release validation
+
+Code / syntax
+- 71 TS/TSX implementation files syntax-transpiled: PASS
+- Targeted semantic TypeScript pass with DOM/React event typing and strict null/type checks: PASS
+- Local import scan: PASS (see release check command)
+
+Build guard
+- npm run prebuild: PASS
+- App Router route.ts count: 2
+- NextRequest in route handlers: 0
+- Route first argument: globalThis.Request
+- external-stubs.d.ts in release tree: 0
+- guarded start/end Autoprefixer values: 0
+- hitlijst old Songgeheugen select regression: guarded
+- agenda native multi-select regression: guarded
+- Templatebouwer narrow DIV/SPAN pointer regression: guarded
+- sidebar work/admin scroll structure: guarded
+- direct social image upload/drop: guarded
+
+Functional code checks
+- Hitlijst integrated artist/title + memory picker present
+- Previous-edition history calculation present
+- New-edition-from-current-list action present
+- Calendar account search/multi-invite present
+- Calendar personal scope suppresses attendees
+- New invite notification call present
+- Sidebar WERKPLEK before BEHEER in shared scroll area
+- Template Builder toolbar image upload + desktop file drop present
+- Template background upload separated from image layer upload
+
+Standalone cleanup
+- Muziekmappen PDF navigation absent
+- No active Playout One / Rotation One / SHOUTcast / listener-statistics references in app/components/lib
+
+Environment limitation
+- A full dependency-backed `next build` was not run in this container because project node_modules are not present and this runtime cannot fetch npm dependencies.
+- On a normal/Vercel install, `npm run build` automatically executes the prebuild guard and full `tsc --noEmit` first.

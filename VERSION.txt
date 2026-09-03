@@ -1,46 +1,37 @@
-VLACORA HUB 0.24.2
-Hitlijst Sheet + Beheercentrum + Social Template Builder release.
+VLACORA HUB 0.24.3
+Hitlijstwerkblad v2 + Agenda-uitnodigingen + Sidebar priority + Social canvas images.
 
-Nieuw in 0.24.2
-- Hitlijsten hebben nu een Excel-achtige sheeteditor met vaste kolommen voor positie, songgeheugen, artiest, titel, vorige positie, trend, weken, peak en notitie.
-- Songs worden centraal per station onthouden in PostgreSQL via hub_chart_song_memory. Een dropdown stelt eerder gebruikte songs, songs uit VLACORA Muziek en songs uit eerdere hitlijsten opnieuw voor.
-- Drag & drop / omhoog / omlaag voor posities blijft beschikbaar; trend, weken en peak worden automatisch opnieuw berekend op basis van de vorige en historische edities.
-- Excel/CSV blijft bedoeld voor bulkimport/export, terwijl dagelijkse correcties rechtstreeks in de sheet kunnen gebeuren.
-- Apart BEHEER-blok in de zijbalk op elke HUB-pagina voor gebruikers met beheerrechten.
-- Nieuwe beheeronderdelen: Hitlijstbeheer, Social beheer en Social Templatebouwer, naast Stations, Team, Sjablonen en centraal Beheer.
-- Teamrechten bepalen zowel toegang als zichtbaarheid van hoofdmenu en beheermenu.
-- Menurechten zijn nu volledig per gebruiker instelbaar: Voor mij, Mijn uitzending en Meldingen kunnen ook afzonderlijk verborgen worden.
-- Team & rechten toont live welke hoofdmenu- en BEHEER-items de geselecteerde gebruiker daadwerkelijk zal zien.
-- Social Templatebouwer gebruikt nu een echte layer-based builderarchitectuur; de gewone Social Studio bevat geen template-editor meer.
-- Social Studio is opgesplitst in dagelijkse contentworkflow en apart template-/brandbeheer.
-- Nieuwe sociale ontwerpstijlen verschillen visueel sterk van elkaar (release, chart, show, takeover, event, update, quote, winactie).
-- Volwaardige Social Templatebouwer met canvas, lagen, tekst/afbeelding/vormen, positie, schaal, rotatie, layer-volgorde, kleuren, fonts, assets, variabelen en meerdere formaten.
-- Nieuwe template-starters: Neon Release, Chart Shock, Takeover Frame, Story Radar, Editorial Quote en Event Cutout.
-- Social templates blijven station-specifiek en worden centraal opgeslagen in Supabase/PostgreSQL.
+Nieuw / verbeterd in 0.24.3
+- Hitlijstwerkblad opnieuw opgebouwd: geen aparte brede “Songgeheugen”-kolom meer. Artiest + titel vormen één bewerkbare songcel met een compacte zoek/dropdown-knop.
+- Centrale songpicker zoekt in hitlijstgeheugen, VLACORA Muziek en eerdere hitlijsten.
+- Rijen blijven direct bewerkbaar, versleepbaar en via pijltjes verplaatsbaar.
+- Vorige positie, trend, weken en peak worden opnieuw berekend vanuit eerdere edities in dezelfde reeks.
+- Vorige editie wordt automatisch gevonden op basis van reeks + publicatiedatum, tenzij expliciet een editie gekozen is.
+- Knop “Nieuwe editie uit deze lijst” maakt een volgende editie vanuit de huidige ranking zodat weekwerk sneller gaat.
+- Excel import/plakken blijft beschikbaar voor bulkwerk.
+- Agenda: bij station- en organisatie-items kunnen echte actieve Supabase-accounts worden uitgenodigd via een zoekbare multi-picker met avatar, naam, functie/e-mail en chips.
+- Nieuwe genodigden krijgen na opslaan een VLACORA-melding. Persoonlijke afspraken blijven strikt privé en kunnen geen genodigden bevatten.
+- Zijbalk: het normale WERKPLEK-menu staat altijd eerst. BEHEER staat pas eronder in dezelfde scrollzone en kan het gewone menu niet meer wegdrukken. Profiel/logout blijft onderaan vast beschikbaar.
+- Social Templatebouwer: afbeeldingen kunnen nu rechtstreeks via de bovenste toolbar worden geüpload en als vrije laag op het canvas geplaatst.
+- Social Templatebouwer: PNG/JPG/WebP kan vanuit de computer rechtstreeks op het canvas worden gesleept; VLACORA uploadt het asset en plaatst de afbeelding op de drop-positie.
+- Achtergrond uploaden is nu expliciet gescheiden van “afbeelding als laag toevoegen”.
+- Bestaande drag/resize/rotate/lagen/lock/visibility/undo-redo/templatevariabelen blijven behouden.
 
-Behouden uit 0.23.x
-- Supabase Auth blijft de verplichte login/identity-laag.
-- Centrale zenders in hub_stations met toevoegen, wijzigen, deactiveren/verwijderen en configuratie kopiëren.
-- Programma's gekoppeld aan echte accounts; DJ-/profiel- en programmacovers.
-- Persoonlijke agenda is privé voor uitsluitend de eigenaar.
-- Afwezigheden, impact op programma's en admin/beheerder-vervanging.
-- Redactie Talk-workflow + automatische versiegeschiedenis.
-- Wekelijkse, jaarlijkse en speciale hitlijsten met historische edities en Excel-import.
-- Muziek-/format-/playlistvoorstellen met Spotify/YouTube en uitleg.
-- Generieke private bijlagen voor Messenger, meldingen, taken, redactie, socials, communicatie, voorstellen enz.
-- Geen Playout One, Rotation One, SHOUTcast/listener-statistieken of playout monitoring in actieve applicatiecode.
+Behouden uit 0.24.x
+- Fijnmazige menurechten per account/rol.
+- Apart Social Studio / Social beheer / Templatebouwer.
+- Centrale hitlijst-songmemory in PostgreSQL.
+- Supabase Auth als vaste login/identity-laag.
+- Persoonlijke agenda door RLS alleen leesbaar voor eigenaar.
+- Account-linked programma’s, afwezigheden/vervangingen, redactieversies, muziek-/formatvoorstellen en generieke bijlagen.
+- Geen actieve Playout One, Rotation One, SHOUTcast/listener-statistieken of encoderintegratie.
 
 Database
-- Nieuwe migratie: 037_hitlist_song_memory.sql
-- Current backend: Supabase Auth + Supabase PostgreSQL + Supabase Storage.
-- Architectuur blijft voorbereid op een latere externe PostgreSQL application-data backend met behoud van Supabase Auth.
+- 0.24.3 vereist geen nieuwe database-migratie bovenop 0.24.2.
+- Laatste vereiste schema-migratie blijft: supabase/migrations/037_hitlist_song_memory.sql.
 
 Build hardening
 - App Router route handlers gebruiken globalThis.Request.
-- Prebuild verwijdert stale external-stubs.d.ts en blokkeert regressies.
-- globals.css gebruikt flex-start/flex-end voor Autoprefixer-compatibiliteit.
-
-
-0.24.2 build hardening:
-- Template Builder pointer handlers accept all HTMLElement pointer sources.
-- Strict TypeScript validation hardened before release.
+- Prebuild verwijdert stale external-stubs.d.ts.
+- Prebuild controleert route-signatures, bekende Autoprefixer-valkuilen, Templatebouwer pointer types, hitlijstwerkblad-regressies, agenda account-uitnodigingen, sidebar-scrollstructuur en directe social-afbeeldingen.
+- Als node_modules aanwezig is, draait prebuild eerst een volledige tsc --noEmit voordat Next.js start.

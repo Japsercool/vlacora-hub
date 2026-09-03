@@ -9,7 +9,7 @@ export type CalendarEvent={
   location:string;sourceType:string;sourceId:string|null;createdBy:string;createdAt:string;updatedAt:string;
   attendeeIds:string[];attendeeNames:string[];
 };
-export type CalendarPerson={id:string;name:string;email:string};
+export type CalendarPerson={id:string;name:string;email:string;jobTitle:string;avatarUrl:string};
 export type CalendarSourceItem={id:string;title:string;startsAt:string;endsAt:string|null;kind:"social"|"music-meeting";stationSlug:string;subtitle:string;path:string};
 
 async function currentUserId(){
@@ -19,9 +19,9 @@ async function currentUserId(){
 
 export async function loadCalendarPeople():Promise<CalendarPerson[]>{
   if(!isSupabaseBrowserConfigured())return[];
-  const{data,error}=await createClient().from("profiles").select("id,display_name,email").order("display_name");
+  const{data,error}=await createClient().from("profiles").select("id,display_name,email,job_title,avatar_url,active").eq("active",true).order("display_name");
   if(error)throw error;
-  return(data||[]).map((x:any)=>({id:String(x.id),name:String(x.display_name||x.email||"Teamlid"),email:String(x.email||"")}));
+  return(data||[]).map((x:any)=>({id:String(x.id),name:String(x.display_name||x.email||"Teamlid"),email:String(x.email||""),jobTitle:String(x.job_title||""),avatarUrl:String(x.avatar_url||"")}));
 }
 
 export async function loadCalendarEvents(stationSlug:string,fromIso:string,toIso:string):Promise<CalendarEvent[]>{

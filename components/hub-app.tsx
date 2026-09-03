@@ -91,15 +91,18 @@ function HubAppInner({ stationSlug, moduleSlug }: Props) {
         <div className="brand"><div className="brand-mark">V</div><div><div className="brand-name">VLACORA</div><div className="brand-sub">HUB</div></div></div>
         <div className="station-mini"><span className="station-dot" style={{ background: station.accent }} /><div><strong>{station.name}</strong><small>Multi-station workspace</small></div></div>
         {!permissions&&<div className="sidebar-rights-loading">Menu laden…</div>}
-        <nav className="nav">
-          {visibleNavItems.map(([slug, icon, label]) => (
-            <Link key={slug} href={`/hub/${station.slug}/${slug}`} className={moduleSlug === slug ? "nav-item active" : "nav-item"}>
-              <span className="nav-icon">{icon}</span><span>{label}</span>
-              {slug === "meldingen" && collaboration.unreadCount > 0 && <span className={`nav-count ${collaboration.requiredCount?"critical-count":""}`}>{Math.min(collaboration.unreadCount,99)}</span>}
-            </Link>
-          ))}
-        </nav>
-        {visibleAdminItems.length>0&&<div className="sidebar-admin-menu"><div className="sidebar-section-title">BEHEER</div><nav className="nav admin-nav">{visibleAdminItems.map(([slug,icon,label])=><Link key={slug} href={`/hub/${station.slug}/${slug}`} className={moduleSlug===slug?"nav-item active admin-item":"nav-item admin-item"}><span className="nav-icon">{icon}</span><span>{label}</span></Link>)}</nav></div>}
+        <div className="sidebar-menu-scroll">
+          <div className="sidebar-section-title workspace-title">WERKPLEK</div>
+          <nav className="nav workspace-nav">
+            {visibleNavItems.map(([slug, icon, label]) => (
+              <Link key={slug} href={`/hub/${station.slug}/${slug}`} className={moduleSlug === slug ? "nav-item active" : "nav-item"}>
+                <span className="nav-icon">{icon}</span><span>{label}</span>
+                {slug === "meldingen" && collaboration.unreadCount > 0 && <span className={`nav-count ${collaboration.requiredCount?"critical-count":""}`}>{Math.min(collaboration.unreadCount,99)}</span>}
+              </Link>
+            ))}
+          </nav>
+          {visibleAdminItems.length>0&&<div className="sidebar-admin-menu"><div className="sidebar-section-title">BEHEER</div><nav className="nav admin-nav">{visibleAdminItems.map(([slug,icon,label])=><Link key={slug} href={`/hub/${station.slug}/${slug}`} className={moduleSlug===slug?"nav-item active admin-item":"nav-item admin-item"}><span className="nav-icon">{icon}</span><span>{label}</span></Link>)}</nav></div>}
+        </div>
         <AccountWidget />
       </aside>
 
