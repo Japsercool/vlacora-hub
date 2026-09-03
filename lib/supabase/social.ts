@@ -266,7 +266,7 @@ export async function loadSocialReviewEvents(postId:string):Promise<SocialReview
   const ids=[...new Set(rows.map(x=>x.created_by).filter(Boolean))] as string[];
   if(!ids.length)return rows;
   const{data:profiles}=await supabase.from("profiles").select("id,display_name").in("id",ids);
-  const names=new Map((profiles||[]).map((p:any)=>[String(p.id),String(p.display_name||"Teamlid")]));
+  const names=new Map<string,string>((profiles||[]).map((p:any)=>[String(p.id),String(p.display_name||"Teamlid")] as [string,string]));
   return rows.map(row=>({...row,author_name:row.created_by?names.get(row.created_by)||"Teamlid":"Systeem"}));
 }
 

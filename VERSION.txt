@@ -1,4 +1,4 @@
-VLACORA HUB 0.22.0
+VLACORA HUB 0.22.2
 Standalone agenda + Social Studio workflow release.
 
 Current backend:
@@ -6,15 +6,11 @@ Current backend:
 - Supabase PostgreSQL
 - Row Level Security
 
-New:
-- Central hub_calendar_events + attendees
-- Personal / station / VLACORA-wide agenda
-- Manager calendar view per person
-- Social posts and music meetings in central calendar view
-- Social platforms, campaign, content pillar and objective
-- Social owner, reviewer and deadline
-- Social publication checklist, notes and publication URL
-- Targeted social workflow notifications
+Build fixes 0.22.2:
+- Hitlist CSV/PDF export functions remain restored.
+- Editorial workspace persistence now returns a typed workspace record instead of a boolean.
+- Editorial revision is read from source_revision consistently.
+- Social review author lookup now uses Map<string,string> so strict TypeScript accepts author_name.
 
 Still standalone:
 - No Rotation/Playout integration code
@@ -22,5 +18,6 @@ Still standalone:
 - No stream/listener statistics integration
 - No encoder/playout monitoring
 
-Migrations required for existing 0.21.0 databases:
+Migrations required for existing 0.21.x databases:
+- supabase/migrations/029_standalone_stations.sql
 - supabase/migrations/030_calendar_social_workflow.sql

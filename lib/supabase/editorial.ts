@@ -87,29 +87,45 @@ export async function deleteEditorialTemplate(id:string){
   if(error)throw error;
 }
 
-export async function loadEditorialWorkspace(stationSlug:string,date:string,hour:number){
+export type EditorialWorkspaceRecord={
+  items:unknown[];
+  revision:string;
+  updatedAt:string|null;
+};
+
+export async function loadEditorialWorkspace(stationSlug:string,date:string,hour:number):Promise<EditorialWorkspaceRecord|null>{
   if(!isSupabaseBrowserConfigured())return null;
   const{data,error}=await createClient().from("hub_editorial_workspaces")
     .select("items,source_revision,updated_at")
     .eq("station_slug",stationSlug).eq("air_date",date).eq("air_hour",hour).maybeSingle();
   if(error)throw error;
-  return data;
+  if(!data)return null;
+  return{
+    items:Array.isArray(data.items)?data.items:[],
+    revision:String(data.source_revision||"1"),
+    updatedAt:data.updated_at?String(data.updated_at):null
+  };
 }
 
-export async function saveEditorialWorkspace(stationSlug:string,date:string,hour:number,items:unknown[],sourceRevision:string){
-  if(!isSupabaseBrowserConfigured())return false;
+export async function saveEditorialWorkspace(stationSlug:string,date:string,hour:number,items:unknown[],sourceRevision:string):Promise<EditorialWorkspaceRecord>{
+  if(!isSupabaseBrowserConfigured())throw new Error("Supabase is niet actief.");
   const supabase=createClient();
-  const{data:user}=await supabase.auth.getUser();
-  if(!user.user)return false;
-  const{error}=await supabase.from("hub_editorial_workspaces").upsert({
+  const{data:user,error:userError}=await supabase.auth.getUser();
+  if(userError||!user.user)throw new Error("Log opnieuw in.");
+  const nextRevision=String(sourceRevision||"1");
+  const{data,error}=await supabase.from("hub_editorial_workspaces").upsert({
     station_slug:stationSlug,
     air_date:date,
     air_hour:hour,
     items,
-    source_revision:sourceRevision||"",
+    source_revision:nextRevision,
     updated_by:user.user.id,
     updated_at:new Date().toISOString()
-  },{onConflict:"station_slug,air_date,air_hour"});
+  },{onConflict:"station_slug,air_date,air_hour"}).select("items,source_revision,updated_at").single();
   if(error)throw error;
-  return true;
+  return{
+    items:Array.isArray(data?.items)?data.items:items,
+    revision:String(data?.source_revision||nextRevision),
+    updatedAt:data?.updated_at?String(data.updated_at):null
+  };
 }

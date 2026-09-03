@@ -1,4 +1,4 @@
-# VLACORA HUB 0.22.0 — Standalone Team Hub
+# VLACORA HUB 0.22.2 — Standalone Team Hub
 
 VLACORA HUB is an internal platform for radio-team organisation, editorial work and collaboration. This edition works **without any playout or rotation engine** and contains **no listener/stream statistics integration**.
 
@@ -62,7 +62,7 @@ No automatic Meta/TikTok publishing API is added in this release. This avoids ex
 
 ### Future PostgreSQL backend
 
-The Beheer page contains the future database target configuration. Version 0.22.0 remains on Supabase; it does not expose or store a PostgreSQL password in the browser. A future external PostgreSQL connection URL belongs in a server-side secret such as `VLACORA_POSTGRES_URL`.
+The Beheer page contains the future database target configuration. Version 0.22.2 remains on Supabase; it does not expose or store a PostgreSQL password in the browser. A future external PostgreSQL connection URL belongs in a server-side secret such as `VLACORA_POSTGRES_URL`.
 
 See `docs/ARCHITECTURE.md` for the migration design.
 
@@ -107,7 +107,14 @@ Production validation:
 npm run build
 ```
 
-## Version 0.22.0
+## Version 0.22.2
+
+**Build fixes:**
+- behoudt de herstelde CSV/PDF-export uit 0.22.1;
+- herstelt de typed return van het redactionele draaiboek (`saveEditorialWorkspace`);
+- gebruikt `source_revision` consequent als `revision`;
+- maakt de Social Studio reviewer-naamlookup strikt TypeScript-veilig met `Map<string,string>`.
+
 
 - Central PostgreSQL calendar
 - Personal / station / organisation agenda scopes
