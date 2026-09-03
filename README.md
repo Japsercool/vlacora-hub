@@ -1,8 +1,8 @@
-# VLACORA HUB 0.23.1
+# VLACORA HUB 0.23.2
 
 VLACORA HUB is de zelfstandige organisatie-, programmatie-, redactie- en social-HUB. Deze editie werkt **zonder Playout One, Rotation One, SHOUTcast/listenerstatistieken of een andere playout-engine**.
 
-Zie `VERSION.txt` voor de release-inhoud en `VALIDATION_0.23.1.txt` voor de uitgevoerde controles.
+Zie `VERSION.txt` voor de release-inhoud en `VALIDATION_0.23.2.txt` voor de uitgevoerde controles.
 
 ## Belangrijkste modules
 

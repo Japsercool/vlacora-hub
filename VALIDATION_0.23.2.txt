@@ -1,0 +1,23 @@
+VLACORA HUB 0.23.2 validation
+
+Build-signature hardening:
+- Every App Router route.ts handler was inspected.
+- app/api/traffic/live/route.ts uses the native Request type.
+- app/auth/callback/route.ts now also uses the native Request type.
+- The auth callback no longer depends on NextRequest.nextUrl or NextRequest.cookies.
+- URL parsing uses new URL(request.url).
+- Supabase PKCE cookie exchange uses next/headers cookies() and writes returned cookies to NextResponse.
+- No App Router route.ts exports a NextRequest-typed first argument.
+
+Other checks:
+- No external-stubs.d.ts included.
+- No node_modules/.next/.git included.
+- Legacy Playout/Rotation/Shoutcast app routes remain absent.
+
+Static validation performed in packaging environment:
+- All TS/TSX source files parsed by TypeScript compiler API: PASS.
+- Local @/ and relative import targets scan: PASS, 0 missing.
+- All app/**/route.ts files inspected: exactly 2; both use native Request.
+- NextRequest occurrence inside app/**/route.ts: 0.
+- CSS mixed-support `align-items:end` / `justify-content:end`: 0.
+- npm dependency installation was attempted for a full Next.js build, but package download timed out in this environment. Vercel remains the authoritative full dependency-backed build check.
