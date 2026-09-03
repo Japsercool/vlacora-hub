@@ -1,68 +1,84 @@
-# VLACORA HUB architecture — standalone edition
+# VLACORA HUB architecture — standalone 0.23.1
 
-VLACORA HUB 0.22.2 is a standalone editorial and organisation platform. It has no dependency on a playout engine, rotation engine, encoder, stream or listener-statistics provider.
+VLACORA HUB is een zelfstandige editorial/organisation HUB. De actieve applicatie heeft geen dependency op een playout-engine, rotation-engine, encoder, stream of listener-statistics provider.
 
-## Current architecture
+## Huidige architectuur
 
 ```text
 Browser / VLACORA HUB
         |
         +-- Supabase Auth
+        |      `-- vaste user UUID / login
         |
         +-- Supabase PostgreSQL
-             |- hub_stations
-             |- profiles / station_memberships
-             |- hub_calendar_events / attendees
-             |- tasks
-             |- incidents / notifications
-             |- programming / program pages
-             |- editorial workspaces and templates
-             |- music meetings / hitlists
-             |- social studio / review workflow
-             |- messenger / collaboration
-             `- hub_settings
+        |      |- hub_stations
+        |      |- profiles / station_memberships
+        |      |- station_programs / hub_program_team
+        |      |- hub_calendar_events
+        |      |- hub_absences / hub_program_overrides
+        |      |- editorial workspaces + versions
+        |      |- hitlists / music proposals / meetings
+        |      |- social workflow
+        |      |- messenger / tasks / incidents
+        |      `- official communication / settings
+        |
+        `-- Supabase Storage
+               |- profile/program/social assets
+               `- private generic HUB attachments
 ```
 
-Supabase is currently the managed backend. PostgreSQL remains the data model and source of truth.
+## Zenderbeheer
 
-## Station management
+Zenders zijn VLACORA-records in `public.hub_stations`. Alleen `superadmin` mag zenders aanmaken, wijzigen, activeren/deactiveren en verwijderen. Configuratie kan via `vlacora_clone_station_configuration(...)` per sectie naar een andere zender worden gekopieerd. Gebruikersaccounts zelf worden niet gekloond.
 
-Stations are owned by VLACORA itself in `public.hub_stations`. Only a `superadmin` may add, edit, activate/deactivate or delete a station. A station slug stays stable when the visible name changes.
+## Programma-identiteit
 
-## Calendar model
+`station_programs` beschrijft het programma; `hub_program_team` koppelt echte Supabase user UUID's met rollen zoals hoofdpresentator en extra teamleden. “Mijn programma” en afwezigheidsimpact worden altijd via user-ID bepaald. Het vrije hosttekstveld is alleen een leesbare/compatibele weergave.
 
-`hub_calendar_events` is intentionally independent of any playout system.
+## Agenda/privacy
 
-- `personal`: an owner plus optional attendees
-- `station`: one station slug
-- `organization`: all VLACORA users
+`hub_calendar_events` kent drie scopes:
 
-The calendar UI can additionally surface source records such as Social Studio posts and music meetings. Those records are read from their own tables instead of being duplicated into `hub_calendar_events`.
+- `personal`: uitsluitend de eigenaar; admins hebben geen lees-bypass;
+- `station`: gedeeld met bevoegde leden van de zender;
+- `organization`: VLACORA-breed.
 
-This keeps writes low, avoids synchronisation loops and makes a later PostgreSQL move simpler.
+Bronitems zoals social planning en muziekmeetings kunnen in de UI worden samengevoegd zonder hun data dubbel in de agenda op te slaan.
+
+## Afwezigheid/vervanging
+
+Afwezigheden worden gekoppeld aan echte accounts. Impactregels en `hub_program_overrides` tonen per uitzenddatum of vervanging nodig is, de uitzending met overblijvend team kan doorgaan, of een vervanger bevestigd werd. Alleen bevoegde beheerrollen wijzigen de effectieve vervanging.
+
+## Redactie en versiehistoriek
+
+Editorial workspaces gebruiken Talk-items en bewaren wijzigingen in `hub_editorial_workspace_versions`. Versies zijn append-only historiek; de werkruimte blijft de actuele toestand.
 
 ## Social workflow
 
-Social Studio stores production metadata directly on `hub_social_posts`: platforms, campaign, content pillar, objective, owner, reviewer, deadline, checklist, internal notes and publication URL. Review events stay append-only in `hub_social_review_events`.
+Social Studio scheidt productie in rustige onderdelen (Studio, Brand kit, Templates, Contentkalender, Copyblokken, Assets). Het grafische patroon is canvas/preview links, invulbare velden rechts en export als expliciete actie. Automatische publicatie naar Meta/TikTok is bewust nog niet ingebouwd om extra provider-afhankelijkheid, tokens, polling en kosten te vermijden.
 
-The current release does not auto-publish to external social networks. A future connector can be added behind a server-side adapter without changing the core editorial data model.
+## Bestanden
 
-## Future PostgreSQL migration
+`hub_attachments` bevat metadata/koppeling; de bytes staan in de private bucket `vlacora-hub-files`. Zo gebruikt de hele HUB één upload/download-infrastructuur in plaats van een aparte opslagimplementatie per module.
 
-The superadmin screen contains a non-secret migration target configuration. A future external PostgreSQL password/connection URL must be configured server-side as a secret, never in the browser or ordinary database settings.
+## Toekomstige PostgreSQL-migratie
 
-Intended migration flow:
+Supabase Auth kan permanent blijven terwijl applicatiedata later naar een eigen PostgreSQL-server verhuist. De user UUID uit Supabase Auth blijft daarbij de referentie in de externe database.
 
-1. Configure the future PostgreSQL target server-side.
-2. Export/copy schema and data.
-3. Run compatibility checks.
-4. Put the HUB briefly in migration/read-only mode.
-5. Perform final delta sync.
-6. Activate the new backend from the superadmin migration workflow.
-7. Keep rollback information until validation is complete.
+Veilige omschakeling:
 
-Version 0.22.2 keeps Supabase active. The data model is deliberately PostgreSQL-oriented and avoids making core team data dependent on a playout engine or an external social provider.
+1. extern PostgreSQL-doel server-side configureren;
+2. schema voorbereiden;
+3. data kopiëren;
+4. aantallen/constraints/referenties controleren;
+5. korte read-only/finale delta-sync;
+6. nieuwe backend activeren;
+7. rollbackperiode behouden;
+8. oude Supabase-applicatiedata pas daarna selectief verwijderen;
+9. Supabase Auth-users nooit meenemen in die cleanup.
 
-## Cost / usage rule
+Secrets horen server-side, nooit in browser/localStorage of `NEXT_PUBLIC_*`.
 
-VLACORA avoids constant polling. Data is loaded when a module opens, refreshed after writes, and Realtime is only used where collaboration benefits from it. Calendar source data is queried only for the visible month. Social assets are uploaded only when a user explicitly chooses a file.
+## Kosten/usage
+
+De HUB vermijdt constante polling. Data wordt geladen wanneer een module opent of na een relevante write; Realtime wordt alleen gebruikt waar samenwerking er werkelijk voordeel van heeft. Bestanden worden alleen geüpload op expliciete gebruikersactie. Dit beperkt database-, storage- en serverless-verbruik.

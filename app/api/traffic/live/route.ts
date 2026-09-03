@@ -1,4 +1,4 @@
-import { NextRequest,NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 
 export const runtime="nodejs";
 export const dynamic="force-dynamic";
@@ -213,7 +213,7 @@ async function loadOfficialOverview(){
   const pages=await Promise.all([0,1,2,3].map(async page=>{
     const url=page===0?OVERVIEW_URL:`${OVERVIEW_URL}?page=${page}`;
     const response=await fetch(url,{
-      headers:{Accept:"text/html,application/xhtml+xml","User-Agent":"VLACORA-HUB/0.21.0"},
+      headers:{Accept:"text/html,application/xhtml+xml","User-Agent":"VLACORA-HUB/0.23.1"},
       next:{revalidate:60}
     });
     if(!response.ok)throw new Error(`Verkeerscentrum overzicht HTTP ${response.status}`);
@@ -222,8 +222,8 @@ async function loadOfficialOverview(){
   return dedupe(pages.flatMap(x=>parseOfficialOverview(x.html,x.page)));
 }
 
-export async function GET(req:NextRequest){
-  const params=req.nextUrl.searchParams;
+export async function GET(req:Request){
+  const params=new URL(req.url).searchParams;
   const roads=(params.get("roads")||"").split(",").map(x=>normalizeRoad(x.trim())).filter(Boolean).slice(0,20);
   const all=params.get("all")==="1";
   const includeRoadworks=params.get("roadworks")!=="0";
@@ -250,7 +250,7 @@ export async function GET(req:NextRequest){
 
   try{
     const response=await fetch(DATEX_URL,{
-      headers:{Accept:"application/xml,text/xml;q=0.9,*/*;q=0.8","User-Agent":"VLACORA-HUB/0.21.0"},
+      headers:{Accept:"application/xml,text/xml;q=0.9,*/*;q=0.8","User-Agent":"VLACORA-HUB/0.23.1"},
       next:{revalidate:60}
     });
     if(!response.ok)throw new Error(`DATEX HTTP ${response.status}`);

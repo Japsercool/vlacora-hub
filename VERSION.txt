@@ -1,33 +1,47 @@
-VLACORA HUB 0.23.0
-Standalone organization + programming + editorial + social workflow release.
+VLACORA HUB 0.23.1
+Standalone organization + programming + editorial + social workflow — build-hardening release.
 
 Backend:
-- Supabase Auth remains the login/identity layer.
+- Supabase Auth remains the mandatory login/identity layer.
 - Supabase PostgreSQL is the current application database.
-- Supabase Storage is used for profile/program/social and generic HUB attachments.
+- Supabase Storage is used for profile/program/social assets and generic private HUB attachments.
 - Architecture remains prepared for a later external PostgreSQL application-data backend while keeping Supabase Auth.
 
-0.23.0 highlights:
-- Real superadmin station management via hub_stations; add/deactivate/delete now persists in PostgreSQL.
-- Copy station configuration by selectable sections (programming, team, templates, social, settings, contacts) or all.
-- Personal calendar is private to the owner, including from admins; station and VLACORA calendars remain separate.
+0.23.0 workflow features retained:
+- Real superadmin station management via hub_stations; add/deactivate/delete persists in PostgreSQL.
+- Copy station configuration by selectable sections (programming, program pages/team, templates, social/brand kit, settings, contacts) or select all.
+- Personal calendar is private to its owner, including from admins; station and VLACORA calendars are separate shared scopes.
 - Programs are linked to real Supabase accounts through hub_program_team (primary presenter + extra team/co-presenters).
-- Presenter dashboards and “Mijn programma” use account IDs rather than name matching.
+- Presenter dashboards and “Mijn programma / Mijn uitzending” use account IDs rather than name matching.
 - Presenter/profile photos and program cover images.
 - Absence impact + replacement workflow with program overrides.
 - Editorial Talk-first workflow and automatic version history.
 - Weekly, annual and special hitlists, historical editions, Excel import and trend/weeks/peak calculations.
 - Excel parser supports the supplied Super 50 layout with DW / Artiest / Titel.
-- Music/format proposals with Spotify/YouTube links, target folder/program, explanation and review status.
-- Generic private HUB attachments for incidents, messenger, tasks, admin requests, content inbox, editorial, social, communications and music proposals.
-- Official communication moved to PostgreSQL + attachments.
+- Music/format/playlist proposals with Spotify/YouTube links, target folder/program, explanation and review status.
+- Generic private HUB attachments for incidents, messenger, tasks, admin requests, content inbox, editorial, social, official communications and music proposals.
+- Official communication stored in PostgreSQL + attachments.
 - Social Studio reorganized toward a calmer TOPhub-inspired workflow.
 - Muziekmappen PDF removed.
 - No Playout One, Rotation One, SHOUTcast/listener statistics or playout monitoring in active application code.
 
-Migrations added in this release:
+0.23.1 build/security hardening:
+- Removed the accidental external-stubs.d.ts release file that overrode Next.js/React/Supabase typings and caused invalid route-handler validation.
+- Traffic GET route now uses the native Request contract and URL(req.url) query parsing.
+- Removed stale announcement/modal code in hub-app.tsx that referenced deleted variables and would have caused the next TypeScript failure.
+- Fixed the CSS flex-end compatibility warning; local PostCSS/Autoprefixer validation reports zero warnings.
+- Hardened calendar selected-options typing and Excel sheet typing.
+- Supabase Auth is mandatory for /hub; there is no unauthenticated setup-mode bypass.
+- Removed remaining active-code legacy Rotation naming/fallbacks.
+- Added migration 036 to revoke anonymous execution on chat SECURITY DEFINER helper functions.
+- Legacy listener/radio integration objects were removed from the active Supabase database; Supabase Auth/users were not touched.
+
+Migrations relevant to the standalone workflow:
+- 029_standalone_stations.sql
+- 030_calendar_social_workflow.sql
 - 031_hub_workflow_round2.sql
 - 032_music_proposals_and_attachments.sql
 - 033_v023_function_acl_hardening.sql
 - 034_program_visuals_and_station_copy.sql
 - 035_official_communications.sql
+- 036_chat_helper_anon_acl_hardening.sql

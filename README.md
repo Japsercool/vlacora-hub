@@ -1,102 +1,74 @@
-# VLACORA HUB 0.23.0
+# VLACORA HUB 0.23.1
 
-Deze versie is de zelfstandige HUB zonder playout. Zie `VERSION.txt` en `VALIDATION_0.23.0.txt` voor de release-inhoud en uitgevoerde controles.
+VLACORA HUB is de zelfstandige organisatie-, programmatie-, redactie- en social-HUB. Deze editie werkt **zonder Playout One, Rotation One, SHOUTcast/listenerstatistieken of een andere playout-engine**.
 
-# VLACORA HUB 0.22.2 — Standalone Team Hub
+Zie `VERSION.txt` voor de release-inhoud en `VALIDATION_0.23.1.txt` voor de uitgevoerde controles.
 
-VLACORA HUB is an internal platform for radio-team organisation, editorial work and collaboration. This edition works **without any playout or rotation engine** and contains **no listener/stream statistics integration**.
+## Belangrijkste modules
 
-## Main modules
+- Supabase-login, accounts, rollen en rechten
+- Standalone zenderbeheer door de superadmin
+- Taken, meldpunt, meldingen en officiële communicatie
+- Messenger + generieke downloadbare bijlagen
+- Agenda: privé persoonlijk, gedeeld per zender en VLACORA-breed
+- Programmering en visuele programmapagina’s
+- Programmateams gekoppeld aan echte Supabase-accounts
+- DJ-/presentatorfoto’s en programma-covers
+- Afwezigheden, impactanalyse en vervangpresentator
+- Redactie met Talk-items en versiegeschiedenis
+- Muziekvergaderingen en muziek-/format-/playlistvoorstellen
+- Hitlijsten: weeklijsten, historische lijsten, jaar-/speciale lijsten en Excel-import
+- Social Studio met Studio, Brand kit, Templates, Contentkalender, Copyblokken en Assets
+- Team, contacten, templates en superadminbeheer
 
-- TODAY / personal inbox / notifications
-- Standalone station management
-- Tasks and responsibilities
-- Incident/reporting workflow
-- Admin requests and content inbox
-- Messenger and official communication
-- Central calendar: personal, per station and VLACORA-wide
-- Programming and program pages
-- Absences and contacts
-- Templates
-- Music library and music meetings
-- Editorial preparation
-- Traffic information on demand
-- Hitlists
-- Presenter workspace
-- Social Studio with briefing, workflow, review and content calendar
-- Team, roles and permissions
-- Superadmin management
+## Opslag
 
-## Data storage
+Supabase blijft voorlopig de backend:
 
-Supabase is currently used as the backend. Supabase stores HUB data in PostgreSQL and provides authentication and Row Level Security.
+```text
+Browser / VLACORA HUB
+        |
+        +-- Supabase Auth (login en user-ID's)
+        +-- Supabase PostgreSQL (HUB-data)
+        `-- Supabase Storage (bestanden/foto's)
+```
 
-Important data is stored centrally. Browser storage may only be used as a temporary cache/fallback and is not the source of truth for stations, calendar items or social workflow data.
+Belangrijke HUB-data is centraal. Browseropslag mag alleen als tijdelijke cache/fallback dienen, niet als bron van waarheid voor zenders of accountkoppelingen.
 
-### Stations
+### Persoonlijke agenda
 
-Migration `029_standalone_stations.sql` adds `public.hub_stations`. A superadmin can manage stations from **Alle zenders → Beheer**.
+Een persoonlijk agenda-item heeft `scope = personal` en is via PostgreSQL RLS uitsluitend leesbaar voor `owner_user_id = auth.uid()`. Beheerders krijgen **geen bypass** naar andermans persoonlijke agenda. Zender- en VLACORA-agenda’s zijn aparte gedeelde scopes.
 
-### Central calendar
+### Programma’s en accounts
 
-Migration `030_calendar_social_workflow.sql` adds a real PostgreSQL calendar with three levels:
+Programma’s worden gekoppeld aan echte accounts in `hub_program_team`. De primaire presentator en extra teamleden/co-presentatoren worden dus op Supabase user-ID gekoppeld. Daardoor werken “Mijn programma”, “Mijn uitzending”, afwezigheid en vervanging onafhankelijk van een los tekstveld met een naam.
 
-- **Personal** — owned by one team member, optionally with invitees.
-- **Station** — visible for the selected station.
-- **VLACORA-wide** — organisation-level events.
+### Bijlagen
 
-Managers can use the **Per persoon** view. Scheduled Social Studio posts and music meetings are shown alongside the calendar without duplicating them into the calendar table.
-
-### Social Studio 0.22
-
-Social Studio now supports more than visuals/captions:
-
-- platform selection (Instagram, Story, Facebook, TikTok, YouTube Shorts, LinkedIn)
-- campaign and content pillar
-- objective
-- owner and reviewer
-- internal deadline and publication time
-- pre-publication checklist
-- internal notes
-- review / approval history
-- publication URL after publishing
-- targeted HUB notifications for reviewer/owner
-
-No automatic Meta/TikTok publishing API is added in this release. This avoids extra provider dependencies, permissions, polling and possible recurring costs while the editorial workflow is being built out.
-
-### Future PostgreSQL backend
-
-The Beheer page contains the future database target configuration. Version 0.22.2 remains on Supabase; it does not expose or store a PostgreSQL password in the browser. A future external PostgreSQL connection URL belongs in a server-side secret such as `VLACORA_POSTGRES_URL`.
-
-See `docs/ARCHITECTURE.md` for the migration design.
+Generieke HUB-bijlagen worden geregistreerd in `hub_attachments` en opgeslagen in de private Storage-bucket `vlacora-hub-files`. Dezelfde infrastructuur kan worden gebruikt bij Messenger, meldpunt, taken, aanvragen, redactie, socials, officiële communicatie en muziek-/formatvoorstellen.
 
 ## Supabase setup / upgrade
 
-For an existing 0.20.x database, run in order:
+Voor een bestaande database: pas de nog niet uitgevoerde migraties in numerieke volgorde toe, tot en met:
 
 ```text
-supabase/migrations/029_standalone_stations.sql
-supabase/migrations/030_calendar_social_workflow.sql
+supabase/migrations/036_chat_helper_anon_acl_hardening.sql
 ```
 
-For an existing 0.21.0 database, only run:
+Op het momenteel gekoppelde Supabase-project zijn de 0.23.x databasewijzigingen al toegepast.
 
-```text
-supabase/migrations/030_calendar_social_workflow.sql
-```
-
-For a fresh installation, apply the retained migrations in numerical order.
+Voor een nieuwe installatie: voer alle behouden migraties in numerieke volgorde uit.
 
 ## Environment
 
-Copy `.env.example` and configure:
+Configureer:
 
 ```text
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=
 ```
 
-Do not expose service-role keys or database passwords through `NEXT_PUBLIC_*` variables.
+Supabase Auth is verplicht voor `/hub`. Service-role keys en databasewachtwoorden mogen nooit in `NEXT_PUBLIC_*` terechtkomen.
 
 ## Development
 
@@ -105,29 +77,14 @@ npm install
 npm run dev
 ```
 
-Production validation:
+Productiecontrole:
 
 ```bash
 npm run build
 ```
 
-## Version 0.22.2
+## Toekomstige eigen PostgreSQL-backend
 
-**Build fixes:**
-- behoudt de herstelde CSV/PDF-export uit 0.22.1;
-- herstelt de typed return van het redactionele draaiboek (`saveEditorialWorkspace`);
-- gebruikt `source_revision` consequent als `revision`;
-- maakt de Social Studio reviewer-naamlookup strikt TypeScript-veilig met `Map<string,string>`.
+De applicatiedata kan later achter een server-side datalaag naar een eigen PostgreSQL-server verhuizen terwijl Supabase Auth de user-identiteit blijft leveren. Databasewachtwoorden worden nooit in de browser bewaard. Oude Supabase-applicatiedata mag pas worden verwijderd nadat schema, data, delta-sync en rollback zijn gecontroleerd.
 
-
-- Central PostgreSQL calendar
-- Personal / station / organisation agenda scopes
-- Manager view per person
-- Invitees on calendar events
-- Social posts and music meetings surfaced in the central agenda
-- Social owner/reviewer/deadline/campaign/platform workflow
-- Social publishing checklist and internal notes
-- Targeted social review notifications
-- Fix: editing an existing planned social post no longer starts a blank replacement concept
-- Supabase remains active; future PostgreSQL migration stays prepared
-- Still no Playout/Rotation integration and no listener statistics
+Zie `docs/ARCHITECTURE.md`.

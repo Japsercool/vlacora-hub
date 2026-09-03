@@ -43,47 +43,12 @@ import {
 
 type Props = { stationSlug: string; moduleSlug: string };
 type Tone = "blue" | "red" | "green" | "orange" | "gray";
-type ModalType = null;
-
 
 function Badge({ children, tone = "blue" }: { children: React.ReactNode; tone?: Tone }) {
   return <span className={`badge badge-${tone}`}>{children}</span>;
 }
 function Card({ children, className = "" }: { children: React.ReactNode; className?: string }) {
   return <div className={`card ${className}`}>{children}</div>;
-}
-
-function useLocalState<T>(key: string, initial: T): [T, React.Dispatch<React.SetStateAction<T>>] {
-  const [value, setValue] = useState<T>(initial);
-  const [loaded, setLoaded] = useState(false);
-
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem(key);
-      if (raw) setValue(JSON.parse(raw));
-    } catch {}
-    setLoaded(true);
-  }, [key]);
-
-  useEffect(() => {
-    if (!loaded) return;
-    try { localStorage.setItem(key, JSON.stringify(value)); } catch {}
-  }, [key, value, loaded]);
-
-  return [value, setValue];
-}
-
-function Modal({
-  title, children, onClose
-}: { title: string; children: React.ReactNode; onClose: () => void }) {
-  return (
-    <div className="modal-backdrop" onMouseDown={onClose}>
-      <div className="modal-card" onMouseDown={(e) => e.stopPropagation()}>
-        <div className="modal-head"><h2>{title}</h2><button className="mini-btn" onClick={onClose}>×</button></div>
-        {children}
-      </div>
-    </div>
-  );
 }
 
 function HubAppInner({ stationSlug, moduleSlug }: Props) {
@@ -98,9 +63,6 @@ function HubAppInner({ stationSlug, moduleSlug }: Props) {
   useEffect(()=>{if(stationSlug!=="all")void runOperationalChecks(stationSlug).catch(()=>{})},[stationSlug,moduleSlug]);
   const station = hubStations.find((s) => s.slug === stationSlug) || (stationSlug==="all"?allHubStation():{slug:stationSlug,name:"Station",short:"ST",accent:"#26269f",source:"vlacora" as const});
 
-  const [modal, setModal] = useState<ModalType>(null);
-  const [toast, setToast] = useState("");
-  const [lastRefresh, setLastRefresh] = useState("zojuist");
   const [permissions,setPermissions]=useState<PermissionMap|null>(null);
 
   useEffect(()=>{
@@ -120,11 +82,6 @@ function HubAppInner({ stationSlug, moduleSlug }: Props) {
   const currentPermissionKey=modulePermission[moduleSlug];
   const hasModuleAccess=currentPermissionKey===null||!permissions||can(permissions[currentPermissionKey],"view");
   const moduleName = useMemo(() => navItems.find((n) => n[0] === moduleSlug)?.[2] || "Dashboard", [moduleSlug]);
-
-  function notify(text: string) {
-    setToast(text);
-    window.setTimeout(() => setToast(""), 2600);
-  }
 
 
   return (
@@ -237,10 +194,7 @@ function HubAppInner({ stationSlug, moduleSlug }: Props) {
       <PresencePanel />
       <MandatoryNotificationModal />
 
-      {toast && <div className="toast">{toast}</div>}
 
-
-      {modal === "announcement" && <Modal title="Officieel bericht publiceren" onClose={()=>setModal(null)}><form onSubmit={e=>{e.preventDefault();const f=new FormData(e.currentTarget);const title=String(f.get("title"));const body=String(f.get("body"));const category=String(f.get("category"));const importance=String(f.get("importance"));const requiresAck=f.get("requiresAck")==="on";setAnnouncements([{id:uid(),title,body,category,importance,read:false,requiresAck},...announcements]);void collaboration.publishNotification({stationSlug:station.slug,title,body,category,severity:importance==="Belangrijk"?"warning":"info",requiresAck,actionPath:`/hub/${station.slug}/communicatie`}).catch(()=>notify("Bericht lokaal opgeslagen; teamnotificatie kon niet worden gedeeld."));setModal(null);notify(requiresAck?"Verplicht bericht gepubliceerd":"Officieel bericht gepubliceerd")}} className="modal-form"><label className="field">Titel<input required name="title" className="input"/></label><label className="field">Categorie<input name="category" className="input" defaultValue="Muziekredactie"/></label><label className="field">Belang<select name="importance" className="select"><option>Normaal</option><option>Belangrijk</option></select></label><label className="field">Bericht<textarea required name="body" className="input textarea"/></label><label className="required-notification-toggle"><input type="checkbox" name="requiresAck"/><div><strong>Moet iedereen gezien hebben</strong><span>De melding blijft verplicht op het scherm tot de gebruiker ze expliciet bevestigt.</span></div></label><button className="primary">Publiceren</button></form></Modal>}
 
 
 

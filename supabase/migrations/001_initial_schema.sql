@@ -177,7 +177,7 @@ create table music_meeting_items (
   position integer,
   decision text,
   target_category text,
-  rotation_start date
+  start_date date
 );
 
 create table charts (

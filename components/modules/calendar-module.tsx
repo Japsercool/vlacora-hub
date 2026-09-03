@@ -107,7 +107,7 @@ export default function CalendarModule({stationSlug}:{stationSlug:string}){
       <label className="required-notification-toggle"><input type="checkbox" checked={Boolean(editor.allDay)} onChange={e=>setEditor({...editor,allDay:e.target.checked})}/><div><strong>Hele dag</strong><span>Toon zonder specifiek uur.</span></div></label>
       <label className="field">Locatie<input className="input" value={editor.location||""} onChange={e=>setEditor({...editor,location:e.target.value})} placeholder="Studio, vergaderzaal, online…"/></label>
       <label className="field">Beschrijving<textarea className="input textarea" value={editor.description||""} onChange={e=>setEditor({...editor,description:e.target.value})}/></label>
-      {editor.scope!=="personal"&&<label className="field">Uitgenodigde teamleden<select className="input calendar-multi-select" multiple value={attendees} onChange={e=>setAttendees(Array.from(e.currentTarget.selectedOptions).map(o=>o.value))}>{people.map(p=><option value={p.id} key={p.id}>{p.name}</option>)}</select></label>}
+      {editor.scope!=="personal"&&<label className="field">Uitgenodigde teamleden<select className="input calendar-multi-select" multiple value={attendees} onChange={e=>setAttendees(Array.from(e.currentTarget.selectedOptions as HTMLCollectionOf<HTMLOptionElement>).map(o=>o.value))}>{people.map(p=><option value={p.id} key={p.id}>{p.name}</option>)}</select></label>}
       <div className="button-row"><button className="primary" disabled={busy} onClick={()=>void persist()}>Opslaan</button>{selected&&<button className="ghost danger-text" disabled={busy} onClick={()=>void remove()}>Verwijderen</button>}</div>
     </div></div></div>}
   </div>;

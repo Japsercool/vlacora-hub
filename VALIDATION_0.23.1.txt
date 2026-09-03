@@ -1,0 +1,72 @@
+VLACORA HUB 0.23.1 — VALIDATION REPORT
+Date: 2026-09-03
+
+BUILD-FAILURE ROOT CAUSE
+- The 0.23.0 archive accidentally contained external-stubs.d.ts.
+- That file declared a fake next/server NextRequest which did not inherit the native Request type.
+- Next.js therefore rejected app/api/traffic/live/route.ts even though NextRequest is normally a valid Next.js type.
+- external-stubs.d.ts has been removed from the release.
+
+CODE FIXES VERIFIED
+- app/api/traffic/live/route.ts now uses Request and new URL(req.url).searchParams.
+- Stale announcement/modal code in components/hub-app.tsx that referenced deleted variables was removed.
+- Calendar selectedOptions typing was hardened.
+- XLSX sheet_to_json typing was hardened.
+- Supabase Auth gating for /hub is mandatory; no setup-mode unauthenticated bypass remains.
+- Active source contains no Playout One / Rotation One / SHOUTcast listener-statistics integration.
+- Muziekmappen PDF is absent.
+- Personal calendar has no admin “Per persoon” UI and database RLS only permits the personal event owner to read it.
+
+STATIC TYPESCRIPT CHECK
+- A local validation-only type harness was used because this execution environment cannot download npm packages.
+- TypeScript validation completed with exit code 0.
+- Validation-only stub/config files are NOT included in the release archive.
+- Local import resolver: 0 missing local imports.
+- External runtime imports are limited to dependencies declared in package.json (Next, React, Supabase, jsPDF, XLSX).
+
+CSS CHECK
+- Replaced mixed-support flex alignment values with flex-end.
+- Local PostCSS + Autoprefixer processing: 0 warnings.
+
+SUPABASE LIVE CHECK (current project)
+Verified existing objects for:
+- hub_stations
+- hub_calendar_events
+- hub_program_team
+- hub_program_overrides
+- hub_editorial_workspace_versions
+- hitlists
+- hub_music_proposals
+- hub_attachments
+- vlacora_clone_station_configuration RPC
+- private attachment bucket vlacora-hub-files
+- profile/program asset buckets
+
+RLS checks:
+- hub_stations writes: superadmin only.
+- personal calendar SELECT: owner_user_id = auth.uid(); no admin bypass.
+- program-team writes: authorized management roles.
+- program overrides: management roles.
+- music proposals and attachments: scoped RLS in place.
+
+LEGACY RADIO CLEANUP VERIFIED
+- public.shoutcast_listener_samples: removed.
+- public.radio_stations: removed.
+- public.hub_integration_secrets: removed.
+- Old Rotation/Playout/SHOUTcast secret entries were cleaned.
+- Supabase Auth/users were NOT removed or altered.
+
+SECURITY ADVISOR
+- Anonymous execute access on chat SECURITY DEFINER helpers was revoked (migration 036).
+- No anonymous SECURITY DEFINER warnings remain from those helpers.
+- Remaining authenticated SECURITY DEFINER warnings concern intentional authenticated RLS/helper RPC access.
+- Supabase currently reports leaked-password protection as disabled; this is an optional Auth hardening setting, not a build blocker.
+
+FULL NEXT.JS BUILD STATUS
+- An npm install was attempted again in the validation environment but timed out because dependency downloads are unavailable from this sandbox.
+- Therefore this report does NOT claim that a real local `npm run build` with downloaded Next.js packages completed here.
+- The exact type-poisoning cause of the Vercel route failure was removed, and additional hidden TypeScript/CSS issues were proactively fixed and statically validated.
+
+ARCHIVE CHECK
+- Final archive must contain no node_modules, .next, .git, external-stubs.d.ts, _validation-stubs.d.ts or tsconfig.validation.json.
+- ZIP integrity is tested before delivery.

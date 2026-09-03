@@ -144,7 +144,7 @@ export default function ChartsModule({stationSlug,stationName}:{stationSlug:stri
     if(!selected||!file)return;setBusy(true);
     try{
       const XLSX=await import("xlsx");const wb=XLSX.read(await file.arrayBuffer(),{type:"array"});let parsed:Array<{rank:number;artist:string;title:string}>=[];let sheetName="";
-      for(const name of wb.SheetNames){const matrix=XLSX.utils.sheet_to_json<any[]>(wb.Sheets[name],{header:1,defval:""});let header=-1,rankCol=-1,artistCol=-1,titleCol=-1;
+      for(const name of wb.SheetNames){const matrix=XLSX.utils.sheet_to_json(wb.Sheets[name],{header:1,defval:""}) as any[][];let header=-1,rankCol=-1,artistCol=-1,titleCol=-1;
         for(let r=0;r<Math.min(matrix.length,25);r++){const cells=(matrix[r]||[]).map((x:any)=>normalized(String(x)));rankCol=cells.findIndex(x=>["dw","positie","pos","rank","ranking","nummer","nr"].includes(x));artistCol=cells.findIndex(x=>["artiest","artist","uitvoerder"].includes(x));titleCol=cells.findIndex(x=>["titel","title","song","track"].includes(x));if(rankCol>=0&&artistCol>=0&&titleCol>=0){header=r;break}}
         if(header<0)continue;const rows:Array<{rank:number;artist:string;title:string}>=[];
         for(let r=header+1;r<matrix.length;r++){const row=matrix[r]||[];const rank=Number(String(row[rankCol]??"").replace(/[^0-9]/g,""));const artist=String(row[artistCol]??"").trim(),title=String(row[titleCol]??"").trim();if(rank>=1&&artist&&title)rows.push({rank,artist,title})}

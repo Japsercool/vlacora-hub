@@ -33,7 +33,7 @@ function normalizeSongs(value:unknown):MusicSong[]{
   if(!Array.isArray(value))return seedSongs;
   return value.map((raw:any)=>({
     ...raw,
-    musicFolder:String(raw?.musicFolder||raw?.rotationMap||"A-MAP")
+    musicFolder:String(raw?.musicFolder||"A-MAP")
   })) as MusicSong[];
 }
 function useStoredSongs(key:string, initial:MusicSong[]) {
