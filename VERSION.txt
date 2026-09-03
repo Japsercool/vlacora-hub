@@ -1,21 +1,13 @@
-VLACORA HUB 0.20.0
-Operations Suite
+VLACORA HUB 0.20.1
+DATEX traffic human-location parser fix.
 
-Major additions:
-- Presenter dashboard: Mijn uitzending
-- Personal inbox: Voor mij
-- Absences and replacements with program impact
-- Central contacts directory
-- Program pages with team, format, templates, documents and history
-- Content inbox
-- Universal search with explicit Rotation One music search
-- Operational warnings integrated into Meldingen
-- On-demand/event-driven checks to keep usage low
-- Program team assignment security hardened
+Fixes:
+- considers ALL public comments instead of only the first generic one;
+- prefers the most specific Dutch traffic description;
+- extracts Alert-C primary/secondary point names;
+- preserves human road names such as 'E40 - A10' and 'Ring 2 Antwerpen (R1)';
+- no longer exposes positive/negative coding direction as if it were a destination;
+- road filters work with E40/A10/R1 aliases;
+- radio text is built from human-readable road/location data.
 
-Supabase production migrations verified/applied:
-- operations_suite_core
-- operations_suite_role_alignment
-- operations_program_team_security
-
-Includes all 0.19.9 editorial persistence fixes.
+No database migration required.

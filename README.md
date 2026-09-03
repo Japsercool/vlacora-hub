@@ -1335,3 +1335,21 @@ zijn op het gekoppelde productieproject toegepast.
 
 Alle 0.19.9 verbeteringen voor redactie-opslag, rich-text talks, Presence
 en verkeer uitsluitend op aanvraag blijven behouden.
+
+
+## 0.20.1 — Verkeer: DATEX locaties en meldingen correct lezen
+
+De vorige parser las bij filemeldingen vaak de eerste generieke DATEX-comment
+(`positieve/negatieve rijrichting`) en miste daardoor de menselijk leesbare
+weg, locatie en richting.
+
+0.20.1:
+- beoordeelt alle publieke comments en kiest de meest specifieke;
+- leest Alert-C primary/secondary location names;
+- houdt samengestelde wegnamen zoals `E40 - A10` intact;
+- gebruikt `positive/negative` niet langer als radiotekst;
+- gebruikt wegcodes alleen voor filtering, niet als vervanging van de
+  menselijk leesbare verkeersmelding;
+- de radio-ready tekst gebruikt dezelfde specifieke informatie.
+
+Geen Supabase-migratie nodig.

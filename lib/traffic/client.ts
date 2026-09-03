@@ -3,7 +3,7 @@
 import { loadSharedSetting,saveSharedSetting } from "@/lib/supabase/settings";
 
 export type TrafficSettings={roads:string[];allFlanders:boolean;includeIncidents:boolean;includeCongestion:boolean;includeRoadworks:boolean;maxItems:number;autoRefreshMinutes:number};
-export type TrafficIncident={id:string;type:string;typeLabel:string;severity:"high"|"medium"|"low";road:string;direction:string;location:string;summary:string;validUntil:string;updatedAt:string};
+export type TrafficIncident={id:string;type:string;typeLabel:string;severity:"high"|"medium"|"low";road:string;roadKeys?:string[];direction:string;location:string;summary:string;validUntil:string;updatedAt:string};
 export type TrafficSnapshot={ok:boolean;source:string;feed:string;feedUrl:string;publicationTime:string;fetchedAt:string;roads:string[];allFlanders:boolean;totalParsed:number;count:number;items:TrafficIncident[];radioText:string;error?:string};
 
 export const DEFAULT_TRAFFIC_SETTINGS:TrafficSettings={roads:["E17","E40","R4","R1","R0"],allFlanders:false,includeIncidents:true,includeCongestion:true,includeRoadworks:true,maxItems:20,autoRefreshMinutes:2};

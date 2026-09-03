@@ -1,0 +1,19 @@
+<payload>
+<publicationTime>2026-09-03T07:34:00Z</publicationTime>
+<situation>
+<situationRecord xsi:type="AbnormalTraffic" id="x1">
+<situationRecordVersionTime>2026-09-03T07:34:00Z</situationRecordVersionTime>
+<abnormalTrafficType>stationaryTraffic</abnormalTrafficType>
+<generalPublicComment><value lang="nl">Op de weg richting positieve rijrichting: file / vertraagd verkeer.</value></generalPublicComment>
+<generalPublicComment><value lang="nl">File E40 - A10 vanaf Parking Groot-Bijgaarden tot Groot-Bijgaarden, richting Brussel</value></generalPublicComment>
+<locationReference>
+<alertCLinear>
+<alertCDirection><alertCDirectionCoded>positive</alertCDirectionCoded><alertCDirectionNamed><value lang="nl">Brussel</value></alertCDirectionNamed></alertCDirection>
+<roadName><value lang="nl">E40 - A10</value></roadName>
+<alertCMethod4PrimaryPointLocation><alertCLocation><alertCLocationName><value lang="nl">Groot-Bijgaarden</value></alertCLocationName></alertCLocation></alertCMethod4PrimaryPointLocation>
+<alertCMethod4SecondaryPointLocation><alertCLocation><alertCLocationName><value lang="nl">Parking Groot-Bijgaarden</value></alertCLocationName></alertCMethod4SecondaryPointLocation>
+</alertCLinear>
+</locationReference>
+</situationRecord>
+</situation>
+</payload>
