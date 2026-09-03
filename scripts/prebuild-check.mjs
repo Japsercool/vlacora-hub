@@ -3,13 +3,29 @@ import path from "node:path";
 
 const root = process.cwd();
 const problems = [];
+const skippedDirs = new Set(["node_modules", ".next", ".git", ".vercel"]);
 
 function walk(dir) {
+  if (!fs.existsSync(dir)) return [];
   return fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+    if (entry.isDirectory() && skippedDirs.has(entry.name)) return [];
     const full = path.join(dir, entry.name);
     if (entry.isDirectory()) return walk(full);
     return [full];
   });
+}
+
+// Older VLACORA releases accidentally shipped this ambient declaration file.
+// When a new ZIP is copied over an existing Git checkout, Git keeps stale tracked files.
+// Remove the legacy stub in the ephemeral/local build workspace before TypeScript/Next.js loads it.
+const staleStubPaths = walk(root).filter((file) => path.basename(file) === "external-stubs.d.ts");
+for (const file of staleStubPaths) {
+  try {
+    fs.unlinkSync(file);
+    console.log(`VLACORA prebuild cleanup: removed stale ${path.relative(root, file)}.`);
+  } catch (error) {
+    problems.push(`Kon stale ${path.relative(root, file)} niet verwijderen: ${error instanceof Error ? error.message : String(error)}`);
+  }
 }
 
 const appDir = path.join(root, "app");
@@ -36,10 +52,10 @@ if (fs.existsSync(cssFile)) {
   if (matches.length) problems.push(`globals.css bevat ${matches.length} niet-geprefixte start/end flex/grid waarde(n): ${[...new Set(matches)].join(", ")}`);
 }
 
-const forbidden = ["external-stubs.d.ts"];
-for (const name of forbidden) {
-  const found = walk(root).find((file) => path.basename(file) === name);
-  if (found) problems.push(`${path.relative(root, found)} mag niet in een release zitten.`);
+// Cleanup must have succeeded: none may remain in the source tree.
+const remainingStubs = walk(root).filter((file) => path.basename(file) === "external-stubs.d.ts");
+for (const file of remainingStubs) {
+  problems.push(`${path.relative(root, file)} kon niet worden opgeschoond en mag niet aan Next.js worden aangeboden.`);
 }
 
 if (problems.length) {
@@ -47,4 +63,4 @@ if (problems.length) {
   process.exit(1);
 }
 
-console.log(`VLACORA prebuild-check OK: ${routes.length} route.ts-bestanden gecontroleerd.`);
+console.log(`VLACORA prebuild-check OK: ${routes.length} route.ts-bestanden gecontroleerd; stale type-stubs opgeschoond.`);

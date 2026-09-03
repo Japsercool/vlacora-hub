@@ -1,0 +1,10 @@
+VLACORA HUB 0.23.4 validation
+
+PASS: prebuild self-healing test: a deliberately-created root external-stubs.d.ts was removed automatically.
+PASS: prebuild route guard passes after cleanup.
+PASS: 2 App Router route.ts handlers use globalThis.Request and contain no NextRequest.
+PASS: globals.css has no mixed-support start/end alignment values covered by the release guard.
+PASS: tsconfig excludes external-stubs.d.ts and **/external-stubs.d.ts.
+PASS: .gitignore prevents re-adding the legacy stub once it is untracked.
+PASS: release tree contains no external-stubs.d.ts.
+NOTE: full dependency-backed Next.js build cannot be run in this artifact environment because npm dependencies are not installed here; Vercel will perform that build.

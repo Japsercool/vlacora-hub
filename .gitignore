@@ -71,3 +71,6 @@ Desktop.ini
 
 # Misc
 *.pem
+# Legacy local type stub; never commit in releases
+external-stubs.d.ts
+**/external-stubs.d.ts

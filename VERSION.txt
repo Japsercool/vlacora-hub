@@ -1,5 +1,11 @@
-VLACORA HUB 0.23.3
-Standalone organization + programming + editorial + social workflow — build-hardening release.
+VLACORA HUB 0.23.4
+Route cleanup + stale stub self-healing release.
+
+0.23.4 deployment hardening:
+- prebuild now automatically removes stale external-stubs.d.ts files left behind by an older Git overlay/commit before Next.js starts.
+- tsconfig explicitly excludes external-stubs.d.ts as a second safety layer.
+- .gitignore prevents the legacy stub from being added again when it is no longer tracked.
+- App Router handlers remain on globalThis.Request; Supabase auth flow is unchanged.
 
 Backend:
 - Supabase Auth remains the mandatory login/identity layer.
