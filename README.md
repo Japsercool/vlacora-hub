@@ -1,8 +1,8 @@
-# VLACORA HUB 0.24.1
+# VLACORA HUB 0.24.2
 
 VLACORA HUB is de zelfstandige organisatie-, programmatie-, redactie- en social-HUB. Deze editie werkt **zonder Playout One, Rotation One, SHOUTcast/listenerstatistieken of een andere playout-engine**.
 
-Zie `VERSION.txt` voor de release-inhoud en `VALIDATION_0.24.1.txt` voor de uitgevoerde controles.
+Zie `VERSION.txt` voor de release-inhoud en `VALIDATION_0.24.2.txt` voor de uitgevoerde controles.
 
 ## Belangrijkste modules
 
@@ -94,7 +94,7 @@ Zie `docs/ARCHITECTURE.md`.
 
 `npm run build` voert eerst `scripts/prebuild-check.mjs` uit. Die controleert alle App Router `route.ts`-handlers op de expliciete native `globalThis.Request` signature en controleert de bekende Autoprefixer `start/end` valkuil.
 
-## 0.24.1 — Hitlijst Sheet, Beheercentrum en Social Template Builder
+## 0.24.2 — Hitlijst Sheet, Beheercentrum en Social Template Builder
 
 De hitlijstmodule werkt nu als een compacte spreadsheet: rechtstreeks rijen bewerken, verslepen en songs opnieuw kiezen uit een centraal songgeheugen. Het geheugen combineert eerdere hitlijsten en de VLACORA muziekbibliotheek en wordt persistent opgeslagen per station.
 
@@ -103,3 +103,8 @@ Beheerfuncties staan voortaan in een apart **BEHEER**-blok in de zijbalk. Hitlij
 Social Studio is bewust gesplitst: de dagelijkse contentworkflow blijft eenvoudig, terwijl grafische templates in een aparte builder met canvas/lagen worden beheerd. De startertemplates verschillen wezenlijk van elkaar en kunnen per station verder worden aangepast.
 
 Voor een bestaande database voer je `supabase/migrations/037_hitlist_song_memory.sql` uit. Op de actieve VLACORA Supabase kan deze migratie vooraf worden toegepast.
+
+
+### 0.24.2 build hardening
+
+De Templatebouwer gebruikt één generieke pointer-handler voor canvaslagen en resize-handles, zodat DIV- en SPAN-events typeveilig dezelfde drag/resize-logica kunnen gebruiken. De prebuild voert op een normale installatie/Vercel bovendien eerst `tsc --noEmit` uit. Zo worden alle TypeScript-fouten in één controle gemeld vóór Next.js aan de productiebuild begint.

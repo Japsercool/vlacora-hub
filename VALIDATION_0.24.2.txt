@@ -1,0 +1,21 @@
+VLACORA HUB 0.24.2 — Template Builder strict-type hardening
+
+FIX
+- PASS: social-template-builder pointerStart is generic: <T extends HTMLElement>.
+- PASS: the same handler accepts both DIV layer PointerEvent and SPAN resize-handle PointerEvent.
+- PASS: no ReactPointerEvent<HTMLDivElement> or ReactPointerEvent<HTMLSpanElement> remains in the Template Builder.
+
+BUILD GUARDS
+- PASS: npm prebuild static guards.
+- NEW: when node_modules is installed, prebuild now runs the real local node_modules/.bin/tsc --noEmit before Next.js.
+- NEW: full TypeScript pass reports all component type errors in one run instead of relying on Next.js stopping at the first error.
+- NEW: explicit Template Builder pointer-handler regression guard.
+
+ARTIFACT ENVIRONMENT
+- PASS: 71 implementation TS/TSX files syntax-transpiled with TypeScript; 0 syntax errors.
+- PASS: local @/ import resolution scan across 71 implementation TS/TSX files; 0 missing imports.
+- PASS: targeted strict TypeScript check of social-template-builder-module.tsx with element-aware React PointerEvent declarations.
+- PASS: 2 App Router route handlers pass the native globalThis.Request guard.
+- PASS: no external-stubs.d.ts or *.tsbuildinfo in release source.
+- PASS: release prebuild static checks.
+- NOTE: npm registry DNS is unavailable in the artifact environment (EAI_AGAIN), so dependency installation/full Next.js build cannot be executed locally here. On Vercel, dependencies are installed before npm prebuild; the new prebuild therefore executes the real TypeScript compiler there before next build.

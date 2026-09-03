@@ -1,7 +1,7 @@
-VLACORA HUB 0.24.1
+VLACORA HUB 0.24.2
 Hitlijst Sheet + Beheercentrum + Social Template Builder release.
 
-Nieuw in 0.24.1
+Nieuw in 0.24.2
 - Hitlijsten hebben nu een Excel-achtige sheeteditor met vaste kolommen voor positie, songgeheugen, artiest, titel, vorige positie, trend, weken, peak en notitie.
 - Songs worden centraal per station onthouden in PostgreSQL via hub_chart_song_memory. Een dropdown stelt eerder gebruikte songs, songs uit VLACORA Muziek en songs uit eerdere hitlijsten opnieuw voor.
 - Drag & drop / omhoog / omlaag voor posities blijft beschikbaar; trend, weken en peak worden automatisch opnieuw berekend op basis van de vorige en historische edities.
@@ -39,3 +39,8 @@ Build hardening
 - App Router route handlers gebruiken globalThis.Request.
 - Prebuild verwijdert stale external-stubs.d.ts en blokkeert regressies.
 - globals.css gebruikt flex-start/flex-end voor Autoprefixer-compatibiliteit.
+
+
+0.24.2 build hardening:
+- Template Builder pointer handlers accept all HTMLElement pointer sources.
+- Strict TypeScript validation hardened before release.

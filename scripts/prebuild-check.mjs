@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { spawnSync } from "node:child_process";
 
 const root = process.cwd();
 const problems = [];
@@ -52,6 +53,17 @@ if (fs.existsSync(cssFile)) {
   if (matches.length) problems.push(`globals.css bevat ${matches.length} niet-geprefixte start/end flex/grid waarde(n): ${[...new Set(matches)].join(", ")}`);
 }
 
+
+// Guard the Template Builder against overly narrow pointer-event types.
+// The same drag helper is called from both DIV layers and SPAN resize handles.
+const builderFile = path.join(root, "components", "modules", "social-template-builder-module.tsx");
+if (fs.existsSync(builderFile)) {
+  const builderSource = fs.readFileSync(builderFile, "utf8");
+  if (/pointerStart\s*\(\s*ev\s*:\s*ReactPointerEvent<HTML(?:Div|Span)Element>/.test(builderSource)) {
+    problems.push("Templatebouwer pointerStart is te nauw getypeerd; gebruik een generieke HTMLElement handler.");
+  }
+}
+
 // Cleanup must have succeeded: none may remain in the source tree.
 const remainingStubs = walk(root).filter((file) => path.basename(file) === "external-stubs.d.ts");
 for (const file of remainingStubs) {
@@ -61,6 +73,27 @@ for (const file of remainingStubs) {
 if (problems.length) {
   console.error("VLACORA prebuild-check FAILED:\n- " + problems.join("\n- "));
   process.exit(1);
+}
+
+// When dependencies are installed (Vercel/normal development), run one full strict
+// TypeScript pass before Next.js. Unlike Next's worker, tsc reports all component
+// errors in one run, preventing a one-error-per-deployment loop.
+const tscName = process.platform === "win32" ? "tsc.cmd" : "tsc";
+const localTsc = path.join(root, "node_modules", ".bin", tscName);
+if (fs.existsSync(localTsc)) {
+  console.log("VLACORA prebuild: volledige TypeScript-controle starten…");
+  const result = spawnSync(localTsc, ["--noEmit", "--pretty", "false"], { cwd: root, stdio: "inherit", shell: false });
+  if (result.error) {
+    console.error(`VLACORA TypeScript-controle kon niet starten: ${result.error.message}`);
+    process.exit(1);
+  }
+  if ((result.status ?? 1) !== 0) {
+    console.error("VLACORA prebuild-check FAILED: volledige TypeScript-controle bevat fouten.");
+    process.exit(result.status ?? 1);
+  }
+  console.log("VLACORA prebuild: volledige TypeScript-controle OK.");
+} else {
+  console.log("VLACORA prebuild: node_modules/.bin/tsc niet aanwezig; volledige typecheck wordt uitgevoerd zodra dependencies geïnstalleerd zijn (bv. op Vercel).");
 }
 
 console.log(`VLACORA prebuild-check OK: ${routes.length} route.ts-bestanden gecontroleerd; stale type-stubs opgeschoond.`);
