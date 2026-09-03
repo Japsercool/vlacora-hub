@@ -1,4 +1,4 @@
-VLACORA HUB 0.23.1
+VLACORA HUB 0.23.3
 Standalone organization + programming + editorial + social workflow — build-hardening release.
 
 Backend:
@@ -45,3 +45,9 @@ Migrations relevant to the standalone workflow:
 - 034_program_visuals_and_station_copy.sql
 - 035_official_communications.sql
 - 036_chat_helper_anon_acl_hardening.sql
+
+
+0.23.2/0.23.3 route hardening:
+- Both App Router GET handlers now explicitly use globalThis.Request, eliminating any ambiguity with NextRequest declarations.
+- Added scripts/prebuild-check.mjs and npm prebuild: deployment stops before Next.js when a route.ts reintroduces NextRequest or a mixed-support CSS start/end value.
+- Replaced all remaining flex/grid start/end compatibility values in globals.css with flex-start/flex-end.

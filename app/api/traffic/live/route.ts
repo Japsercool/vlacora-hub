@@ -222,7 +222,7 @@ async function loadOfficialOverview(){
   return dedupe(pages.flatMap(x=>parseOfficialOverview(x.html,x.page)));
 }
 
-export async function GET(req:Request){
+export async function GET(req: globalThis.Request){
   const params=new URL(req.url).searchParams;
   const roads=(params.get("roads")||"").split(",").map(x=>normalizeRoad(x.trim())).filter(Boolean).slice(0,20);
   const all=params.get("all")==="1";

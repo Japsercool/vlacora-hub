@@ -1,8 +1,8 @@
-# VLACORA HUB 0.23.2
+# VLACORA HUB 0.23.3
 
 VLACORA HUB is de zelfstandige organisatie-, programmatie-, redactie- en social-HUB. Deze editie werkt **zonder Playout One, Rotation One, SHOUTcast/listenerstatistieken of een andere playout-engine**.
 
-Zie `VERSION.txt` voor de release-inhoud en `VALIDATION_0.23.2.txt` voor de uitgevoerde controles.
+Zie `VERSION.txt` voor de release-inhoud en `VALIDATION_0.23.3.txt` voor de uitgevoerde controles.
 
 ## Belangrijkste modules
 
@@ -88,3 +88,8 @@ npm run build
 De applicatiedata kan later achter een server-side datalaag naar een eigen PostgreSQL-server verhuizen terwijl Supabase Auth de user-identiteit blijft leveren. Databasewachtwoorden worden nooit in de browser bewaard. Oude Supabase-applicatiedata mag pas worden verwijderd nadat schema, data, delta-sync en rollback zijn gecontroleerd.
 
 Zie `docs/ARCHITECTURE.md`.
+
+
+## 0.23.3 build guard
+
+`npm run build` voert eerst `scripts/prebuild-check.mjs` uit. Die controleert alle App Router `route.ts`-handlers op de expliciete native `globalThis.Request` signature en controleert de bekende Autoprefixer `start/end` valkuil.

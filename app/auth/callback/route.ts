@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { VLACORA_SUPABASE_PUBLISHABLE_KEY,VLACORA_SUPABASE_URL } from "@/lib/supabase/public-config";
 
-export async function GET(request:Request){
+export async function GET(request: globalThis.Request){
   const requestUrl=new URL(request.url);
   const url=process.env.NEXT_PUBLIC_SUPABASE_URL||VLACORA_SUPABASE_URL;
   const key=process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY||VLACORA_SUPABASE_PUBLISHABLE_KEY;

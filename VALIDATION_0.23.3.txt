@@ -1,0 +1,11 @@
+VLACORA HUB 0.23.3 VALIDATION
+
+- app/auth/callback/route.ts GET argument: globalThis.Request
+- app/api/traffic/live/route.ts GET argument: globalThis.Request
+- NextRequest in app/**/route.ts: 0
+- App Router route files: 2
+- external-stubs.d.ts: absent
+- CSS mixed-support align/justify/place start/end values: 0
+- npm prebuild guard added and executed successfully
+- TypeScript syntax parse: 66 TS/TSX implementation files, 0 syntax errors
+- Full npm dependency install cannot be completed in this sandbox because registry access times out; Vercel remains the dependency-backed Next.js build environment.

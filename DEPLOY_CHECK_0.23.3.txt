@@ -1,0 +1,20 @@
+VLACORA HUB 0.23.3 DEPLOY CHECK
+
+Before pushing to GitHub, app/auth/callback/route.ts MUST contain exactly this handler signature:
+
+export async function GET(request: globalThis.Request){
+
+And app/api/traffic/live/route.ts MUST contain:
+
+export async function GET(req: globalThis.Request){
+
+There must be NO NextRequest inside any app/**/route.ts.
+
+Run locally if Node is installed:
+  npm run prebuild
+
+Expected:
+  VLACORA prebuild-check OK: 2 route.ts-bestanden gecontroleerd.
+
+If Vercel still reports that app/auth/callback/route.ts has NextRequest after this release is committed,
+Vercel is building a different/older Git commit or the new files were not copied into the repository root.
