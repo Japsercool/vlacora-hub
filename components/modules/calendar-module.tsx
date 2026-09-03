@@ -26,14 +26,11 @@ export default function CalendarModule({stationSlug}:{stationSlug:string}){
   const[events,setEvents]=useState<CalendarEvent[]>([]);
   const[sources,setSources]=useState<CalendarSourceItem[]>([]);
   const[people,setPeople]=useState<CalendarPerson[]>([]);
-  const[scope,setScope]=useState<"mine"|"station"|"organization"|"person">("mine");
-  const[personId,setPersonId]=useState("");
+  const[scope,setScope]=useState<"mine"|"station"|"organization">("mine");
   const[selectedId,setSelectedId]=useState<string>("");
   const[editor,setEditor]=useState<Partial<CalendarEvent>|null>(null);
   const[attendees,setAttendees]=useState<string[]>([]);
   const[busy,setBusy]=useState(false);const[notice,setNotice]=useState("");
-  const role=collaboration.currentUser?.role||"";
-  const canManagePeople=["superadmin","stationmanager","admin","beheer"].includes(role);
   const range=useMemo(()=>endOfMonthRange(month),[month]);
   const cells=useMemo(()=>monthCells(month),[month]);
   const flash=(x:string)=>{setNotice(x);window.setTimeout(()=>setNotice(""),2500)};
@@ -42,7 +39,6 @@ export default function CalendarModule({stationSlug}:{stationSlug:string}){
     setBusy(true);try{
       const[e,s,p]=await Promise.all([loadCalendarEvents(stationSlug,range.from,range.to),loadCalendarSourceItems(stationSlug,range.from,range.to),loadCalendarPeople()]);
       setEvents(e);setSources(s);setPeople(p);
-      if(collaboration.currentUser?.id)setPersonId(x=>x||collaboration.currentUser!.id);
     }catch(e){flash(e instanceof Error?e.message:"Agenda laden mislukt")}finally{setBusy(false)}
   },[stationSlug,range.from,range.to,collaboration.currentUser?.id]);
   useEffect(()=>{void load()},[load]);
@@ -51,8 +47,8 @@ export default function CalendarModule({stationSlug}:{stationSlug:string}){
     if(scope==="mine")return e.scope==="organization"||(e.scope==="station"&&(stationSlug==="all"||e.stationSlug===stationSlug))||e.ownerUserId===collaboration.currentUser?.id||e.attendeeIds.includes(collaboration.currentUser?.id||"");
     if(scope==="station")return e.scope==="station"&&(stationSlug==="all"||e.stationSlug===stationSlug);
     if(scope==="organization")return e.scope==="organization";
-    return e.scope==="personal"&&(e.ownerUserId===personId||e.attendeeIds.includes(personId));
-  }),[events,scope,stationSlug,personId,collaboration.currentUser?.id]);
+    return false;
+  }),[events,scope,stationSlug,collaboration.currentUser?.id]);
   const showSources=scope==="station"||scope==="organization";
   const selected=events.find(e=>e.id===selectedId)||null;
   const upcoming=useMemo(()=>{
@@ -79,8 +75,6 @@ export default function CalendarModule({stationSlug}:{stationSlug:string}){
       <button className={scope==="mine"?"active":""} onClick={()=>setScope("mine")}>◎ Mijn agenda</button>
       <button className={scope==="station"?"active":""} onClick={()=>setScope("station")}>◉ {stationSlug==="all"?"Alle zenders":"Zenderagenda"}</button>
       <button className={scope==="organization"?"active":""} onClick={()=>setScope("organization")}>▣ VLACORA breed</button>
-      {canManagePeople&&<button className={scope==="person"?"active":""} onClick={()=>setScope("person")}>♙ Per persoon</button>}
-      {scope==="person"&&<select className="select" value={personId} onChange={e=>setPersonId(e.target.value)}>{people.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select>}
     </div>
 
     <div className="calendar-v22-layout">
@@ -91,7 +85,7 @@ export default function CalendarModule({stationSlug}:{stationSlug:string}){
           const key=localKey(day),outside=day.getMonth()!==month.getMonth(),today=key===localKey(new Date());
           const dayEvents=visibleEvents.filter(e=>localKey(new Date(e.startsAt))===key);
           const daySources=showSources?sources.filter(e=>localKey(new Date(e.startsAt))===key):[];
-          return <div className={`calendar-v22-day ${outside?"outside":""} ${today?"today":""}`} key={key}><div className="calendar-v22-dayhead"><b>{day.getDate()}</b>{today&&<span>vandaag</span>}<button onClick={()=>{const start=new Date(day);start.setHours(10,0,0,0);const end=new Date(start.getTime()+3600000);setAttendees([]);setEditor({id:`new-${Date.now()}`,scope:scope==="organization"?"organization":scope==="station"?"station":"personal",stationSlug,ownerUserId:scope==="person"?personId:collaboration.currentUser?.id||null,title:"",eventType:"meeting",startsAt:start.toISOString(),endsAt:end.toISOString(),description:"",location:""})}}>＋</button></div><div className="calendar-v22-items">
+          return <div className={`calendar-v22-day ${outside?"outside":""} ${today?"today":""}`} key={key}><div className="calendar-v22-dayhead"><b>{day.getDate()}</b>{today&&<span>vandaag</span>}<button onClick={()=>{const start=new Date(day);start.setHours(10,0,0,0);const end=new Date(start.getTime()+3600000);setAttendees([]);setEditor({id:`new-${Date.now()}`,scope:scope==="organization"?"organization":scope==="station"?"station":"personal",stationSlug,ownerUserId:collaboration.currentUser?.id||null,title:"",eventType:"meeting",startsAt:start.toISOString(),endsAt:end.toISOString(),description:"",location:""})}}>＋</button></div><div className="calendar-v22-items">
             {dayEvents.slice(0,4).map(e=><button className={`calendar-event-chip type-${e.eventType}`} key={e.id} onClick={()=>editEvent(e)}><span>{e.allDay?"hele dag":new Date(e.startsAt).toLocaleTimeString("nl-BE",{hour:"2-digit",minute:"2-digit"})}</span><strong>{e.title}</strong></button>)}
             {daySources.slice(0,3).map(s=><button className={`calendar-event-chip source-${s.kind}`} key={s.id} onClick={()=>router.push(s.path)}><span>{new Date(s.startsAt).toLocaleTimeString("nl-BE",{hour:"2-digit",minute:"2-digit"})}</span><strong>{s.title}</strong></button>)}
             {dayEvents.length+daySources.length>7&&<small>+{dayEvents.length+daySources.length-7} meer</small>}
@@ -108,12 +102,12 @@ export default function CalendarModule({stationSlug}:{stationSlug:string}){
     {editor&&<div className="modal-backdrop" onMouseDown={()=>setEditor(null)}><div className="modal-card calendar-event-modal" onMouseDown={e=>e.stopPropagation()}><div className="modal-head"><div><span className="eyebrow">AGENDA-ITEM</span><h2>{editor.id?.startsWith("new-")?"Nieuwe afspraak":"Afspraak bewerken"}</h2></div><button className="mini-btn" onClick={()=>setEditor(null)}>×</button></div><div className="modal-form">
       <label className="field">Titel<input className="input" value={editor.title||""} onChange={e=>setEditor({...editor,title:e.target.value})}/></label>
       <div className="calendar-editor-grid"><label className="field">Niveau<select className="select" value={editor.scope||"personal"} onChange={e=>setEditor({...editor,scope:e.target.value as CalendarScope})}><option value="personal">Persoonlijk</option><option value="station">Zender</option><option value="organization">VLACORA breed</option></select></label><label className="field">Type<select className="select" value={editor.eventType||"meeting"} onChange={e=>setEditor({...editor,eventType:e.target.value})}>{TYPES.map(([v,l])=><option value={v} key={v}>{l}</option>)}</select></label></div>
-      {editor.scope==="personal"&&<label className="field">Agenda van<select className="select" value={editor.ownerUserId||collaboration.currentUser?.id||""} onChange={e=>setEditor({...editor,ownerUserId:e.target.value})}>{people.map(p=><option value={p.id} key={p.id}>{p.name}</option>)}</select></label>}
+      {editor.scope==="personal"&&<div className="privacy-note"><strong>🔒 Alleen voor jou</strong><span>Persoonlijke afspraken zijn door niemand anders leesbaar, ook niet door admins of beheerders.</span></div>}
       <div className="calendar-editor-grid"><label className="field">Start<input className="input" type="datetime-local" value={toLocalInput(editor.startsAt||null)} onChange={e=>setEditor({...editor,startsAt:fromLocalInput(e.target.value)})}/></label><label className="field">Einde<input className="input" type="datetime-local" value={toLocalInput(editor.endsAt||null)} onChange={e=>setEditor({...editor,endsAt:e.target.value?fromLocalInput(e.target.value):null})}/></label></div>
       <label className="required-notification-toggle"><input type="checkbox" checked={Boolean(editor.allDay)} onChange={e=>setEditor({...editor,allDay:e.target.checked})}/><div><strong>Hele dag</strong><span>Toon zonder specifiek uur.</span></div></label>
       <label className="field">Locatie<input className="input" value={editor.location||""} onChange={e=>setEditor({...editor,location:e.target.value})} placeholder="Studio, vergaderzaal, online…"/></label>
       <label className="field">Beschrijving<textarea className="input textarea" value={editor.description||""} onChange={e=>setEditor({...editor,description:e.target.value})}/></label>
-      <label className="field">Uitgenodigde teamleden<select className="input calendar-multi-select" multiple value={attendees} onChange={e=>setAttendees(Array.from(e.currentTarget.selectedOptions).map(o=>o.value))}>{people.map(p=><option value={p.id} key={p.id}>{p.name}</option>)}</select></label>
+      {editor.scope!=="personal"&&<label className="field">Uitgenodigde teamleden<select className="input calendar-multi-select" multiple value={attendees} onChange={e=>setAttendees(Array.from(e.currentTarget.selectedOptions).map(o=>o.value))}>{people.map(p=><option value={p.id} key={p.id}>{p.name}</option>)}</select></label>}
       <div className="button-row"><button className="primary" disabled={busy} onClick={()=>void persist()}>Opslaan</button>{selected&&<button className="ghost danger-text" disabled={busy} onClick={()=>void remove()}>Verwijderen</button>}</div>
     </div></div></div>}
   </div>;

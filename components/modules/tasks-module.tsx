@@ -8,6 +8,8 @@ import {
 } from "@/lib/supabase/tasks";
 import { useCollaboration } from "@/components/collaboration/collaboration-provider";
 import { emitActivity } from "@/lib/collaboration/activity";
+import AttachmentPanel from "@/components/attachment-panel";
+import { uploadAttachments } from "@/lib/supabase/attachments";
 
 type View="list"|"board";
 type Filter="mine"|"all"|"recurring";
@@ -56,6 +58,7 @@ export default function TasksModule({stationSlug}:{stationSlug:string}){
   const[team,setTeam]=useState<TaskTeamMember[]>([]);
   const[events,setEvents]=useState<TaskEvent[]>([]);
   const[draft,setDraft]=useState<TaskDraft|null>(null);
+  const[pendingFiles,setPendingFiles]=useState<File[]>([]);
   const[selectedId,setSelectedId]=useState("");
   const[filter,setFilter]=useState<Filter>("mine");
   const[view,setView]=useState<View>("list");
@@ -125,7 +128,7 @@ export default function TasksModule({stationSlug}:{stationSlug:string}){
     patch({recurrenceConfig:{...draft.recurrenceConfig,weekdays:current.includes(day)?current.filter(x=>x!==day):[...current,day]}});
   }
   function openTask(task:HubTask){
-    setSelectedId(task.id);setDraft(draftFromTask(task));
+    setSelectedId(task.id);setDraft(draftFromTask(task));setPendingFiles([]);
     emitActivity({detail:`Werkt aan taak: ${task.title}`,entityType:"task",entityId:task.id});
   }
   function newTask(title=""){
@@ -142,6 +145,7 @@ export default function TasksModule({stationSlug}:{stationSlug:string}){
     setBusy(true);
     try{
       const saved=await saveTask(draft);
+      if(pendingFiles.length){await uploadAttachments(draft.stationSlug||stationSlug,"task",saved.id,pendingFiles);setPendingFiles([])}
       const oldAssignees=new Set(previous?.assigneeIds||[]);
       for(const userId of saved.assigneeIds.filter(id=>!oldAssignees.has(id)&&id!==me)){
         await collab.publishNotification({
@@ -276,6 +280,8 @@ export default function TasksModule({stationSlug}:{stationSlug:string}){
           {draft.recurrenceKind!=="none"&&<div className="recurrence-preview">↻ {recurrenceLabel(draft)}</div>}
         </section>
 
+        {!draft.id.startsWith("new-")&&<section className="task-editor-section"><AttachmentPanel stationSlug={draft.stationSlug||stationSlug} entityType="task" entityId={draft.id} title="Bestanden bij taak"/></section>}
+        <section className="task-editor-section"><div className="attachment-head"><div><strong>📎 Bestanden toevoegen</strong><small>{draft.id.startsWith("new-")?"Worden geüpload zodra je de taak opslaat.":"Je kunt ook via het bestandenblok hierboven uploaden."}</small></div><label className="ghost file-button">Kies bestanden<input type="file" multiple hidden onChange={e=>setPendingFiles(Array.from(e.target.files||[]))}/></label></div>{pendingFiles.length>0&&<div className="file-chip-row">{pendingFiles.map((f,i)=><span key={`${f.name}-${i}`}>{f.name}</span>)}</div>}</section>
         {!draft.id.startsWith("new-")&&<section className="task-editor-section">
           <div className="section-head"><div><h3>Activiteit & opmerkingen</h3><p>Wie heeft wat aangepast aan deze taak?</p></div></div>
           <div className="task-event-list">{events.map(event=><div key={event.id} className={`task-event event-${event.eventType}`}><span/><div><strong>{event.eventType==="comment"?"Opmerking":event.eventType==="status"?`${event.fromStatus?statusLabel(event.fromStatus as TaskStatus):""} → ${event.toStatus?statusLabel(event.toStatus as TaskStatus):""}`:event.eventType==="created"?"Taak aangemaakt":event.eventType==="recurrence"?"Volgende routine":"Taak bijgewerkt"}</strong><small>{event.authorName} • {new Date(event.createdAt).toLocaleString("nl-BE")}</small>{event.body&&<p>{event.body}</p>}</div></div>)}{!events.length&&<span className="muted-copy-hint">Nog geen activiteiten.</span>}</div>

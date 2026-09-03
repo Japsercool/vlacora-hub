@@ -2,7 +2,7 @@
 
 import { useEffect,useMemo,useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { loadProgramProfile,loadPrograms,loadProgramTeam,loadTeamPeople,saveProgramProfile,saveProgramTeam,type ProgramProfile,type ProgramTeamMember,type StationProgram,type TeamPerson } from "@/lib/supabase/operations";
+import { loadProgramProfile,loadPrograms,loadProgramTeam,loadProgramTeamAssignments,loadTeamPeople,saveProgramProfile,saveProgramTeam,uploadProgramCover,type ProgramProfile,type ProgramTeamMember,type StationProgram,type TeamPerson } from "@/lib/supabase/operations";
 import { emitActivity } from "@/lib/collaboration/activity";
 import { useCollaboration } from "@/components/collaboration/collaboration-provider";
 
@@ -11,6 +11,9 @@ export default function ProgramPagesModule({stationSlug}:{stationSlug:string}){
   const canManageTeam=["superadmin","stationmanager","admin","beheer"].includes(String(collaboration.currentUser?.role||"").toLowerCase());
   const[programs,setPrograms]=useState<StationProgram[]>([]);
   const[team,setTeam]=useState<TeamPerson[]>([]);
+  const[programCovers,setProgramCovers]=useState<Record<string,string>>({});
+  const[allProgramTeams,setAllProgramTeams]=useState<Record<string,ProgramTeamMember[]>>({});
+  const[coverBusy,setCoverBusy]=useState(false);
   const[selectedId,setSelectedId]=useState("");
   const[profile,setProfile]=useState<ProgramProfile|null>(null);
   const[members,setMembers]=useState<ProgramTeamMember[]>([]);
@@ -24,8 +27,10 @@ export default function ProgramPagesModule({stationSlug}:{stationSlug:string}){
   async function loadBase(){
     if(stationSlug==="all")return;
     try{
-      const[p,t]=await Promise.all([loadPrograms(stationSlug),loadTeamPeople(stationSlug)]);
-      setPrograms(p);setTeam(t);
+      const supabase=createClient();
+      const[p,t,{data:coverRows}]=await Promise.all([loadPrograms(stationSlug),loadTeamPeople(stationSlug),supabase.from("hub_program_profiles").select("program_id,cover_url").eq("station_slug",stationSlug)]);
+      setPrograms(p);setTeam(t);setProgramCovers(Object.fromEntries((coverRows||[]).map((x:any)=>[String(x.program_id),String(x.cover_url||"")])));
+      try{setAllProgramTeams(await loadProgramTeamAssignments(p.map(x=>x.id)))}catch{setAllProgramTeams({})}
       const wanted=typeof window!=="undefined"?new URLSearchParams(window.location.search).get("program"):null;setSelectedId(old=>wanted&&p.some(x=>x.id===wanted)?wanted:old&&p.some(x=>x.id===old)?old:p[0]?.id||"");
     }catch(e){flash(e instanceof Error?e.message:"Programma's laden mislukt")}
   }
@@ -55,8 +60,13 @@ export default function ProgramPagesModule({stationSlug}:{stationSlug:string}){
 
   const memberIds=useMemo(()=>new Set(members.map(x=>x.userId)),[members]);
   function toggleMember(person:TeamPerson){
-    setMembers(old=>memberIds.has(person.id)?old.filter(x=>x.userId!==person.id):[...old,{programId:selectedId,userId:person.id,role:"presentator",isPrimary:old.length===0,name:person.name,initials:person.initials}]);
+    setMembers(old=>memberIds.has(person.id)?old.filter(x=>x.userId!==person.id):[...old,{programId:selectedId,userId:person.id,role:"presentator",isPrimary:old.length===0,name:person.name,initials:person.initials,avatarUrl:person.avatarUrl}]);
   }
+  async function changeCover(file:File|undefined){
+    if(!selected||!profile||!file)return;setCoverBusy(true);
+    try{const url=await uploadProgramCover(selected,file);const next={...profile,coverUrl:url};setProfile(next);setProgramCovers(x=>({...x,[selected.id]:url}));await saveProgramProfile(selected,next);flash("Programmafoto opgeslagen")}catch(e){flash(e instanceof Error?e.message:"Programmafoto uploaden mislukt")}finally{setCoverBusy(false)}
+  }
+
   async function save(){
     if(!selected||!profile)return;
     try{
@@ -64,6 +74,7 @@ export default function ProgramPagesModule({stationSlug}:{stationSlug:string}){
         saveProgramProfile(selected,profile),
         canManageTeam?saveProgramTeam(selected.id,members.map(x=>({userId:x.userId,role:x.role,isPrimary:x.isPrimary}))):Promise.resolve(members)
       ]);
+      setAllProgramTeams(old=>({...old,[selected.id]:members}));
       flash("Programmapagina opgeslagen");
     }catch(e){flash(e instanceof Error?e.message:"Opslaan mislukt")}
   }
@@ -71,16 +82,22 @@ export default function ProgramPagesModule({stationSlug}:{stationSlug:string}){
   return <div className="program-pages">
     <div className="page-intro"><div><span className="eyebrow">PROGRAMMAHUB</span><h2>Programma-pagina&apos;s</h2><p>Team, format, vaste items, templates, jingles, studio-info, documenten en eerdere uitzendingen op één plek.</p></div>{selected&&<button className="primary" onClick={()=>void save()}>Opslaan</button>}</div>
     {notice&&<div className="inline-notice standalone">{notice}</div>}
-    <div className="program-pages-layout">
-      <aside className="card program-pages-list">{programs.map(p=><button key={p.id} className={selectedId===p.id?"active":""} onClick={()=>setSelectedId(p.id)}><strong>{p.name}</strong><span>{p.start}–{p.end} • {p.host||"geen host"}</span></button>)}</aside>
+    <div className="program-pages-layout visual">
+      <aside className="program-pages-list visual-list">
+        {programs.map(p=>{const cover=programCovers[p.id];const linked=allProgramTeams[p.id]||[];const mine=Boolean(collaboration.currentUser?.id&&linked.some(m=>m.userId===collaboration.currentUser?.id));const host=linked.length?linked.slice().sort((a,b)=>Number(b.isPrimary)-Number(a.isPrimary)).map(m=>m.name).join(" & "):p.host||"Nog geen account gekoppeld";return <button key={p.id} className={`card program-show-card ${selectedId===p.id?"active":""}`} onClick={()=>setSelectedId(p.id)}>
+          <div className="program-show-card-cover">{cover?<img src={cover} alt=""/>:<span>{p.name.slice(0,2).toUpperCase()}</span>}<b>{["MA","DI","WO","DO","VR","ZA","ZO"][p.day]||""}</b></div>
+          <div className="program-show-card-copy"><strong>{p.name}{mine&&<small className="my-program-chip">Mijn programma</small>}</strong><span>{p.start}–{p.end}</span><small>{host} • {p.format}</small></div><span className="program-show-arrow">›</span>
+        </button>})}
+        {!programs.length&&<div className="card empty-live-state compact"><strong>Nog geen programma&apos;s</strong><span>Maak ze eerst aan in Programmering.</span></div>}
+      </aside>
       <main className="program-page-detail">
         {!selected||!profile?<div className="card empty-live-state"><strong>Kies een programma</strong><span>Daarna verschijnt de volledige programmapagina.</span></div>:<>
-          <section className="card program-page-hero"><div><span className="eyebrow">{selected.start}–{selected.end}</span><h2>{selected.name}</h2><p>{selected.format} • {selected.host||"Nog geen presentator"}</p></div><div className="program-team-avatars">{members.map(m=><span key={m.userId} title={`${m.name} • ${m.role}`}>{m.initials}</span>)}</div></section>
+          <section className={`card program-page-hero visual ${profile.coverUrl?"has-cover":""}`} style={profile.coverUrl?{backgroundImage:`linear-gradient(90deg,rgba(17,18,48,.91),rgba(17,18,48,.58)),url(${profile.coverUrl})`}:undefined}><div className="program-hero-copy"><span className="eyebrow">{members.some(m=>m.userId===collaboration.currentUser?.id)?"MIJN PROGRAMMA • ":""}{["Maandag","Dinsdag","Woensdag","Donderdag","Vrijdag","Zaterdag","Zondag"][selected.day]} • {selected.start}–{selected.end}</span><h2>{selected.name}</h2><p>{selected.format} • {members.length?members.slice().sort((a,b)=>Number(b.isPrimary)-Number(a.isPrimary)).map(m=>m.name).join(" & "):selected.host||"Nog geen account gekoppeld"}</p><div className="program-cover-actions"><label className="ghost file-button light">{coverBusy?"Uploaden…":"Programmafoto kiezen"}<input type="file" accept="image/png,image/jpeg,image/webp" hidden disabled={coverBusy} onChange={e=>void changeCover(e.target.files?.[0])}/></label>{profile.coverUrl&&<button className="ghost light" onClick={()=>setProfile({...profile,coverUrl:""})}>Foto verwijderen</button>}</div></div><div className="program-team-avatars large">{members.map(m=><span key={m.userId} title={`${m.name} • ${m.role}`}>{m.avatarUrl?<img src={m.avatarUrl} alt=""/>:m.initials}</span>)}</div></section>
           <div className="two-col">
             <section className="card"><h3>Format & studio</h3><label className="field">Korte omschrijving<textarea className="input textarea" value={profile.summary} onChange={e=>setProfile({...profile,summary:e.target.value})}/></label><label className="field">Studio-info<textarea className="input textarea" value={profile.studioInfo} onChange={e=>setProfile({...profile,studioInfo:e.target.value})} placeholder="Microfoons, remote login, bijzonderheden…"/></label><label className="field">Jingles / imaging<textarea className="input textarea" value={profile.jingleNotes} onChange={e=>setProfile({...profile,jingleNotes:e.target.value})}/></label></section>
             <section className="card"><h3>Vaste items</h3><p className="muted">Eén item per regel. Deze lijst verschijnt als geheugensteun op het presentator-dashboard.</p><textarea className="input textarea tall" value={profile.fixedItems.join("\n")} onChange={e=>setProfile({...profile,fixedItems:e.target.value.split("\n").filter(Boolean)})} placeholder={"Openingsbreak\nVerkeer 16:40\nSponsoractie\nClosing"}/><h3>Documenten / links</h3><textarea className="input textarea" value={profile.documentLinks.map(x=>`${x.label}|${x.url}`).join("\n")} onChange={e=>setProfile({...profile,documentLinks:e.target.value.split("\n").filter(Boolean).map(line=>{const[label,...url]=line.split("|");return{label:label||"Document",url:url.join("|")}})})} placeholder="Draaiboek|https://…"/></section>
           </div>
-          <section className="card"><div className="section-head"><div><h3>Team</h3><p>Koppel echte Supabase-gebruikers aan dit programma. Dit stuurt ook Mijn uitzending en afwezigheidsimpact.{!canManageTeam?" Alleen stationbeheer kan teamkoppelingen wijzigen.":""}</p></div></div><div className="program-team-picker">{team.map(person=>{const member=members.find(x=>x.userId===person.id);return <div className={`program-team-person ${member?"selected":""}`} key={person.id}><button disabled={!canManageTeam} onClick={()=>canManageTeam&&toggleMember(person)}><span>{person.initials}</span><div><strong>{person.name}</strong><small>{person.jobTitle||person.role}</small></div><b>{member?"✓":canManageTeam?"+":"—"}</b></button>{member&&<div className="program-team-meta"><input disabled={!canManageTeam} value={member.role} onChange={e=>setMembers(old=>old.map(x=>x.userId===person.id?{...x,role:e.target.value}:x))}/><label><input disabled={!canManageTeam} type="checkbox" checked={member.isPrimary} onChange={e=>setMembers(old=>old.map(x=>({...x,isPrimary:x.userId===person.id?e.target.checked:e.target.checked?false:x.isPrimary})))}/> Primair</label></div>}</div>})}</div></section>
+          <section className="card"><div className="section-head"><div><h3>Team</h3><p>Koppel echte Supabase-gebruikers aan dit programma. Hun DJ-/presentatorfoto komt automatisch uit Team & rechten en wordt ook gebruikt bij afwezigheden en vervanging.{!canManageTeam?" Alleen stationbeheer kan teamkoppelingen wijzigen.":""}</p></div></div><div className="program-team-picker">{team.map(person=>{const member=members.find(x=>x.userId===person.id);return <div className={`program-team-person ${member?"selected":""}`} key={person.id}><button disabled={!canManageTeam} onClick={()=>canManageTeam&&toggleMember(person)}><span>{person.avatarUrl?<img src={person.avatarUrl} alt=""/>:person.initials}</span><div><strong>{person.name}</strong><small>{person.jobTitle||person.role}</small></div><b>{member?"✓":canManageTeam?"+":"—"}</b></button>{member&&<div className="program-team-meta"><input disabled={!canManageTeam} value={member.role} onChange={e=>setMembers(old=>old.map(x=>x.userId===person.id?{...x,role:e.target.value}:x))}/><label><input disabled={!canManageTeam} type="checkbox" checked={member.isPrimary} onChange={e=>setMembers(old=>old.map(x=>({...x,isPrimary:x.userId===person.id?e.target.checked:e.target.checked?false:x.isPrimary})))}/> Primair</label></div>}</div>})}</div></section>
           <div className="two-col">
             <section className="card"><h3>Redactietemplates</h3><div className="template-link-list">{editorialTemplates.map(t=><label key={t.id}><input type="checkbox" checked={profile.editorialTemplateIds.includes(String(t.id))} onChange={e=>setProfile({...profile,editorialTemplateIds:e.target.checked?[...profile.editorialTemplateIds,String(t.id)]:profile.editorialTemplateIds.filter(id=>id!==String(t.id))})}/><span><strong>{t.name}</strong><small>{t.program_name||"Algemeen"}</small></span></label>)}</div></section>
             <section className="card"><h3>Social templates</h3><div className="template-link-list">{socialTemplates.map(t=><label key={t.id}><input type="checkbox" checked={profile.socialTemplateIds.includes(String(t.id))} onChange={e=>setProfile({...profile,socialTemplateIds:e.target.checked?[...profile.socialTemplateIds,String(t.id)]:profile.socialTemplateIds.filter(id=>id!==String(t.id))})}/><span><strong>{t.name}</strong><small>{t.content_type||"Social"}</small></span></label>)}</div></section>

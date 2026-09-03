@@ -5,10 +5,11 @@ import { createClient,isSupabaseBrowserConfigured } from "@/lib/supabase/client"
 import { useCollaboration } from "@/components/collaboration/collaboration-provider";
 import { readHubStations } from "@/lib/hub-stations";
 import { emitActivity } from "@/lib/collaboration/activity";
+import { downloadAttachment,formatBytes,loadAttachmentsForEntities,uploadAttachments,type HubAttachment } from "@/lib/supabase/attachments";
 
 type Person={id:string;name:string;email:string;role:string;jobTitle:string;initials:string};
 type Channel={id:string;stationSlug:string;name:string;type:"direct"|"group"|"station";createdBy:string|null;memberIds:string[];createdAt:string;updatedAt:string};
-type Message={id:string;channelId:string;senderId:string|null;senderName:string;text:string;createdAt:string};
+type Message={id:string;channelId:string;senderId:string|null;senderName:string;text:string;createdAt:string;attachments:HubAttachment[]};
 
 const initials=(name:string)=>(name||"T").split(/\s+/).filter(Boolean).map(x=>x[0]).slice(0,2).join("").toUpperCase()||"T";
 
@@ -21,6 +22,7 @@ export default function MessengerModule({stationSlug}:{stationSlug:string}){
   const[selectedId,setSelectedId]=useState("");
   const[search,setSearch]=useState("");
   const[draft,setDraft]=useState("");
+  const[draftFiles,setDraftFiles]=useState<File[]>([]);
   const[notice,setNotice]=useState("");
   const[busy,setBusy]=useState(false);
   const[showCreate,setShowCreate]=useState(false);
@@ -81,10 +83,13 @@ export default function MessengerModule({stationSlug}:{stationSlug:string}){
     const{data:rows,error}=await supabase.from("hub_chat_messages").select("id,channel_id,sender_id,content,created_at").eq("channel_id",channelId).order("created_at",{ascending:true}).limit(250);
     if(error)throw error;
     const names=new Map(people.map(p=>[p.id,p.name]));
+    const ids=(rows||[]).map((r:any)=>String(r.id));
+    let attachmentMap:Record<string,HubAttachment[]>={};
+    try{attachmentMap=await loadAttachmentsForEntities("chat_message",ids)}catch{}
     setMessages((rows||[]).map((r:any)=>({
       id:String(r.id),channelId:String(r.channel_id),senderId:r.sender_id?String(r.sender_id):null,
       senderName:r.sender_id?names.get(String(r.sender_id))||"Verwijderde gebruiker":"Verwijderde gebruiker",
-      text:String(r.content||""),createdAt:String(r.created_at)
+      text:String(r.content||""),createdAt:String(r.created_at),attachments:attachmentMap[String(r.id)]||[]
     })));
   },[configured,people]);
 
@@ -151,14 +156,15 @@ export default function MessengerModule({stationSlug}:{stationSlug:string}){
   }
 
   async function send(){
-    if(!selected||!draft.trim()||!collab.currentUser)return;
-    const text=draft.trim();setDraft("");
+    if(!selected||(!draft.trim()&&!draftFiles.length)||!collab.currentUser)return;
+    const text=draft.trim();const files=[...draftFiles];setDraft("");setDraftFiles([]);
     try{
-      const{error}=await createClient().from("hub_chat_messages").insert({channel_id:selected.id,sender_id:collab.currentUser.id,content:text});
+      const{data,error}=await createClient().from("hub_chat_messages").insert({channel_id:selected.id,sender_id:collab.currentUser.id,content:text||"📎 Bijlage"}).select("id").single();
       if(error)throw error;
+      if(files.length)await uploadAttachments(selected.stationSlug||stationSlug,"chat_message",String(data.id),files);
       emitActivity({detail:`Messenger • ${channelName(selected)}`,entityType:"chat",entityId:selected.id});
       await loadMessages(selected.id);
-    }catch(e){setDraft(text);flash(e instanceof Error?e.message:"Bericht versturen mislukt")}
+    }catch(e){setDraft(text);setDraftFiles(files);flash(e instanceof Error?e.message:"Bericht versturen mislukt")}
   }
 
   async function removeChannel(){
@@ -188,6 +194,6 @@ export default function MessengerModule({stationSlug}:{stationSlug:string}){
     </div>
     <div className="chat">{selected?<><div className="chat-head"><div><strong>{selected.type==="station"?"#":""}{channelName(selected)}</strong><small>{channelMembers(selected)}</small></div><div className="button-row"><button className="ghost" onClick={()=>void loadPeople().then(()=>loadChannels())}>↻ Gebruikers</button><button className="ghost danger-text" onClick={()=>void removeChannel()}>Verwijder</button></div></div>
       <div className="messages">{messages.map(m=>{const mine=m.senderId===collab.currentUser?.id;return <div className={`message ${mine?"mine":""}`} key={m.id}><div className="avatar small">{initials(m.senderName)}</div><div><div className="message-meta"><strong>{m.senderName}</strong><span>{new Date(m.createdAt).toLocaleTimeString("nl-BE",{hour:"2-digit",minute:"2-digit"})}</span></div><p>{m.text}</p></div></div>})}{!messages.length&&<div className="empty-chat"><strong>Nog geen berichten</strong><span>Stuur het eerste bericht.</span></div>}</div>
-      <div className="composer"><input className="input grow" value={draft} onChange={e=>setDraft(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();void send()}}} placeholder={`Bericht naar ${channelName(selected)}…`}/><button className="primary" onClick={()=>void send()}>Verstuur</button></div></>:<div className="empty-chat"><strong>Kies een gesprek</strong><span>De gebruikerslijst komt live uit Supabase profiles.</span></div>}</div>
+      <div className="composer composer-with-files"><label className="ghost file-button">📎<input type="file" multiple hidden onChange={e=>setDraftFiles(Array.from(e.target.files||[]))}/></label><input className="input grow" value={draft} onChange={e=>setDraft(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();void send()}}} placeholder={`Bericht naar ${channelName(selected)}…`}/><button className="primary" onClick={()=>void send()}>Verstuur</button>{draftFiles.length>0&&<div className="composer-file-preview">{draftFiles.map((f,i)=><span key={`${f.name}-${i}`}>{f.name}<button onClick={()=>setDraftFiles(draftFiles.filter((_,j)=>j!==i))}>×</button></span>)}</div>}</div></>:<div className="empty-chat"><strong>Kies een gesprek</strong><span>De gebruikerslijst komt live uit Supabase profiles.</span></div>}</div>
   </div>;
 }

@@ -73,6 +73,15 @@ export async function createHubStation(input:{name:string;slug?:string;short?:st
   await saveHubStation({slug,name:input.name.trim(),short:(input.short||input.name.slice(0,2)).trim().toUpperCase().slice(0,4)||"ST",accent:input.accent||"#5438ff",timezone:input.timezone||"Europe/Brussels",active:true,sortOrder:(Math.max(0,...existing.map(x=>x.sortOrder))+10)});
   return slug;
 }
+
+export async function cloneHubStationConfiguration(sourceSlug:string,targetSlug:string,sections:string[]=["settings","programming","team","templates","social","contacts"]){
+  if(!sourceSlug||!targetSlug||sourceSlug===targetSlug)return null;
+  if(!isSupabaseBrowserConfigured())throw new Error("Supabase is niet actief.");
+  const {data,error}=await createClient().rpc("vlacora_clone_station_configuration",{source_station:sourceSlug,target_station:targetSlug,p_sections:sections});
+  if(error)throw error;
+  return data;
+}
+
 export async function deleteHubStation(slug:string){
   if(!slug||slug==="all")return;
   const {error}=await createClient().from("hub_stations").delete().eq("slug",slug);

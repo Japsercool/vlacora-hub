@@ -50,7 +50,7 @@ export async function loadCalendarEvents(stationSlug:string,fromIso:string,toIso
 export async function saveCalendarEvent(event:Partial<CalendarEvent>&{id?:string;scope:CalendarScope;stationSlug:string;title:string;startsAt:string},attendeeIds:string[]=[]):Promise<string>{
   if(!isSupabaseBrowserConfigured())throw new Error("Supabase is niet actief.");
   const actor=await currentUserId();if(!actor)throw new Error("Log opnieuw in.");
-  const payload={scope:event.scope,station_slug:event.scope==="station"?event.stationSlug:"all",owner_user_id:event.scope==="personal"?(event.ownerUserId||actor):event.ownerUserId||null,title:event.title.trim(),description:event.description||"",event_type:event.eventType||"meeting",starts_at:event.startsAt,ends_at:event.endsAt||null,all_day:Boolean(event.allDay),location:event.location||"",source_type:event.sourceType||"manual",source_id:event.sourceId||null,updated_by:actor,updated_at:new Date().toISOString()};
+  const payload={scope:event.scope,station_slug:event.scope==="station"?event.stationSlug:"all",owner_user_id:event.scope==="personal"?actor:null,title:event.title.trim(),description:event.description||"",event_type:event.eventType||"meeting",starts_at:event.startsAt,ends_at:event.endsAt||null,all_day:Boolean(event.allDay),location:event.location||"",source_type:event.sourceType||"manual",source_id:event.sourceId||null,updated_by:actor,updated_at:new Date().toISOString()};
   const supabase=createClient();let id=event.id||"";
   if(id&& !id.startsWith("new-")){
     const{error}=await supabase.from("hub_calendar_events").update(payload).eq("id",id);if(error)throw error;
@@ -58,7 +58,7 @@ export async function saveCalendarEvent(event:Partial<CalendarEvent>&{id?:string
     const{data,error}=await supabase.from("hub_calendar_events").insert({...payload,created_by:actor}).select("id").single();if(error)throw error;id=String(data.id);
   }
   await supabase.from("hub_calendar_event_attendees").delete().eq("event_id",id);
-  const unique=[...new Set(attendeeIds.filter(Boolean))];
+  const unique=event.scope==="personal"?[]:[...new Set(attendeeIds.filter(Boolean))];
   if(unique.length){const{error}=await supabase.from("hub_calendar_event_attendees").insert(unique.map(user_id=>({event_id:id,user_id,added_by:actor})));if(error)throw error}
   return id;
 }

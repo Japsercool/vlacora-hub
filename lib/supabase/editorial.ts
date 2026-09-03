@@ -129,3 +129,15 @@ export async function saveEditorialWorkspace(stationSlug:string,date:string,hour
     updatedAt:data?.updated_at?String(data.updated_at):null
   };
 }
+
+
+export type EditorialWorkspaceVersion={id:string;revision:number;items:unknown[];createdBy:string|null;createdByName:string;createdAt:string};
+export async function loadEditorialWorkspaceVersions(stationSlug:string,date:string,hour:number):Promise<EditorialWorkspaceVersion[]>{
+  if(!isSupabaseBrowserConfigured())return[];
+  const supabase=createClient();
+  const{data:rows,error}=await supabase.from("hub_editorial_workspace_versions").select("id,revision,items,created_by,created_at").eq("station_slug",stationSlug).eq("air_date",date).eq("air_hour",hour).order("revision",{ascending:false}).limit(50);
+  if(error)throw error;
+  const ids=[...new Set((rows||[]).map((x:any)=>x.created_by).filter(Boolean).map(String))];const names=new Map<string,string>();
+  if(ids.length){const{data:profiles}=await supabase.from("profiles").select("id,display_name,email").in("id",ids);for(const p of profiles||[])names.set(String((p as any).id),String((p as any).display_name||(p as any).email||"Teamlid"))}
+  return(rows||[]).map((x:any)=>({id:String(x.id),revision:Number(x.revision||1),items:Array.isArray(x.items)?x.items:[],createdBy:x.created_by?String(x.created_by):null,createdByName:x.created_by?names.get(String(x.created_by))||"Teamlid":"Systeem",createdAt:String(x.created_at)}));
+}

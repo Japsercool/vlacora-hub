@@ -1,3 +1,7 @@
+# VLACORA HUB 0.23.0
+
+Deze versie is de zelfstandige HUB zonder playout. Zie `VERSION.txt` en `VALIDATION_0.23.0.txt` voor de release-inhoud en uitgevoerde controles.
+
 # VLACORA HUB 0.22.2 — Standalone Team Hub
 
 VLACORA HUB is an internal platform for radio-team organisation, editorial work and collaboration. This edition works **without any playout or rotation engine** and contains **no listener/stream statistics integration**.

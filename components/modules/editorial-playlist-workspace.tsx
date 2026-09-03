@@ -26,15 +26,11 @@ type Props={
   syncLabel?:string;
   saveLabel?:string;
   onSave?:()=>void|Promise<unknown>;
+  onHistory?:()=>void;
 };
 
 const filters:{key:string;label:string;types:EditorialType[]}[]=[
-  {key:"tease",label:"Tease",types:["tease"]},
-  {key:"number",label:"Nummer",types:["music"]},
-  {key:"commercial",label:"Reclame",types:["commercial"]},
-  {key:"talk",label:"Talk",types:["talk","weather","traffic","news","browse"]},
-  {key:"link",label:"Link",types:["link","imaging","promo"]},
-  {key:"browse",label:"Browselist",types:["browse"]}
+  {key:"talk",label:"Talk",types:["talk","weather","traffic","news","browse"]}
 ];
 
 function isoDate(date:Date){
@@ -53,17 +49,7 @@ function durationText(seconds:number){return `${pad(Math.floor(seconds/60))}:${p
 function itemKind(item:EditorialItem){return canonicalPlaylistType({type:item.type,rawType:(item as any).rawType,category:(item as any).category,externalKind:(item as any).externalKind,artist:item.artist,musicId:item.musicId,isSweeper:(item as any).isSweeper})}
 function normalizedType(item:EditorialItem){const k=itemKind(item);if(k==="music")return"number";if(k==="commercial")return"commercial";if(["imaging","promo","link"].includes(k))return"link";if(k==="tease")return"tease";if(k==="browse")return"browse";return"talk"}
 function badgeLabel(item:EditorialItem){const k=itemKind(item);if(k==="music")return"Nummer";if(k==="commercial")return"Reclame";if(k==="traffic")return"Verkeer";if(k==="weather")return"Weer";if(k==="news")return"Nieuws";if(k==="browse")return"Browse List";if(k==="tease")return"Tease";if(["imaging","promo","link"].includes(k))return"Jingle";return k==="talk"?"Talk":broadPlaylistLabel(k)}
-function manualType(slot:EditorialTemplateSlot):EditorialType{
-  const label=(slot.label||"").toLowerCase();
-  if(slot.type==="tease")return"tease";
-  if(slot.type==="browse")return"browse";
-  if(slot.type==="commercial")return"commercial";
-  if(slot.type==="link")return"link";
-  if(slot.type==="weather"||label.includes("weer"))return"weather";
-  if(slot.type==="traffic"||label.includes("verkeer"))return"traffic";
-  if(slot.type==="news"||label.includes("nieuws"))return"news";
-  return"talk";
-}
+function manualType(_slot:EditorialTemplateSlot):EditorialType{return "talk"}
 
 function generalPlaylistType(item:EditorialItem){const k=itemKind(item);return ["imaging","promo","link"].includes(k)?"jingle":k}
 function defaultNotes(type:EditorialType,label:string){
@@ -175,7 +161,7 @@ function TalkRichTextEditor({
 }
 
 export default function EditorialPlaylistWorkspace(props:Props){
-  const{stationName,stationSlug,date,setDate,hour,setHour,playlist,setPlaylist,onPull,playlistVersion,syncLabel,saveLabel,onSave}=props;
+  const{stationName,stationSlug,date,setDate,hour,setHour,playlist,setPlaylist,onPull,playlistVersion,syncLabel,saveLabel,onSave,onHistory}=props;
   const[query,setQuery]=useState("");
   const[enabled,setEnabled]=useState(()=>new Set(filters.map(x=>x.key)));
   const[selectedId,setSelectedId]=useState("");
@@ -377,17 +363,17 @@ export default function EditorialPlaylistWorkspace(props:Props){
         </div>
         <span className="template-picker-meta">{syncLabel||templateMessage}</span>
       </div>
-      <div className="button-row"><span className={`workspace-save-label ${saveLabel?.includes("mislukt")?"error":saveLabel?.startsWith("✓")?"saved":""}`}>{saveLabel||"—"}</span><button className="ghost" onClick={()=>void onSave?.()}>💾 Opslaan</button><button className="ghost" onClick={()=>void onPull()}>↻ Herladen</button><span className="version-badge">rev {playlistVersion}</span></div>
+      <div className="button-row"><span className={`workspace-save-label ${saveLabel?.includes("mislukt")?"error":saveLabel?.startsWith("✓")?"saved":""}`}>{saveLabel||"—"}</span><button className="ghost" onClick={()=>void onSave?.()}>💾 Opslaan</button><button className="ghost" onClick={()=>void onPull()}>↻ Herladen</button>{onHistory&&<button className="ghost" onClick={onHistory}>Versiegeschiedenis</button>}<span className="version-badge">rev {playlistVersion}</span></div>
     </div>
 
     <div className="topplaylist-main">
       <section className="topplaylist-center">
         <div className="topplaylist-searchrow">
           <label><span>⌕</span><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Zoek op titel of artiest…"/></label>
-          <span>{visible.length} zichtbaar · {hidden} verborgen</span><span>✎ Filters actief</span>
+          <span>{visible.length} talks{hidden?` · ${hidden} oude niet-talk items verborgen`:""}</span><span>✎ Talk-redactie</span>
         </div>
         <div className="topplaylist-list">
-          {visible.length===0&&<div className="topplaylist-empty"><strong>Nog niets zichtbaar</strong><span>Voeg redactie-items toe of pas een redactietemplate toe.</span></div>}
+          {visible.length===0&&<div className="topplaylist-empty"><strong>Nog niets zichtbaar</strong><span>Voeg een talk toe of pas een redactietemplate toe.</span></div>}
           {visible.map(item=>{
             const kind=itemKind(item);
             const isTalk=!["music","commercial","imaging","promo","link"].includes(kind);
@@ -426,9 +412,9 @@ export default function EditorialPlaylistWorkspace(props:Props){
       </section>
 
       <aside className="topplaylist-actions">
-        <button onClick={()=>quickAdd("weather","Weer")}><span>☁</span> WEER</button>
-        <button onClick={()=>quickAdd("traffic","Verkeer")}><span>⇄</span> VERKEER</button>
-        <button onClick={()=>quickAdd("news","Nieuws")}><span>▣</span> NIEUWS</button>
+        <button onClick={()=>quickAdd("talk","Weer")}><span>☁</span> WEER</button>
+        <button onClick={()=>quickAdd("talk","Verkeer")}><span>⇄</span> VERKEER</button>
+        <button onClick={()=>quickAdd("talk","Nieuws")}><span>▣</span> NIEUWS</button>
         <button onClick={()=>quickAdd("talk","Redactie")}><span>✎</span> REDACTIE</button>
         <button onClick={()=>quickAdd("talk","Verkochte actie")}><span>★</span> ACTIE</button>
         <button onClick={()=>quickAdd("talk","Wedstrijd / sponsoractie")}><span>✓</span> WEDSTRIJD</button>

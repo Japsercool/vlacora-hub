@@ -2,6 +2,8 @@
 
 import { useCallback,useEffect,useMemo,useState } from "react";
 import { createClient,isSupabaseBrowserConfigured } from "@/lib/supabase/client";
+import AttachmentPanel from "@/components/attachment-panel";
+import { uploadAttachments } from "@/lib/supabase/attachments";
 
 type Severity="Laag"|"Normaal"|"Hoog"|"Kritiek";
 type Status="Open"|"In behandeling"|"Wachten op info"|"Opgelost"|"Gesloten";
@@ -23,6 +25,7 @@ export default function IncidentModule({stationSlug,publishNotification}:{statio
   const[showCreate,setShowCreate]=useState(false);
   const[category,setCategory]=useState("Technisch");
   const[updateText,setUpdateText]=useState("");
+  const[newFiles,setNewFiles]=useState<File[]>([]);
   const[notice,setNotice]=useState("");
   const configured=isSupabaseBrowserConfigured();
   const selected=incidents.find(i=>i.id===selectedId)||null;
@@ -62,8 +65,9 @@ export default function IncidentModule({stationSlug,publishNotification}:{statio
     const{data,error}=await supabase.from("hub_incidents").insert({station_slug:stationSlug,category,title,description,severity,status:"Open",created_by:user.user.id}).select().single();
     if(error)return flash(error.message);
     await supabase.from("hub_incident_updates").insert({incident_id:data.id,update_type:"created",body:description||"Melding geregistreerd.",status:"Open",created_by:user.user.id});
+    if(newFiles.length)await uploadAttachments(stationSlug,"incident",String(data.id),newFiles);
     if(severity==="Hoog"||severity==="Kritiek")await publishNotification({stationSlug,title:`${severity}e melding: ${title}`,body:description,category,severity:"critical",requiresAck:severity==="Kritiek",actionPath:`/hub/${stationSlug}/meldpunt`}).catch(()=>{});
-    setShowCreate(false);setSelectedId(data.id);flash("Melding geregistreerd en gedeeld");void load();
+    setShowCreate(false);setNewFiles([]);setSelectedId(data.id);flash("Melding geregistreerd en gedeeld");void load();
   }
 
   async function addUpdate(nextStatus?:Status,presetBody?:string){
@@ -92,11 +96,12 @@ export default function IncidentModule({stationSlug,publishNotification}:{statio
           <div className="incident-progress">{statusOrder.map((s,index)=>{const current=statusOrder.indexOf(selected.status);return <div key={s} className={`incident-step ${index<=current?"done":""} ${s===selected.status?"current":""}`}><span>{index+1}</span><strong>{s}</strong></div>})}</div>
           <div className="incident-quick-actions"><button className="primary soft" onClick={()=>void addUpdate("In behandeling","We zijn ermee bezig.")}>▶ We zijn ermee bezig</button><button className="ghost" onClick={()=>void addUpdate("Wachten op info","We wachten op extra informatie.")}>⏸ Wachten op info</button><button className="ghost positive-action" onClick={()=>void addUpdate("Opgelost","De melding is opgelost.")}>✓ Opgelost</button></div>
         </div>
+        <div className="card"><AttachmentPanel stationSlug={selected.station_slug} entityType="incident" entityId={selected.id} title="Bestanden bij deze melding"/></div>
         <div className="card"><div className="section-head"><div><h3>Updates</h3><p>Iedere update blijft chronologisch bij de melding.</p></div><span className="badge badge-blue">{updates.length}</span></div><div className="incident-timeline">{updates.map((u,index)=><div className="incident-timeline-item" key={u.id}><div className="timeline-marker">{index+1}</div><div><strong>{u.status||"Update"}</strong><p>{u.body}</p><small>{new Date(u.created_at).toLocaleString("nl-BE")}</small></div></div>)}</div><div className="incident-update-compose"><textarea className="input textarea" value={updateText} onChange={e=>setUpdateText(e.target.value)} placeholder="Update over de melding… bv. leverancier gecontacteerd, technicus onderweg, fix getest…"/><div className="button-row"><button className="primary" disabled={!updateText.trim()} onClick={()=>void addUpdate()}>Update toevoegen</button><select className="select" value={selected.status} onChange={e=>void addUpdate(e.target.value as Status,`Status gewijzigd naar ${e.target.value}.`)}>{statusOrder.map(s=><option key={s}>{s}</option>)}</select></div></div></div>
       </div>}
     </div>}
 
-    {showCreate&&<div className="modal-backdrop" onMouseDown={()=>setShowCreate(false)}><div className="modal-card" onMouseDown={e=>e.stopPropagation()}><div className="modal-head"><h2>Nieuwe melding</h2><button className="mini-btn" onClick={()=>setShowCreate(false)}>×</button></div><form className="modal-form" onSubmit={createIncident}><label className="field">Categorie<select className="select" value={category} onChange={e=>setCategory(e.target.value)} name="category">{categories.map(x=><option key={x}>{x}</option>)}</select></label><label className="field">Titel<input className="input" name="title" required placeholder="Wat is er aan de hand?"/></label><label className="field">Ernst<select className="select" name="severity"><option>Laag</option><option>Normaal</option><option>Hoog</option><option>Kritiek</option></select></label><label className="field">Beschrijving<textarea className="input textarea" name="description" placeholder="Wat heb je vastgesteld? Wat is de impact?"/></label><button className="primary">Melding indienen</button></form></div></div>}
+    {showCreate&&<div className="modal-backdrop" onMouseDown={()=>setShowCreate(false)}><div className="modal-card" onMouseDown={e=>e.stopPropagation()}><div className="modal-head"><h2>Nieuwe melding</h2><button className="mini-btn" onClick={()=>setShowCreate(false)}>×</button></div><form className="modal-form" onSubmit={createIncident}><label className="field">Categorie<select className="select" value={category} onChange={e=>setCategory(e.target.value)} name="category">{categories.map(x=><option key={x}>{x}</option>)}</select></label><label className="field">Titel<input className="input" name="title" required placeholder="Wat is er aan de hand?"/></label><label className="field">Ernst<select className="select" name="severity"><option>Laag</option><option>Normaal</option><option>Hoog</option><option>Kritiek</option></select></label><label className="field">Beschrijving<textarea className="input textarea" name="description" placeholder="Wat heb je vastgesteld? Wat is de impact?"/></label><label className="field">Bestanden<input className="input file-input" type="file" multiple onChange={e=>setNewFiles(Array.from(e.target.files||[]))}/><small>Foto, video, audio, PDF, Office of andere documenten • max. 25 MB per bestand.</small></label>{newFiles.length>0&&<div className="file-chip-row">{newFiles.map((f,i)=><span key={`${f.name}-${i}`}>{f.name}</span>)}</div>}<button className="primary">Melding indienen</button></form></div></div>}
   </div>
 }
 

@@ -56,6 +56,12 @@ export type SharedHitlist={
   previousEditionId:string;
   programName:string;
   notes:string;
+  chartKind:"weekly"|"annual"|"special";
+  seriesKey:string;
+  editionYear:number|null;
+  editionWeek:number|null;
+  recurrence:"weekly"|"annual"|"none";
+  sourceLabel:string;
   entries:Array<{
     id:string; songId?:string; artist:string; title:string; previousPosition:number|null; weeks:number; peak:number; notes:string;
   }>;
@@ -67,7 +73,7 @@ export async function loadSharedHitlists(stationSlug:string):Promise<SharedHitli
   if(!(await loggedIn()))return [];
   const supabase=createClient();
   const {data,error}=await supabase.from("hitlists")
-    .select("id,station_slug,name,edition_label,publish_date,valid_from,valid_to,size,status,previous_edition_id,program_name,notes,entries,created_at,updated_at")
+    .select("id,station_slug,name,edition_label,publish_date,valid_from,valid_to,size,status,previous_edition_id,program_name,notes,chart_kind,series_key,edition_year,edition_week,recurrence,source_label,entries,created_at,updated_at")
     .eq("station_slug",stationSlug)
     .order("publish_date",{ascending:false});
   if(error)throw error;
@@ -75,7 +81,7 @@ export async function loadSharedHitlists(stationSlug:string):Promise<SharedHitli
     id:String(x.id),stationSlug:String(x.station_slug),name:String(x.name||""),editionLabel:String(x.edition_label||""),
     publishDate:String(x.publish_date||""),validFrom:String(x.valid_from||""),validTo:String(x.valid_to||""),
     size:Number(x.size||50),status:(x.status||"draft") as SharedHitlist["status"],previousEditionId:String(x.previous_edition_id||""),
-    programName:String(x.program_name||""),notes:String(x.notes||""),entries:Array.isArray(x.entries)?x.entries:[],
+    programName:String(x.program_name||""),notes:String(x.notes||""),chartKind:(x.chart_kind||"weekly") as SharedHitlist["chartKind"],seriesKey:String(x.series_key||x.name||""),editionYear:x.edition_year==null?null:Number(x.edition_year),editionWeek:x.edition_week==null?null:Number(x.edition_week),recurrence:(x.recurrence||"weekly") as SharedHitlist["recurrence"],sourceLabel:String(x.source_label||""),entries:Array.isArray(x.entries)?x.entries:[],
     createdAt:String(x.created_at||new Date().toISOString()),updatedAt:String(x.updated_at||new Date().toISOString())
   }));
 }
@@ -88,7 +94,7 @@ export async function syncSharedHitlists(stationSlug:string,hitlists:SharedHitli
   if(hitlists.length){
     const rows=hitlists.map(x=>({
       id:x.id,station_slug:stationSlug,name:x.name,edition_label:x.editionLabel,publish_date:x.publishDate||null,valid_from:x.validFrom||null,valid_to:x.validTo||null,
-      size:x.size,status:x.status,previous_edition_id:x.previousEditionId||null,program_name:x.programName||"",notes:x.notes||"",entries:x.entries||[],updated_by:userId,
+      size:x.size,status:x.status,previous_edition_id:x.previousEditionId||null,program_name:x.programName||"",notes:x.notes||"",chart_kind:x.chartKind||"weekly",series_key:x.seriesKey||x.name,edition_year:x.editionYear||null,edition_week:x.editionWeek||null,recurrence:x.recurrence||"weekly",source_label:x.sourceLabel||"",entries:x.entries||[],updated_by:userId,
       created_at:x.createdAt||new Date().toISOString(),updated_at:new Date().toISOString()
     }));
     const {error}=await supabase.from("hitlists").upsert(rows,{onConflict:"id"});

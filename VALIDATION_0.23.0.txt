@@ -1,0 +1,15 @@
+VLACORA HUB 0.23.0 validation
+
+Completed checks:
+- All TS/TSX sources parsed with the TypeScript 5.8 parser: 0 syntax errors.
+- Active source scan: no Playout One / Rotation One / SHOUTcast listener-statistics integration remains. References in migration 029 only remove old legacy objects/secrets.
+- “Muziekmappen PDF” has no active source references.
+- Calendar personal-scope UI explicitly states owner-only privacy; RLS migration 031 restricts personal SELECT to owner_user_id = auth.uid().
+- Program-account linking present in Programming and Program pages via hub_program_team.
+- Generic attachment panels wired into multiple content modules.
+- Supplied Super 50 workbook inspected: sheet WK50 contains header row DW / Artiest / Titel and 50 ranked songs. The 0.23 Excel importer recognizes that schema; OUT/IN rows without numeric rank are ignored.
+- Package dependency list includes xlsx for browser-side Excel import.
+
+Environment limitation:
+- A clean npm install could not complete inside the artifact environment before the network/package-install timeout, so a full next build could not be executed here.
+- The source package does not include node_modules.

@@ -104,7 +104,7 @@ export default function MusicLibraryModule({stationSlug}:{stationSlug:string}) {
     </div>
 
     {showAdd && <div className="card inline-editor-card">
-      <div className="module-title-row"><div><h3>Nieuwe song toevoegen</h3><small>Wordt meteen beschikbaar in Muziekmappen.</small></div><button className="mini-btn" onClick={()=>setShowAdd(false)}>×</button></div>
+      <div className="module-title-row"><div><h3>Nieuwe song toevoegen</h3><small>Wordt meteen beschikbaar in de VLACORA-muziekbibliotheek.</small></div><button className="mini-btn" onClick={()=>setShowAdd(false)}>×</button></div>
       <form className="music-add-grid" onSubmit={addSong}>
         <label className="field">Artiest<input className="input" name="artist" required /></label>
         <label className="field">Titel<input className="input" name="title" required /></label>

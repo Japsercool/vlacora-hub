@@ -9,6 +9,8 @@ import PresentationModule from "@/components/modules/presentation-module";
 import SocialStudioModule from "@/components/modules/social-studio-module";
 import CalendarModule from "@/components/modules/calendar-module";
 import MusicLibraryModule from "@/components/modules/music-library-module";
+import MusicProposalsModule from "@/components/modules/music-proposals-module";
+import CommunicationsModule from "@/components/modules/communications-module";
 import EditorialModule from "@/components/modules/editorial-module";
 import TrafficModule from "@/components/modules/traffic-module";
 import PresenterDashboardModule from "@/components/modules/presenter-dashboard-module";
@@ -23,7 +25,6 @@ import AdminRequestsModule from "@/components/modules/admin-requests-module";
 import MusicMeetingsModule from "@/components/modules/music-meetings-module";
 import TeamRightsModule from "@/components/modules/team-rights-module";
 import AdminIntegrationsModule from "@/components/modules/admin-integrations-module";
-import MusicFoldersModule from "@/components/modules/music-folders-module";
 import ProgrammingModule from "@/components/modules/programming-module";
 import ChartsModule from "@/components/modules/charts-module";
 import IncidentModule,{IncidentSummaryCard} from "@/components/modules/incident-module";
@@ -32,6 +33,8 @@ import TasksModule,{TaskSummaryCard} from "@/components/modules/tasks-module";
 import { HUB_STATIONS_EVENT, allHubStation, hydrateHubStations, readHubStations, type HubStation } from "@/lib/hub-stations";
 import AccountWidget from "@/components/auth/account-widget";
 import { runOperationalChecks } from "@/lib/supabase/operations";
+import { createClient,isSupabaseBrowserConfigured } from "@/lib/supabase/client";
+import { can,modulePermission,resolvePermissions,type PermissionMap } from "@/lib/permissions";
 import { CollaborationProvider,useCollaboration } from "@/components/collaboration/collaboration-provider";
 import {
   MandatoryNotificationModal,NotificationBell,NotificationDrawer,NotificationsPage,
@@ -40,10 +43,8 @@ import {
 
 type Props = { stationSlug: string; moduleSlug: string };
 type Tone = "blue" | "red" | "green" | "orange" | "gray";
-type Announcement = { id: string; title: string; body: string; category: string; importance: string; read: boolean; requiresAck?: boolean };
-type ModalType = "announcement" | null;
+type ModalType = null;
 
-const uid = () => Math.random().toString(36).slice(2) + Date.now().toString(36);
 
 function Badge({ children, tone = "blue" }: { children: React.ReactNode; tone?: Tone }) {
   return <span className={`badge badge-${tone}`}>{children}</span>;
@@ -96,18 +97,28 @@ function HubAppInner({ stationSlug, moduleSlug }: Props) {
   },[]);
   useEffect(()=>{if(stationSlug!=="all")void runOperationalChecks(stationSlug).catch(()=>{})},[stationSlug,moduleSlug]);
   const station = hubStations.find((s) => s.slug === stationSlug) || (stationSlug==="all"?allHubStation():{slug:stationSlug,name:"Station",short:"ST",accent:"#26269f",source:"vlacora" as const});
-  const storagePrefix = `vlacora:${stationSlug}`;
-
-  const [announcements, setAnnouncements] = useLocalState<Announcement[]>(`${storagePrefix}:announcements`, [
-    { id: "a1", title: "Nieuwe muziek vanaf maandag", body: "Vanaf maandag gaan Joel Corry – Whisper en ANOTR – Talk To You naar de A-rotatie. Bebe Rexha schuift door naar B.", category: "Muziekredactie", importance: "Belangrijk", read: false },
-    { id: "a2", title: "Aangepast weekendschema", body: "Vanaf dit weekend start The Partyroom om 18:00. Het nieuwe schema staat in VLACORA Kalender.", category: "Programmering", importance: "Normaal", read: true }
-  ]);
-
 
   const [modal, setModal] = useState<ModalType>(null);
   const [toast, setToast] = useState("");
   const [lastRefresh, setLastRefresh] = useState("zojuist");
+  const [permissions,setPermissions]=useState<PermissionMap|null>(null);
 
+  useEffect(()=>{
+    let alive=true;
+    if(!isSupabaseBrowserConfigured())return;
+    const supabase=createClient();
+    void supabase.auth.getUser().then(async({data})=>{
+      if(!data.user||!alive)return;
+      const{data:profile}=await supabase.from("profiles").select("role,permissions").eq("id",data.user.id).maybeSingle();
+      if(!alive)return;
+      setPermissions(resolvePermissions(String(profile?.role||"kijker"),profile?.permissions));
+    });
+    return()=>{alive=false};
+  },[]);
+
+  const visibleNavItems=useMemo(()=>navItems.filter(([slug])=>{const key=modulePermission[slug];return key===null||!permissions||can(permissions[key],"view")}),[permissions]);
+  const currentPermissionKey=modulePermission[moduleSlug];
+  const hasModuleAccess=currentPermissionKey===null||!permissions||can(permissions[currentPermissionKey],"view");
   const moduleName = useMemo(() => navItems.find((n) => n[0] === moduleSlug)?.[2] || "Dashboard", [moduleSlug]);
 
   function notify(text: string) {
@@ -122,7 +133,7 @@ function HubAppInner({ stationSlug, moduleSlug }: Props) {
         <div className="brand"><div className="brand-mark">V</div><div><div className="brand-name">VLACORA</div><div className="brand-sub">HUB</div></div></div>
         <div className="station-mini"><span className="station-dot" style={{ background: station.accent }} /><div><strong>{station.name}</strong><small>Multi-station workspace</small></div></div>
         <nav className="nav">
-          {navItems.map(([slug, icon, label]) => (
+          {visibleNavItems.map(([slug, icon, label]) => (
             <Link key={slug} href={`/hub/${station.slug}/${slug}`} className={moduleSlug === slug ? "nav-item active" : "nav-item"}>
               <span className="nav-icon">{icon}</span><span>{label}</span>
               {slug === "meldingen" && collaboration.unreadCount > 0 && <span className={`nav-count ${collaboration.requiredCount?"critical-count":""}`}>{Math.min(collaboration.unreadCount,99)}</span>}
@@ -147,7 +158,8 @@ function HubAppInner({ stationSlug, moduleSlug }: Props) {
         </header>
 
         <div className="content">
-          {moduleSlug === "dashboard" && <>
+          {!hasModuleAccess && <div className="card empty-live-state"><strong>Geen toegang tot dit onderdeel</strong><span>Een superadmin kan dit per gebruiker aanpassen bij Team & rechten.</span></div>}
+          {hasModuleAccess && moduleSlug === "dashboard" && <>
             <section className="hero">
               <div><div className="hero-kicker">TODAY • LIVE WERKPLEK</div><h2>{collaboration.currentUser?.name?`Welkom, ${collaboration.currentUser.name}.`:"Vandaag in VLACORA"}</h2><p>Dit vraagt vandaag aandacht binnen {station.name}.</p></div>
               <div className="hero-now"><span className="tiny">TEAM HUB</span><strong>Redactie • planning • communicatie</strong><span>Alles wat je team vandaag nodig heeft in één werkplek.</span></div>
@@ -166,61 +178,58 @@ function HubAppInner({ stationSlug, moduleSlug }: Props) {
             <Card><div className="section-head"><div><h3>Uitzendschema</h3><p>Vandaag • {station.name}</p></div><button className="ghost" onClick={()=>router.push(`/hub/${station.slug}/programmering`)}>Open programmering →</button></div><div className="empty-live-state compact"><strong>Bewerkbare programmering</strong><span>Programma&apos;s worden niet meer uit een vaste demo geladen. Beheer ze in Programmering.</span></div></Card>
           </>}
 
-          {moduleSlug === "voor-mij" && <PersonalInboxModule stationSlug={station.slug} />}
+          {hasModuleAccess && moduleSlug === "voor-mij" && <PersonalInboxModule stationSlug={station.slug} />}
 
-          {moduleSlug === "mijn-uitzending" && <PresenterDashboardModule stationSlug={station.slug} />}
+          {hasModuleAccess && moduleSlug === "mijn-uitzending" && <PresenterDashboardModule stationSlug={station.slug} />}
 
-          {moduleSlug === "meldingen" && <><NotificationsPage stationSlug={station.slug} /><OperationalWarningsPanel stationSlug={station.slug}/></>}
+          {hasModuleAccess && moduleSlug === "meldingen" && <><NotificationsPage stationSlug={station.slug} /><OperationalWarningsPanel stationSlug={station.slug}/></>}
 
-          {moduleSlug === "stations" && <><div className="page-intro"><div><h2>Stations</h2><p>VLACORA beheert deze zenders zelfstandig, zonder externe radio-engine.</p></div></div><div className="station-grid">{hubStations.filter(s=>s.slug!=="all").map(s=><Card key={s.slug} className="station-card"><div className="station-card-head"><div className="station-logo" style={{background:s.accent}}>{s.short}</div><div><h3>{s.name}</h3><span className="muted">VLACORA station</span></div></div><div className="station-stat"><span>Werkmodus</span><strong>Standalone HUB</strong></div><Link className="primary wide" href={`/hub/${s.slug}/dashboard`}>Open station</Link></Card>)}</div></>}
+          {hasModuleAccess && moduleSlug === "stations" && <><div className="page-intro"><div><h2>Stations</h2><p>VLACORA beheert deze zenders zelfstandig, zonder externe radio-engine.</p></div></div><div className="station-grid">{hubStations.filter(s=>s.slug!=="all").map(s=><Card key={s.slug} className="station-card"><div className="station-card-head"><div className="station-logo" style={{background:s.accent}}>{s.short}</div><div><h3>{s.name}</h3><span className="muted">VLACORA station</span></div></div><div className="station-stat"><span>Werkmodus</span><strong>Standalone HUB</strong></div><Link className="primary wide" href={`/hub/${s.slug}/dashboard`}>Open station</Link></Card>)}</div></>}
 
-          {moduleSlug === "taken" && <TasksModule stationSlug={station.slug} />}
+          {hasModuleAccess && moduleSlug === "taken" && <TasksModule stationSlug={station.slug} />}
 
-          {moduleSlug === "meldpunt" && <IncidentModule stationSlug={station.slug} publishNotification={collaboration.publishNotification} />}
+          {hasModuleAccess && moduleSlug === "meldpunt" && <IncidentModule stationSlug={station.slug} publishNotification={collaboration.publishNotification} />}
 
-          {moduleSlug === "aanvragen" && <AdminRequestsModule stationSlug={station.slug} />}
+          {hasModuleAccess && moduleSlug === "aanvragen" && <AdminRequestsModule stationSlug={station.slug} />}
 
-          {moduleSlug === "content-inbox" && <ContentInboxModule stationSlug={station.slug} />}
+          {hasModuleAccess && moduleSlug === "content-inbox" && <ContentInboxModule stationSlug={station.slug} />}
 
-          {moduleSlug === "messenger" && <MessengerModule stationSlug={station.slug} />}
+          {hasModuleAccess && moduleSlug === "messenger" && <MessengerModule stationSlug={station.slug} />}
 
-          {moduleSlug === "communicatie" && <>
-            <div className="page-intro"><div><h2>Officiële communicatie</h2><p>Publiceer berichten en deel ook vaste interne documenten met het zenderteam.</p></div><div className="button-row"><button className="ghost" onClick={()=>router.push(`/hub/${station.slug}/muziekmappen`)}>Muziekmappen PDF</button><button className="primary" onClick={()=>setModal("announcement")}>+ Bericht publiceren</button></div></div>
-            <Card className="internal-doc-banner"><div><Badge tone="blue">INTERN DOCUMENT</Badge><h3>Muziekmappen / intern overzicht</h3><p>Maak een gebrande PDF met per map alle songs en deel die als officiële interne communicatie.</p></div><button className="primary" onClick={()=>router.push(`/hub/${station.slug}/muziekmappen`)}>Open PDF-maker →</button></Card>
-            {announcements.map(a=><Card className={`announcement ${a.importance==="Belangrijk"?"important":""}`} key={a.id}><div className="announcement-head"><div><Badge tone={a.importance==="Belangrijk"?"red":"blue"}>{a.importance.toUpperCase()}</Badge><span>{a.category}</span></div><span>VLACORA</span></div><h2>{a.title}</h2><p>{a.body}</p><div className="readline"><strong>{a.read?"Gelezen":"Nog niet gelezen"}</strong><button className="ghost" onClick={()=>setAnnouncements(announcements.map(x=>x.id===a.id?{...x,read:!x.read}:x))}>{a.read?"Markeer ongelezen":"Markeer gelezen"}</button><button className="mini-btn danger" onClick={()=>setAnnouncements(announcements.filter(x=>x.id!==a.id))}>×</button></div></Card>)}
-          </>}
+          {hasModuleAccess && moduleSlug === "communicatie" && <CommunicationsModule stationSlug={station.slug} publishNotification={collaboration.publishNotification} />}
 
-          {moduleSlug === "muziekmappen" && <MusicFoldersModule stationSlug={station.slug} />}
 
-          {moduleSlug === "kalender" && <CalendarModule stationSlug={station.slug} />}
+          {hasModuleAccess && moduleSlug === "kalender" && <CalendarModule stationSlug={station.slug} />}
 
-          {moduleSlug === "programmering" && <ProgrammingModule stationSlug={station.slug} stationName={station.name} />}
+          {hasModuleAccess && moduleSlug === "programmering" && <ProgrammingModule stationSlug={station.slug} stationName={station.name} />}
 
-          {moduleSlug === "programmas" && <ProgramPagesModule stationSlug={station.slug} />}
+          {hasModuleAccess && moduleSlug === "programmas" && <ProgramPagesModule stationSlug={station.slug} />}
 
-          {moduleSlug === "afwezigheden" && <AbsencesModule stationSlug={station.slug} />}
+          {hasModuleAccess && moduleSlug === "afwezigheden" && <AbsencesModule stationSlug={station.slug} />}
 
-          {moduleSlug === "contacten" && <ContactsModule stationSlug={station.slug} />}
+          {hasModuleAccess && moduleSlug === "contacten" && <ContactsModule stationSlug={station.slug} />}
 
-          {moduleSlug === "sjablonen" && <TemplatesModule stationSlug={station.slug} />}
+          {hasModuleAccess && moduleSlug === "sjablonen" && <TemplatesModule stationSlug={station.slug} />}
 
-          {moduleSlug === "muziek" && <MusicLibraryModule stationSlug={station.slug} />}
+          {hasModuleAccess && moduleSlug === "muziek" && <MusicLibraryModule stationSlug={station.slug} />}
 
-          {moduleSlug === "meetings" && <MusicMeetingsModule stationSlug={station.slug} />}
+          {hasModuleAccess && moduleSlug === "muziek-voorstellen" && <MusicProposalsModule stationSlug={station.slug} />}
 
-          {moduleSlug === "redactie" && <EditorialModule stationSlug={station.slug} />}
+          {hasModuleAccess && moduleSlug === "meetings" && <MusicMeetingsModule stationSlug={station.slug} />}
 
-          {moduleSlug === "verkeer" && <TrafficModule stationSlug={station.slug} />}
+          {hasModuleAccess && moduleSlug === "redactie" && <EditorialModule stationSlug={station.slug} />}
 
-          {moduleSlug === "hitlijsten" && <ChartsModule stationSlug={station.slug} stationName={station.name} />}
+          {hasModuleAccess && moduleSlug === "verkeer" && <TrafficModule stationSlug={station.slug} />}
 
-          {moduleSlug === "presentatie" && <PresentationModule stationSlug={station.slug} />}
+          {hasModuleAccess && moduleSlug === "hitlijsten" && <ChartsModule stationSlug={station.slug} stationName={station.name} />}
 
-          {moduleSlug === "social" && <SocialStudioModule stationSlug={station.slug} />}
+          {hasModuleAccess && moduleSlug === "presentatie" && <PresentationModule stationSlug={station.slug} />}
 
-          {moduleSlug === "team" && <TeamRightsModule stationSlug={station.slug} />}
+          {hasModuleAccess && moduleSlug === "social" && <SocialStudioModule stationSlug={station.slug} permissions={permissions} />}
 
-          {moduleSlug === "beheer" && <AdminIntegrationsModule stationName={station.name} stationSlug={station.slug} />}
+          {hasModuleAccess && moduleSlug === "team" && <TeamRightsModule stationSlug={station.slug} />}
+
+          {hasModuleAccess && moduleSlug === "beheer" && <AdminIntegrationsModule stationName={station.name} stationSlug={station.slug} />}
         </div>
       </main>
 

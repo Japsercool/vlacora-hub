@@ -9,6 +9,8 @@ import {
 } from "@/lib/supabase/admin-requests";
 import { useCollaboration } from "@/components/collaboration/collaboration-provider";
 import { emitActivity } from "@/lib/collaboration/activity";
+import AttachmentPanel from "@/components/attachment-panel";
+import { uploadAttachments } from "@/lib/supabase/attachments";
 
 const categories:{value:AdminRequestCategory;label:string}[]=[
   {value:"feature",label:"Nieuwe functie"},
@@ -41,6 +43,7 @@ export default function AdminRequestsModule({stationSlug}:{stationSlug:string}){
   const[category,setCategory]=useState<AdminRequestCategory>("feature");
   const[notice,setNotice]=useState("");
   const[busy,setBusy]=useState(false);
+  const[newFiles,setNewFiles]=useState<File[]>([]);
   const[filter,setFilter]=useState<"open"|"all">("open");
   const configured=isSupabaseBrowserConfigured();
   const role=(collaboration.currentUser?.role||"").toLowerCase();
@@ -75,7 +78,8 @@ export default function AdminRequestsModule({stationSlug}:{stationSlug:string}){
       const created=await createAdminRequest({
         stationSlug:stationSlug||"all",category,title,description
       });
-      setItems(old=>[created,...old]);setTitle("");setDescription("");
+      if(newFiles.length)await uploadAttachments(created.stationSlug,"admin_request",created.id,newFiles);
+      setItems(old=>[created,...old]);setTitle("");setDescription("");setNewFiles([]);
       emitActivity({detail:`Aanvraag verstuurd • ${created.title}`,entityType:"admin-request",entityId:created.id});
       flash("Aanvraag naar beheer verstuurd");
 
@@ -159,7 +163,7 @@ export default function AdminRequestsModule({stationSlug}:{stationSlug:string}){
         <p>Bijvoorbeeld een nieuwe functie, een extra verkeersweg, een redactietype of een technisch verzoek.</p>
         <label>Categorie<select value={category} onChange={e=>setCategory(e.target.value as AdminRequestCategory)}>{categories.map(x=><option key={x.value} value={x.value}>{x.label}</option>)}</select></label>
         <label>Titel<input value={title} onChange={e=>setTitle(e.target.value)} placeholder="Kort: wat wil je toegevoegd zien?"/></label>
-        <label>Uitleg<textarea value={description} onChange={e=>setDescription(e.target.value)} placeholder="Wat zou je precies willen en waarom?"/></label>
+        <label>Uitleg<textarea value={description} onChange={e=>setDescription(e.target.value)} placeholder="Wat zou je precies willen en waarom?"/></label><label>Bestanden<input type="file" multiple onChange={e=>setNewFiles(Array.from(e.target.files||[]))}/><small>Je kunt screenshots, PDF&apos;s, audio, documenten enz. meesturen.</small></label>
         <button className="primary" disabled={busy||!title.trim()} onClick={()=>void submit()}>{busy?"Versturen…":"Stuur naar beheer"}</button>
       </section>
 
@@ -170,7 +174,7 @@ export default function AdminRequestsModule({stationSlug}:{stationSlug:string}){
             <div><div className="request-tags"><span>{categoryLabel(item.category)}</span><span className={`request-status status-${item.status}`}>{statusLabel(item.status)}</span></div><h3>{item.title}</h3><small>{dateLabel(item.createdAt)} • {item.stationSlug==="all"?"alle stations":item.stationSlug}{isAdmin&&item.createdByName?` • door ${item.createdByName}`:""}</small></div>
             {!isAdmin&&item.createdBy===collaboration.currentUser?.id&&item.status==="new"&&<button className="ghost danger-text" onClick={()=>void deleteAdminRequest(item.id).then(()=>setItems(old=>old.filter(x=>x.id!==item.id)))}>Verwijder</button>}
           </div>
-          {item.description&&<p>{item.description}</p>}
+          {item.description&&<p>{item.description}</p>}<AttachmentPanel stationSlug={item.stationSlug} entityType="admin_request" entityId={item.id} title="Bijlagen" compact/>
           {isAdmin?<div className="admin-request-admin">
             <label>Status<select value={item.status} onChange={e=>void setStatus(item,e.target.value as AdminRequestStatus)}>{statuses.map(x=><option key={x.value} value={x.value}>{x.label}</option>)}</select></label>
             <label>Antwoord aan medewerker<textarea defaultValue={item.adminNote} onBlur={e=>void setAdminNote(item,e.currentTarget.value)} placeholder="Korte terugkoppeling vanuit beheer…"/></label>

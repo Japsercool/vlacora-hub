@@ -31,7 +31,7 @@ export default function PresenterDashboardModule({stationSlug}:{stationSlug:stri
   if(stationSlug==="all")return <div className="page-intro"><div><h2>Mijn uitzending</h2><p>Kies één station om jouw huidige of volgende uitzending te tonen.</p></div></div>;
   if(busy&&!data)return <div className="page-intro"><div><h2>Mijn uitzending</h2><p>Programma, redactie en teaminfo worden geladen…</p></div></div>;
   if(error)return <div className="config-error standalone"><strong>Mijn uitzending</strong><span>{error}</span><button className="ghost" onClick={()=>void load(true)}>Opnieuw</button></div>;
-  if(!data?.program)return <div><div className="page-intro"><div><span className="eyebrow">PRESENTATOR</span><h2>Geen uitzending aan jou gekoppeld</h2><p>Koppel jezelf op de Programma-pagina aan een programma, of zorg dat je naam bij Presentator / team in Programmering staat.</p></div><button className="primary" onClick={()=>router.push(`/hub/${stationSlug}/programmas`)}>Open programma&apos;s</button></div></div>;
+  if(!data?.program)return <div><div className="page-intro"><div><span className="eyebrow">PRESENTATOR</span><h2>Geen uitzending aan jou gekoppeld</h2><p>Je Supabase-account is nog niet aan een programma gekoppeld. Laat beheer je bij Programmering of op de Programma-pagina als presentator/teamlid selecteren.</p></div><button className="primary" onClick={()=>router.push(`/hub/${stationSlug}/programmas`)}>Open programma&apos;s</button></div></div>;
 
   const p=data.program;
   return <div className="presenter-dashboard">

@@ -3,7 +3,7 @@
 import { createClient,isSupabaseBrowserConfigured } from "@/lib/supabase/client";
 
 export type TeamPerson={
-  id:string;name:string;email:string;role:string;jobTitle:string;phone:string;initials:string;stations:string[];
+  id:string;name:string;email:string;role:string;jobTitle:string;phone:string;initials:string;avatarUrl:string;stations:string[];
 };
 export type StationProgram={
   id:string;stationSlug:string;day:number;start:string;end:string;name:string;host:string;format:string;notes:string;active:boolean;
@@ -11,18 +11,18 @@ export type StationProgram={
 export type ProgramProfile={
   programId:string;stationSlug:string;summary:string;studioInfo:string;jingleNotes:string;
   fixedItems:string[];documentLinks:Array<{label:string;url:string}>;
-  editorialTemplateIds:string[];socialTemplateIds:string[];
+  editorialTemplateIds:string[];socialTemplateIds:string[];coverUrl:string;
 };
-export type ProgramTeamMember={programId:string;userId:string;role:string;isPrimary:boolean;name?:string;initials?:string};
+export type ProgramTeamMember={programId:string;userId:string;role:string;isPrimary:boolean;name?:string;initials?:string;avatarUrl?:string};
 export type Absence={
-  id:string;stationSlug:string;userId:string;userName:string;startsOn:string;endsOn:string;reason:string;notes:string;status:"requested"|"approved"|"cancelled";
+  id:string;stationSlug:string;userId:string;userName:string;userAvatarUrl:string;startsOn:string;endsOn:string;reason:string;notes:string;status:"requested"|"approved"|"cancelled";
   createdBy:string|null;createdAt:string;updatedAt:string;
   coverages:AbsenceCoverage[];
   openTasks:number;
 };
 export type AbsenceCoverage={
   id:string;absenceId:string;programId:string;programName:string;airDate:string;replacementUserId:string|null;replacementName:string;
-  status:"unassigned"|"asked"|"confirmed"|"declined";notes:string;
+  status:"unassigned"|"asked"|"confirmed"|"declined";coverageMode:"required"|"optional";notes:string;
 };
 export type ExternalContact={
   id:string;stationSlug:string;category:string;name:string;company:string;roleTitle:string;email:string;phone:string;emergency:boolean;visibility:"team"|"management";notes:string;
@@ -74,7 +74,7 @@ export async function loadTeamPeople(stationSlug:string):Promise<TeamPerson[]>{
   if(!isSupabaseBrowserConfigured())return[];
   const supabase=createClient();
   const[{data:profiles,error:pErr},{data:memberships,error:mErr}]=await Promise.all([
-    supabase.from("profiles").select("id,display_name,email,role,job_title,phone,active").eq("active",true).order("display_name"),
+    supabase.from("profiles").select("id,display_name,email,role,job_title,phone,avatar_url,active").eq("active",true).order("display_name"),
     supabase.from("station_memberships").select("user_id,station_slug,active").eq("active",true)
   ]);
   if(pErr)throw pErr;if(mErr)throw mErr;
@@ -86,7 +86,7 @@ export async function loadTeamPeople(stationSlug:string):Promise<TeamPerson[]>{
   const hasScoped=stationSlug!=="all"&&scoped.size>0;
   return(profiles||[]).filter((p:any)=>stationSlug==="all"||String(p.role).toLowerCase()==="superadmin"||!hasScoped||scoped.has(String(p.id))).map((p:any)=>{
     const name=String(p.display_name||p.email||"Teamlid");
-    return{id:String(p.id),name,email:String(p.email||""),role:String(p.role||""),jobTitle:String(p.job_title||""),phone:String(p.phone||""),initials:initials(name),stations:byUser.get(String(p.id))||[]};
+    return{id:String(p.id),name,email:String(p.email||""),role:String(p.role||""),jobTitle:String(p.job_title||""),phone:String(p.phone||""),initials:initials(name),avatarUrl:String(p.avatar_url||""),stations:byUser.get(String(p.id))||[]};
   });
 }
 
@@ -103,7 +103,8 @@ function mapProgramProfile(r:any,program?:StationProgram):ProgramProfile{
     fixedItems:Array.isArray(r?.fixed_items)?r.fixed_items.map(String):[],
     documentLinks:Array.isArray(r?.document_links)?r.document_links.map((x:any)=>({label:String(x?.label||"Document"),url:String(x?.url||"")})):[],
     editorialTemplateIds:Array.isArray(r?.editorial_template_ids)?r.editorial_template_ids.map(String):[],
-    socialTemplateIds:Array.isArray(r?.social_template_ids)?r.social_template_ids.map(String):[]};
+    socialTemplateIds:Array.isArray(r?.social_template_ids)?r.social_template_ids.map(String):[],
+    coverUrl:String(r?.cover_url||"")};
 }
 export async function loadProgramProfile(program:StationProgram):Promise<ProgramProfile>{
   if(!isSupabaseBrowserConfigured())return mapProgramProfile(null,program);
@@ -113,7 +114,7 @@ export async function loadProgramProfile(program:StationProgram):Promise<Program
 export async function saveProgramProfile(program:StationProgram,profile:ProgramProfile){
   const userId=await currentUserId();if(!userId)throw new Error("Log opnieuw in.");
   const payload={program_id:program.id,station_slug:program.stationSlug,summary:profile.summary,studio_info:profile.studioInfo,jingle_notes:profile.jingleNotes,
-    fixed_items:profile.fixedItems,document_links:profile.documentLinks,editorial_template_ids:profile.editorialTemplateIds,social_template_ids:profile.socialTemplateIds,
+    fixed_items:profile.fixedItems,document_links:profile.documentLinks,editorial_template_ids:profile.editorialTemplateIds,social_template_ids:profile.socialTemplateIds,cover_url:profile.coverUrl||"",
     updated_by:userId,updated_at:new Date().toISOString()};
   const{data,error}=await createClient().from("hub_program_profiles").upsert({...payload,created_by:userId},{onConflict:"program_id"}).select("*").single();
   if(error)throw error;return mapProgramProfile(data,program);
@@ -124,12 +125,35 @@ export async function loadProgramTeam(programId:string):Promise<ProgramTeamMembe
   const{data:rows,error}=await supabase.from("hub_program_team").select("program_id,user_id,role,is_primary").eq("program_id",programId);
   if(error)throw error;
   const ids=(rows||[]).map((r:any)=>String(r.user_id));
-  const names=new Map<string,{name:string;initials:string}>();
+  const names=new Map<string,{name:string;initials:string;avatarUrl:string}>();
   if(ids.length){
-    const{data:profiles}=await supabase.from("profiles").select("id,display_name,email").in("id",ids);
-    for(const p of profiles||[]){const name=String((p as any).display_name||(p as any).email||"Teamlid");names.set(String((p as any).id),{name,initials:initials(name)})}
+    const{data:profiles}=await supabase.from("profiles").select("id,display_name,email,avatar_url").in("id",ids);
+    for(const p of profiles||[]){const name=String((p as any).display_name||(p as any).email||"Teamlid");names.set(String((p as any).id),{name,initials:initials(name),avatarUrl:String((p as any).avatar_url||"")})}
   }
-  return(rows||[]).map((r:any)=>({programId:String(r.program_id),userId:String(r.user_id),role:String(r.role||"presentator"),isPrimary:Boolean(r.is_primary),name:names.get(String(r.user_id))?.name||"Teamlid",initials:names.get(String(r.user_id))?.initials||"T"}));
+  return(rows||[]).map((r:any)=>({programId:String(r.program_id),userId:String(r.user_id),role:String(r.role||"presentator"),isPrimary:Boolean(r.is_primary),name:names.get(String(r.user_id))?.name||"Teamlid",initials:names.get(String(r.user_id))?.initials||"T",avatarUrl:names.get(String(r.user_id))?.avatarUrl||""}));
+}
+export async function loadProgramTeamAssignments(programIds:string[]):Promise<Record<string,ProgramTeamMember[]>>{
+  const ids=[...new Set(programIds.filter(Boolean))];
+  if(!ids.length||!isSupabaseBrowserConfigured())return{};
+  const supabase=createClient();
+  const{data:rows,error}=await supabase.from("hub_program_team").select("program_id,user_id,role,is_primary").in("program_id",ids);
+  if(error)throw error;
+  const userIds=[...new Set((rows||[]).map((r:any)=>String(r.user_id)))];
+  const names=new Map<string,{name:string;initials:string;avatarUrl:string}>();
+  if(userIds.length){
+    const{data:profiles}=await supabase.from("profiles").select("id,display_name,email,avatar_url").in("id",userIds);
+    for(const profile of profiles||[]){
+      const name=String((profile as any).display_name||(profile as any).email||"Teamlid");
+      names.set(String((profile as any).id),{name,initials:initials(name),avatarUrl:String((profile as any).avatar_url||"")});
+    }
+  }
+  const result:Record<string,ProgramTeamMember[]>={};
+  for(const row of rows||[]){
+    const programId=String((row as any).program_id),userId=String((row as any).user_id),person=names.get(userId);
+    (result[programId] ||= []).push({programId,userId,role:String((row as any).role||"presentator"),isPrimary:Boolean((row as any).is_primary),name:person?.name||"Teamlid",initials:person?.initials||"T",avatarUrl:person?.avatarUrl||""});
+  }
+  for(const programId of Object.keys(result))result[programId].sort((a,b)=>Number(b.isPrimary)-Number(a.isPrimary)||(a.name||"").localeCompare(b.name||""));
+  return result;
 }
 export async function saveProgramTeam(programId:string,members:Array<{userId:string;role:string;isPrimary:boolean}>){
   const supabase=createClient();
@@ -159,13 +183,19 @@ export async function rebuildAbsenceCoverage(absenceId:string){
     supabase.from("profiles").select("display_name,email").eq("id",userId).maybeSingle()
   ]);
   const programIds=new Set((team||[]).map((x:any)=>String(x.program_id)));
+  const {data:allTeam}=programIds.size?await supabase.from("hub_program_team").select("program_id,user_id").in("program_id",[...programIds]):{data:[] as any[]};
+  const teamCount=new Map<string,number>();
+  for(const member of allTeam||[]){const pid=String((member as any).program_id);teamCount.set(pid,(teamCount.get(pid)||0)+1)}
   const name=String((profile as any)?.display_name||(profile as any)?.email||"").toLowerCase();
   const rows:any[]=[];
   for(const date of dateRange(String(absence.starts_on),String(absence.ends_on))){
     const js=new Date(`${date}T12:00:00`),day=(js.getDay()+6)%7;
     for(const program of programs.filter(p=>p.active&&p.day===day)){
       const hostMatch=name&&program.host.toLowerCase().includes(name.split(" ")[0]);
-      if(programIds.has(program.id)||hostMatch)rows.push({absence_id:absenceId,program_id:program.id,air_date:date,status:"unassigned"});
+      if(programIds.has(program.id)||hostMatch){
+        const coverageMode=programIds.has(program.id)&&(teamCount.get(program.id)||1)>1?"optional":"required";
+        rows.push({absence_id:absenceId,program_id:program.id,air_date:date,status:"unassigned",coverage_mode:coverageMode});
+      }
     }
   }
   await supabase.from("hub_absence_coverages").delete().eq("absence_id",absenceId);
@@ -190,13 +220,14 @@ export async function loadAbsences(stationSlug:string):Promise<Absence[]>{
   if(!(rows||[]).length)return[];
   const absIds=(rows||[]).map((x:any)=>String(x.id)),userIds=[...new Set((rows||[]).map((x:any)=>String(x.user_id)))];
   const[{data:profiles},{data:coverages},{data:programs},{data:taskAssignees},{data:tasks}]=await Promise.all([
-    supabase.from("profiles").select("id,display_name,email").in("id",userIds),
+    supabase.from("profiles").select("id,display_name,email,avatar_url").in("id",userIds),
     supabase.from("hub_absence_coverages").select("*").in("absence_id",absIds).order("air_date"),
     supabase.from("station_programs").select("id,name"),
     supabase.from("hub_task_assignees").select("task_id,user_id").in("user_id",userIds),
     supabase.from("hub_tasks").select("id,status,due_at")
   ]);
   const names=new Map<string,string>((profiles||[]).map((x:any)=>[String(x.id),String(x.display_name||x.email||"Teamlid")]));
+  const avatars=new Map<string,string>((profiles||[]).map((x:any)=>[String(x.id),String(x.avatar_url||"")]));
   const programNames=new Map<string,string>((programs||[]).map((x:any)=>[String(x.id),String(x.name||"Programma")]));
   const replacementIds=[...new Set((coverages||[]).map((x:any)=>x.replacement_user_id).filter(Boolean).map(String))];
   if(replacementIds.length){
@@ -212,10 +243,42 @@ export async function loadAbsences(stationSlug:string):Promise<Absence[]>{
   const covByAbs=new Map<string,AbsenceCoverage[]>();
   for(const c of coverages||[]){
     const id=String((c as any).absence_id),list=covByAbs.get(id)||[];
-    list.push({id:String((c as any).id),absenceId:id,programId:String((c as any).program_id),programName:programNames.get(String((c as any).program_id))||"Programma",airDate:String((c as any).air_date),replacementUserId:(c as any).replacement_user_id?String((c as any).replacement_user_id):null,replacementName:(c as any).replacement_user_id?names.get(String((c as any).replacement_user_id))||"Teamlid":"",status:String((c as any).status) as AbsenceCoverage["status"],notes:String((c as any).notes||"")});
+    list.push({id:String((c as any).id),absenceId:id,programId:String((c as any).program_id),programName:programNames.get(String((c as any).program_id))||"Programma",airDate:String((c as any).air_date),replacementUserId:(c as any).replacement_user_id?String((c as any).replacement_user_id):null,replacementName:(c as any).replacement_user_id?names.get(String((c as any).replacement_user_id))||"Teamlid":"",status:String((c as any).status) as AbsenceCoverage["status"],coverageMode:String((c as any).coverage_mode||"required") as AbsenceCoverage["coverageMode"],notes:String((c as any).notes||"")});
     covByAbs.set(id,list);
   }
-  return(rows||[]).map((r:any)=>({id:String(r.id),stationSlug:String(r.station_slug),userId:String(r.user_id),userName:names.get(String(r.user_id))||"Teamlid",startsOn:String(r.starts_on),endsOn:String(r.ends_on),reason:String(r.reason||""),notes:String(r.notes||""),status:String(r.status) as Absence["status"],createdBy:r.created_by?String(r.created_by):null,createdAt:String(r.created_at),updatedAt:String(r.updated_at),coverages:covByAbs.get(String(r.id))||[],openTasks:openTaskCount.get(String(r.user_id))||0}));
+  return(rows||[]).map((r:any)=>({id:String(r.id),stationSlug:String(r.station_slug),userId:String(r.user_id),userName:names.get(String(r.user_id))||"Teamlid",userAvatarUrl:avatars.get(String(r.user_id))||"",startsOn:String(r.starts_on),endsOn:String(r.ends_on),reason:String(r.reason||""),notes:String(r.notes||""),status:String(r.status) as Absence["status"],createdBy:r.created_by?String(r.created_by):null,createdAt:String(r.created_at),updatedAt:String(r.updated_at),coverages:covByAbs.get(String(r.id))||[],openTasks:openTaskCount.get(String(r.user_id))||0}));
+}
+
+export type ProgramOverride={id:string;stationSlug:string;programId:string;programName:string;airDate:string;status:"needs_replacement"|"can_run"|"covered"|"cancelled";originalUserId:string|null;originalName:string;replacementUserId:string|null;replacementName:string;notes:string};
+export async function loadProgramOverrides(stationSlug:string,fromDate:string,toDate:string):Promise<ProgramOverride[]>{
+  if(!isSupabaseBrowserConfigured()||stationSlug==="all")return[];
+  const supabase=createClient();
+  const {data:rows,error}=await supabase.from("hub_program_overrides").select("*").eq("station_slug",stationSlug).gte("air_date",fromDate).lte("air_date",toDate).order("air_date");if(error)throw error;
+  const pids=[...new Set((rows||[]).map((x:any)=>String(x.program_id)))],uids=[...new Set((rows||[]).flatMap((x:any)=>[x.original_user_id,x.replacement_user_id]).filter(Boolean).map(String))];
+  const[{data:programs},{data:profiles}]=await Promise.all([pids.length?supabase.from("station_programs").select("id,name").in("id",pids):Promise.resolve({data:[]} as any),uids.length?supabase.from("profiles").select("id,display_name,email").in("id",uids):Promise.resolve({data:[]} as any)]);
+  const pn=new Map<string,string>((programs||[]).map((x:any)=>[String(x.id),String(x.name||"Programma")]));const un=new Map<string,string>((profiles||[]).map((x:any)=>[String(x.id),String(x.display_name||x.email||"Teamlid")]));
+  return(rows||[]).map((r:any)=>({id:String(r.id),stationSlug:String(r.station_slug),programId:String(r.program_id),programName:pn.get(String(r.program_id))||"Programma",airDate:String(r.air_date),status:String(r.status) as ProgramOverride["status"],originalUserId:r.original_user_id?String(r.original_user_id):null,originalName:r.original_user_id?un.get(String(r.original_user_id))||"Teamlid":"",replacementUserId:r.replacement_user_id?String(r.replacement_user_id):null,replacementName:r.replacement_user_id?un.get(String(r.replacement_user_id))||"Teamlid":"",notes:String(r.notes||"")}));
+}
+export async function uploadProfileAvatar(targetUserId:string,file:File):Promise<string>{
+  if(!isSupabaseBrowserConfigured())throw new Error("Supabase is niet actief.");
+  if(!file.type.startsWith("image/"))throw new Error("Kies een afbeelding.");
+  if(file.size>5*1024*1024)throw new Error("Foto is groter dan 5 MB.");
+  const supabase=createClient();const ext=(file.name.split(".").pop()||"jpg").replace(/[^a-z0-9]/gi,"").toLowerCase()||"jpg";const path=`${targetUserId}/avatar-${Date.now()}.${ext}`;
+  const {error}=await supabase.storage.from("vlacora-profile-photos").upload(path,file,{upsert:true,contentType:file.type});if(error)throw error;
+  const {data}=supabase.storage.from("vlacora-profile-photos").getPublicUrl(path);const url=data.publicUrl;
+  const {error:rpcError}=await supabase.rpc("vlacora_set_profile_avatar",{target_user_id:targetUserId,p_avatar_url:url});if(rpcError)throw rpcError;return url;
+}
+
+export async function uploadProgramCover(program:StationProgram,file:File):Promise<string>{
+  if(!isSupabaseBrowserConfigured())throw new Error("Supabase is niet actief.");
+  if(!file.type.startsWith("image/"))throw new Error("Kies een afbeelding.");
+  if(file.size>8*1024*1024)throw new Error("Programmafoto is groter dan 8 MB.");
+  const supabase=createClient();const{data:u}=await supabase.auth.getUser();const userId=u.user?.id;if(!userId)throw new Error("Log opnieuw in.");
+  const ext=(file.name.split(".").pop()||"jpg").replace(/[^a-z0-9]/gi,"").toLowerCase()||"jpg";
+  const safeProgram=program.id.replace(/[^a-zA-Z0-9_-]+/g,"-").slice(0,80);
+  const path=`${program.stationSlug}/${userId}/${safeProgram}-${Date.now()}.${ext}`;
+  const{error}=await supabase.storage.from("vlacora-program-assets").upload(path,file,{upsert:false,contentType:file.type});if(error)throw error;
+  const{data}=supabase.storage.from("vlacora-program-assets").getPublicUrl(path);return data.publicUrl;
 }
 
 export async function loadExternalContacts(stationSlug:string):Promise<ExternalContact[]>{
@@ -370,9 +433,7 @@ export async function loadPresenterDashboard(stationSlug:string,userId:string):P
   const todayPrograms=programs.filter(p=>p.active&&p.day===todayDay).sort((a,b)=>a.start.localeCompare(b.start));
   const{data:teamRows}=await supabase.from("hub_program_team").select("program_id,user_id,role,is_primary").eq("user_id",userId);
   const assigned=new Set((teamRows||[]).map((x:any)=>String(x.program_id)));
-  const{data:me}=await supabase.from("profiles").select("display_name,email").eq("id",userId).maybeSingle();
-  const firstName=String(me?.display_name||me?.email||"").split(/\s+/)[0].toLowerCase();
-  const mine=todayPrograms.filter(p=>assigned.has(p.id)||(firstName&&p.host.toLowerCase().includes(firstName)));
+  const mine=todayPrograms.filter(p=>assigned.has(p.id));
   const program=mine.find(p=>timeToMinutes(p.start)<=nowMin&&timeToMinutes(p.end)>nowMin)||mine.find(p=>timeToMinutes(p.start)>nowMin)||mine[0]||null;
   const nextProgram=program?todayPrograms.find(p=>timeToMinutes(p.start)>=timeToMinutes(program.end))||null:null;
   const profile=program?await loadProgramProfile(program):null,team=program?await loadProgramTeam(program.id):[];

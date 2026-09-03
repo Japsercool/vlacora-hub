@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect,useMemo,useState } from "react";
+import AttachmentPanel from "@/components/attachment-panel";
 import { useCollaboration } from "@/components/collaboration/collaboration-provider";
+import { can,type PermissionMap } from "@/lib/permissions";
 import { loadSharedHitlists,loadSharedProgramming } from "@/lib/supabase/hub-data";
 import {
   addSocialReviewEvent,deleteSocialAsset,deleteSocialCopyBlock,deleteSocialPost,deleteSocialTemplate,
@@ -14,7 +16,7 @@ type Tab="studio"|"brand"|"templates"|"calendar"|"copy"|"assets";
 type FormatKey="1:1"|"4:5"|"9:16"|"16:9";
 type Context={
   station:string;artist:string;title:string;program:string;presenter:string;
-  chartPosition:string;previousPosition:string;nextShow:string;date:string;time:string;cta:string;
+  chartPosition:string;previousPosition:string;nextShow:string;date:string;time:string;cta:string;artworkImage:string;
 };
 type VisualConfig={
   label:string;headline:string;subline:string;footer:string;
@@ -44,7 +46,7 @@ const presetTemplates:Array<{name:string;contentType:string;format:FormatKey;cap
 const defaultContext=(stationSlug:string):Context=>({
   station:stationSlug==="all"?"VLACORA":stationSlug,artist:"Joel Corry",title:"Whisper",program:"",presenter:"",
   chartPosition:"1",previousPosition:"2",nextShow:"",date:new Date().toLocaleDateString("nl-BE"),
-  time:new Date().toLocaleTimeString("nl-BE",{hour:"2-digit",minute:"2-digit"}),cta:"Luister nu live"
+  time:new Date().toLocaleTimeString("nl-BE",{hour:"2-digit",minute:"2-digit"}),cta:"Luister nu live",artworkImage:""
 });
 const defaultBrand=(stationSlug:string):BrandKit=>({
   station_slug:stationSlug,brand_name:stationSlug==="all"?"VLACORA":stationSlug,logo_url:"",
@@ -123,7 +125,7 @@ function newPost(stationSlug:string,template:SocialTemplate,ctx:Context):SocialP
   return{id:`new-${uid()}`,station_slug:stationSlug,template_id:template.id.startsWith("new-")?null:template.id,title:replaceVars(String(cfg(template).headline),ctx),status:"concept",format:template.aspect_ratio||"4:5",payload:ctx,caption:replaceVars(template.caption_template,ctx),scheduled_at:null,published_at:null,platforms:["Instagram"],campaign:"",content_pillar:"",objective:"",assigned_to:null,reviewer_id:null,due_at:null,publication_url:"",internal_notes:"",checklist:{copy:false,visual:false,rights:false,links:false}};
 }
 
-export default function SocialStudioModule({stationSlug}:{stationSlug:string}){
+export default function SocialStudioModule({stationSlug,permissions}:{stationSlug:string;permissions?:PermissionMap|null}){
   const[tab,setTab]=useState<Tab>("studio");
   const[brand,setBrand]=useState<BrandKit>(()=>defaultBrand(stationSlug));
   const[templates,setTemplates]=useState<SocialTemplate[]>([]);
@@ -148,6 +150,19 @@ export default function SocialStudioModule({stationSlug}:{stationSlug:string}){
   const[exportFormats,setExportFormats]=useState<Record<FormatKey,boolean>>({"1:1":true,"4:5":true,"9:16":true,"16:9":false});
 
   const collaboration=useCollaboration();
+  const canContent=!permissions||can(permissions.social_content,"view");
+  const canEditContent=!permissions||can(permissions.social_content,"edit");
+  const canCalendar=!permissions||can(permissions.social_calendar,"view");
+  const canTemplates=!permissions||can(permissions.social_templates,"view");
+  const canAssets=!permissions||can(permissions.social_assets,"view");
+  const canApprove=!permissions||can(permissions.social_approval,"publish");
+  const visibleTabs=([
+    ["studio","Studio",canContent],["brand","Brand kit",canTemplates],
+    ["templates","Templates",canTemplates],["calendar","Contentkalender",canCalendar],
+    ["copy","Copyblokken",canAssets],["assets","Assets",canAssets]
+  ] as [Tab,string,boolean][]).filter(x=>x[2]);
+
+  useEffect(()=>{if(!visibleTabs.some(([key])=>key===tab)&&visibleTabs[0])setTab(visibleTabs[0][0])},[tab,permissions]);
 
   function flash(message:string){setNotice(message);window.setTimeout(()=>setNotice(""),3200)}
   async function loadAll(){
@@ -167,10 +182,10 @@ export default function SocialStudioModule({stationSlug}:{stationSlug:string}){
   }
   useEffect(()=>{void loadAll()},[stationSlug]);
 
-  const selectedTemplate=useMemo(()=>templates.find(x=>x.id===selectedTemplateId)||templateDraft||templates[0]||null,[templates,selectedTemplateId,templateDraft]);
+  const selectedTemplate=useMemo(()=>templateDraft&&templateDraft.id===selectedTemplateId?templateDraft:templates.find(x=>x.id===selectedTemplateId)||templateDraft||templates[0]||null,[templates,selectedTemplateId,templateDraft]);
   const selectedCalendarPost=useMemo(()=>posts.find(x=>x.id===selectedCalendarPostId)||null,[posts,selectedCalendarPostId]);
   const calendarCells=useMemo(()=>monthCells(calendarMonth),[calendarMonth]);
-  const visual=cfg(selectedTemplate);
+  const visual={...cfg(selectedTemplate),artworkImage:ctx.artworkImage||cfg(selectedTemplate).artworkImage};
   const liveCaption=currentPost?.caption??replaceVars(selectedTemplate?.caption_template||"",ctx);
   const previewHeadline=replaceVars(visual.headline,ctx);
   const previewSubline=replaceVars(visual.subline,ctx);
@@ -395,61 +410,41 @@ export default function SocialStudioModule({stationSlug}:{stationSlug:string}){
     if(stationSlug==="all")return flash("Kies één station.");
     setAssetUpload(true);try{const asset=await uploadSocialAsset(stationSlug,file,assetTags.split(",").map(x=>x.trim()).filter(Boolean));setAssets(rows=>[asset,...rows]);flash("Asset geüpload naar Supabase Storage")}catch(e){flash(e instanceof Error?e.message:"Upload mislukt")}finally{setAssetUpload(false)}
   }
+  async function handleStudioPhoto(file:File|undefined){
+    if(!file)return;setAssetUpload(true);try{const asset=await uploadSocialAsset(stationSlug,file,["studio","post-photo"]);setAssets(rows=>[asset,...rows]);patchContext("artworkImage",asset.public_url);flash("Foto toegevoegd aan deze socialpost") }catch(e){flash(e instanceof Error?e.message:"Foto uploaden mislukt")}finally{setAssetUpload(false)}
+  }
   async function removeAsset(asset:SocialAsset){if(!confirm(`Asset “${asset.name}” verwijderen?`))return;try{await deleteSocialAsset(asset);setAssets(rows=>rows.filter(x=>x.id!==asset.id));flash("Asset verwijderd")}catch(e){flash(e instanceof Error?e.message:"Verwijderen mislukt")}}
 
   if(stationSlug==="all")return <div><div className="page-intro"><div><h2>Social Studio</h2><p>Kies één station zodat VLACORA de juiste brand kit, assets en templates gebruikt.</p></div></div><div className="card empty-live-state"><strong>Social Studio is station-specifiek</strong><span>Kies bovenaan een station.</span></div></div>;
 
   return <div className="social-studio-v16">
     <div className="page-intro social-studio-intro">
-      <div><span className="eyebrow">VLACORA CONTENT</span><h2>Social Studio</h2><p>Van idee en briefing tot visual, caption, review, planning en publicatie-opvolging in één werkplek.</p></div>
-      <div className="button-row"><button className="ghost" disabled={busy} onClick={()=>void autofill()}>⚡ Vul HUB-data in</button><button className="primary" disabled={busy||!selectedTemplate} onClick={()=>void persistPost()}>Bewaar concept</button></div>
+      <div><span className="eyebrow">VLACORA CONTENT</span><h2>Social Studio</h2><p>Maak visuals zoals in een eenvoudige grafische template-editor: kies een template, vul alleen de nodige velden in en plan daarna review/publicatie.</p></div>
+      <div className="button-row"><button className="ghost" disabled={busy} onClick={()=>void autofill()}>⚡ Vul HUB-data in</button>{canEditContent&&<button className="primary" disabled={busy||!selectedTemplate} onClick={()=>void persistPost()}>Bewaar concept</button>}</div>
     </div>
     {notice&&<div className="inline-notice standalone">{notice}</div>}
     <div className="social-tabs">
-      {([["studio","Studio"],["brand","Brand kit"],["templates","Templates"],["calendar","Contentkalender"],["copy","Copyblokken"],["assets","Assets"]] as [Tab,string][]).map(([key,label])=><button key={key} className={tab===key?"active":""} onClick={()=>setTab(key)}>{label}</button>)}
+      {visibleTabs.map(([key,label])=><button key={key} className={tab===key?"active":""} onClick={()=>setTab(key)}>{label}</button>)}
     </div>
 
     {tab==="studio"&&selectedTemplate&&<div className="social-workbench">
-      <section className="card social-composer">
-        <div className="section-head"><div><h3>Maak content</h3><p>Gebruik echte data of vul zelf aan.</p></div><span className="badge badge-blue">{selectedTemplate.name}</span></div>
+      <section className="card social-composer social-fields-panel">
+        <div className="section-head"><div><span className="eyebrow">VELDEN INVULLEN</span><h3>{currentPost?.title||selectedTemplate.name}</h3><p>Alleen de invulvelden voor deze post. De live preview blijft links zichtbaar, zoals in je TOPhub-voorbeeld.</p></div><span className="badge badge-blue">{selectedTemplate.name}</span></div>
         <label className="field">Template<select className="select" value={selectedTemplate.id} onChange={e=>{const x=templates.find(t=>t.id===e.target.value);if(x)chooseTemplate(x)}}>{templates.map(t=><option key={t.id} value={t.id}>{t.name}</option>)}</select></label>
-        <div className="social-format-row">{(Object.keys(formats) as FormatKey[]).map(key=><button key={key} className={format===key?"active":""} onClick={()=>setFormat(key)}>{formats[key].label}</button>)}</div>
-        <div className="social-context-grid">
+        <div className="social-format-row compact">{(Object.keys(formats) as FormatKey[]).map(key=><button key={key} className={format===key?"active":""} onClick={()=>setFormat(key)}>{formats[key].label}</button>)}</div>
+        <div className="social-photo-field"><div><strong>Afbeelding / DJ-foto</strong><small>Deze foto hoort bij deze post en verandert het template zelf niet.</small></div><div className="social-photo-actions"><label className="ghost file-button">{assetUpload?"Uploaden…":"Foto kiezen"}<input type="file" accept="image/png,image/jpeg,image/webp" hidden onChange={e=>void handleStudioPhoto(e.target.files?.[0])}/></label>{ctx.artworkImage&&<button className="ghost" onClick={()=>patchContext("artworkImage","")}>Verwijder</button>}</div>{assets.length>0&&<div className="studio-asset-strip">{assets.slice(0,8).map(a=><button key={a.id} className={ctx.artworkImage===a.public_url?"selected":""} onClick={()=>patchContext("artworkImage",a.public_url)}><img src={a.public_url} alt=""/></button>)}</div>}</div>
+        <div className="social-context-grid clean">
           <label>Artiest<input value={ctx.artist} onChange={e=>patchContext("artist",e.target.value)}/></label>
           <label>Titel / onderwerp<input value={ctx.title} onChange={e=>patchContext("title",e.target.value)}/></label>
           <label>Programma<input value={ctx.program} onChange={e=>patchContext("program",e.target.value)}/></label>
           <label>Presentator<input value={ctx.presenter} onChange={e=>patchContext("presenter",e.target.value)}/></label>
-          
           <label>Hitlijstpositie<input value={ctx.chartPosition} onChange={e=>patchContext("chartPosition",e.target.value)}/></label>
           <label>Vorige positie<input value={ctx.previousPosition} onChange={e=>patchContext("previousPosition",e.target.value)}/></label>
           <label>Volgende show<input value={ctx.nextShow} onChange={e=>patchContext("nextShow",e.target.value)}/></label>
         </div>
-        <div className="social-caption-head"><strong>Caption</strong><button onClick={()=>void copyCaption()}>Kopieer</button></div>
-        <textarea className="social-caption-editor" value={currentPost?.caption??liveCaption} onChange={e=>setCurrentPost(p=>p?{...p,caption:e.target.value}:p)} />
-        <div className="variable-strip">{variables.map(v=><button key={v} onClick={()=>setCurrentPost(p=>p?{...p,caption:`${p.caption}${p.caption.endsWith(" ")?"":" "}${v}`}:p)}>{v}</button>)}</div>
-        <div className="studio-copy-blocks">
-          <div className="social-caption-head"><strong>Snelle copyblokken</strong><button onClick={()=>setTab("copy")}>Beheer</button></div>
-          <div className="studio-copy-buttons">{copyBlocks.length?copyBlocks.slice(0,8).map(block=><button key={block.id} onClick={()=>insertCopyBlock(block)}><span>{block.category}</span><strong>{block.name}</strong></button>):<span className="muted-copy-hint">Nog geen copyblokken. Maak vaste CTA’s, hashtags of programmablokken onder Copyblokken.</span>}</div>
-        </div>
-        <div className="social-post-controls">
-          <label>Status<select value={currentPost?.status||"concept"} onChange={e=>setCurrentPost(p=>p?{...p,status:e.target.value as SocialPost["status"]}:p)}><option value="concept">Concept</option><option value="review">Klaar voor review</option><option value="approved">Goedgekeurd</option><option value="published">Gepubliceerd</option></select></label>
-          <label>Planning<input type="datetime-local" value={toLocalInput(currentPost?.scheduled_at||null)} onChange={e=>setCurrentPost(p=>p?{...p,scheduled_at:fromLocalInput(e.target.value)}:p)}/></label>
-        </div>
-        <div className="social-brief-card">
-          <div className="section-head"><div><h3>Briefing & workflow</h3><p>Leg vóór publicatie vast wie wat maakt, voor welk kanaal en met welk doel.</p></div></div>
-          <div className="social-platform-picker">{["Instagram","Instagram Story","Facebook","TikTok","YouTube Shorts","LinkedIn"].map(platform=><button key={platform} className={(currentPost?.platforms||[]).includes(platform)?"active":""} onClick={()=>togglePlatform(platform)}>{platform}</button>)}</div>
-          <div className="social-brief-grid">
-            <label>Campagne<input value={currentPost?.campaign||""} onChange={e=>patchPost({campaign:e.target.value})} placeholder="bv. Back to school"/></label>
-            <label>Contentpijler<input value={currentPost?.content_pillar||""} onChange={e=>patchPost({content_pillar:e.target.value})} placeholder="Muziek, programma, community…"/></label>
-            <label>Doel<input value={currentPost?.objective||""} onChange={e=>patchPost({objective:e.target.value})} placeholder="Informeren, engagement, promo…"/></label>
-            <label>Deadline<input type="datetime-local" value={toLocalInput(currentPost?.due_at||null)} onChange={e=>patchPost({due_at:fromLocalInput(e.target.value)})}/></label>
-            <label>Eigenaar<select value={currentPost?.assigned_to||""} onChange={e=>patchPost({assigned_to:e.target.value||null})}><option value="">Niet toegewezen</option>{people.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select></label>
-            <label>Reviewer<select value={currentPost?.reviewer_id||""} onChange={e=>patchPost({reviewer_id:e.target.value||null})}><option value="">Geen vaste reviewer</option>{people.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select></label>
-          </div>
-          <div className="social-checklist">{[["copy","Copy klaar"],["visual","Visual klaar"],["rights","Rechten gecheckt"],["links","Links/CTA gecheckt"]].map(([key,label])=><label key={key}><input type="checkbox" checked={Boolean(currentPost?.checklist?.[key])} onChange={()=>toggleChecklist(key)}/><span>{label}</span></label>)}</div>
-          <label className="field">Interne notitie<textarea className="input" value={currentPost?.internal_notes||""} onChange={e=>patchPost({internal_notes:e.target.value})} placeholder="Niet zichtbaar in de caption: briefing, beeldrechten, opmerkingen…"/></label>
-          {currentPost?.status==="published"&&<label className="field">Link naar publicatie<input className="input" value={currentPost?.publication_url||""} onChange={e=>patchPost({publication_url:e.target.value})} placeholder="https://…"/></label>}
-        </div>
+        <details className="social-editor-details" open><summary>Caption & tekst</summary><div className="social-caption-head"><strong>Caption</strong><button onClick={()=>void copyCaption()}>Kopieer</button></div><textarea className="social-caption-editor" value={currentPost?.caption??liveCaption} onChange={e=>setCurrentPost(p=>p?{...p,caption:e.target.value}:p)} /><div className="variable-strip">{variables.map(v=><button key={v} onClick={()=>setCurrentPost(p=>p?{...p,caption:`${p.caption}${p.caption.endsWith(" ")?"":" "}${v}`}:p)}>{v}</button>)}</div></details>{currentPost&&!currentPost.id.startsWith("new-")&&<div className="social-post-attachments"><AttachmentPanel stationSlug={stationSlug} entityType="social_post" entityId={currentPost.id} title="Bestanden bij deze socialpost"/></div>}
+        <details className="social-editor-details"><summary>Planning, kanalen & goedkeuring</summary><div className="social-post-controls"><label>Status<select value={currentPost?.status||"concept"} onChange={e=>setCurrentPost(p=>p?{...p,status:e.target.value as SocialPost["status"]}:p)}><option value="concept">Concept</option><option value="review">Klaar voor review</option><option value="approved">Goedgekeurd</option><option value="published">Gepubliceerd</option></select></label><label>Planning<input type="datetime-local" value={toLocalInput(currentPost?.scheduled_at||null)} onChange={e=>setCurrentPost(p=>p?{...p,scheduled_at:fromLocalInput(e.target.value)}:p)}/></label></div><div className="social-platform-picker">{["Instagram","Instagram Story","Facebook","TikTok","YouTube Shorts","LinkedIn"].map(platform=><button key={platform} className={(currentPost?.platforms||[]).includes(platform)?"active":""} onClick={()=>togglePlatform(platform)}>{platform}</button>)}</div><div className="social-brief-grid"><label>Campagne<input value={currentPost?.campaign||""} onChange={e=>patchPost({campaign:e.target.value})}/></label><label>Contentpijler<input value={currentPost?.content_pillar||""} onChange={e=>patchPost({content_pillar:e.target.value})}/></label><label>Doel<input value={currentPost?.objective||""} onChange={e=>patchPost({objective:e.target.value})}/></label><label>Deadline<input type="datetime-local" value={toLocalInput(currentPost?.due_at||null)} onChange={e=>patchPost({due_at:fromLocalInput(e.target.value)})}/></label><label>Eigenaar<select value={currentPost?.assigned_to||""} onChange={e=>patchPost({assigned_to:e.target.value||null})}><option value="">Niet toegewezen</option>{people.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select></label><label>Reviewer<select value={currentPost?.reviewer_id||""} onChange={e=>patchPost({reviewer_id:e.target.value||null})}><option value="">Geen vaste reviewer</option>{people.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select></label></div><div className="social-checklist">{[["copy","Copy klaar"],["visual","Visual klaar"],["rights","Rechten gecheckt"],["links","Links/CTA gecheckt"]].map(([key,label])=><label key={key}><input type="checkbox" checked={Boolean(currentPost?.checklist?.[key])} onChange={()=>toggleChecklist(key)}/><span>{label}</span></label>)}</div><label className="field">Interne notitie<textarea className="input" value={currentPost?.internal_notes||""} onChange={e=>patchPost({internal_notes:e.target.value})}/></label>{currentPost?.status==="published"&&<label className="field">Link naar publicatie<input className="input" value={currentPost?.publication_url||""} onChange={e=>patchPost({publication_url:e.target.value})}/></label>}</details>
+        <div className="social-panel-actions">{canAssets&&<button className="ghost" onClick={()=>setTab("copy")}>Copyblokken</button>}{canEditContent&&<button className="primary" disabled={busy} onClick={()=>void persistPost()}>Concept opslaan</button>}</div>
       </section>
 
       <section className="social-preview-stage">
@@ -484,40 +479,49 @@ export default function SocialStudioModule({stationSlug}:{stationSlug:string}){
       <section className="card brand-assets"><div className="section-head"><div><h3>Snel logo kiezen</h3><p>Gebruik één van de centrale assets.</p></div></div><div className="mini-asset-grid">{assets.slice(0,8).map(a=><button key={a.id} onClick={()=>setBrand({...brand,logo_url:a.public_url})}><img src={a.public_url} alt=""/><span>{a.name}</span></button>)}</div></section>
     </div>}
 
-    {tab==="templates"&&<div className="social-template-layout-v16">
-      <aside className="card social-template-browser-v16">
-        <div className="section-head"><div><h3>Templates</h3><p>Centraal per station.</p></div><button className="mini-btn" onClick={()=>{const n=newTemplate(stationSlug,presetTemplates[0]);setTemplateDraft(n);setSelectedTemplateId(n.id)}}>＋</button></div>
-        {templates.map(t=><button key={t.id} className={selectedTemplateId===t.id?"selected":""} onClick={()=>{setSelectedTemplateId(t.id);setTemplateDraft(t);setFormat((t.aspect_ratio as FormatKey)||"4:5")}}><strong>{t.name}</strong><span>{t.content_type} • {t.aspect_ratio}</span></button>)}
-        <div className="social-preset-list"><strong>Snelle presets</strong>{presetTemplates.map(p=><button key={p.name} onClick={()=>{const n=newTemplate(stationSlug,p);setTemplateDraft(n);setSelectedTemplateId(n.id);setFormat(p.format)}}>＋ {p.name}</button>)}</div>
-      </aside>
-      <section className="card social-template-config-v16">
-        {!templateDraft?<div className="empty-live-state"><strong>Kies een template</strong></div>:<>
-          <div className="section-head"><div><h3>{templateDraft.name}</h3><p>Visuele regels + captionvariabelen.</p></div><div className="button-row"><button className="primary" disabled={busy} onClick={()=>void persistTemplate()}>Opslaan</button>{!templateDraft.id.startsWith("new-")&&<button className="ghost danger-text" onClick={()=>void removeTemplate()}>Verwijder</button>}</div></div>
-          <div className="template-config-grid">
-            <label>Naam<input value={templateDraft.name} onChange={e=>patchTemplate({name:e.target.value})}/></label>
-            <label>Type<input value={templateDraft.content_type} onChange={e=>patchTemplate({content_type:e.target.value})}/></label>
-            <label>Formaat<select value={format} onChange={e=>{const x=e.target.value as FormatKey;setFormat(x);patchTemplate({aspect_ratio:x})}}>{(Object.keys(formats) as FormatKey[]).map(k=><option key={k}>{k}</option>)}</select></label>
-            <label>Uitlijning<select value={cfg(templateDraft).align} onChange={e=>patchVisual({align:e.target.value as "left"|"center"})}><option value="left">Links</option><option value="center">Midden</option></select></label>
-            <label>Label<input value={cfg(templateDraft).label} onChange={e=>patchVisual({label:e.target.value})}/></label>
-            <label>Headline<input value={cfg(templateDraft).headline} onChange={e=>patchVisual({headline:e.target.value})}/></label>
-            <label>Subline<input value={cfg(templateDraft).subline} onChange={e=>patchVisual({subline:e.target.value})}/></label>
-            <label>Footer<input value={cfg(templateDraft).footer} onChange={e=>patchVisual({footer:e.target.value})}/></label>
-            <label>Overlay %<input type="number" min="0" max="75" value={cfg(templateDraft).overlay} onChange={e=>patchVisual({overlay:Number(e.target.value)})}/></label>
-            <label>Artworkvorm<select value={cfg(templateDraft).artworkShape} onChange={e=>patchVisual({artworkShape:e.target.value as VisualConfig["artworkShape"]})}><option value="circle">Cirkel</option><option value="rounded">Afgerond</option><option value="square">Vierkant</option></select></label>
-          </div>
-          <div className="template-switch-row"><label><input type="checkbox" checked={cfg(templateDraft).showArtwork} onChange={e=>patchVisual({showArtwork:e.target.checked})}/> Artwork tonen</label><label><input type="checkbox" checked={cfg(templateDraft).accentBar} onChange={e=>patchVisual({accentBar:e.target.checked})}/> Accentbalk</label></div>
-          <label className="field">Caption template<textarea className="input textarea" value={templateDraft.caption_template} onChange={e=>patchTemplate({caption_template:e.target.value})}/></label>
-          <div className="variable-strip">{variables.map(v=><button key={v} onClick={()=>patchTemplate({caption_template:`${templateDraft.caption_template}${templateDraft.caption_template.endsWith(" ")?"":" "}${v}`})}>{v}</button>)}</div>
-          <div className="asset-picker-row"><strong>Achtergrond</strong><button className="ghost" onClick={()=>patchVisual({backgroundImage:""})}>Gradient</button>{assets.slice(0,10).map(a=><button key={a.id} onClick={()=>patchVisual({backgroundImage:a.public_url})}><img src={a.public_url} alt=""/></button>)}</div>
-          <div className="asset-picker-row"><strong>Artwork</strong><button className="ghost" onClick={()=>patchVisual({artworkImage:""})}>Leeg</button>{assets.slice(0,10).map(a=><button key={a.id} onClick={()=>patchVisual({artworkImage:a.public_url})}><img src={a.public_url} alt=""/></button>)}</div>
-        </>}
+    {tab==="templates"&&<div className="social-template-editor-tophub">
+      <section className="card social-template-toolbar-tophub">
+        <div><span className="eyebrow">GRAFISCHE TEMPLATES</span><h3>{templateDraft?.name||"Kies een template"}</h3><p>Een rustige editor: voorbeeld links, alleen de bewerkbare velden rechts.</p></div>
+        <div className="template-toolbar-controls"><select className="select" value={selectedTemplateId} onChange={e=>{const t=templates.find(x=>x.id===e.target.value);if(t){setSelectedTemplateId(t.id);setTemplateDraft(t);setFormat((t.aspect_ratio as FormatKey)||"4:5")}}}><option value="">Kies template…</option>{templates.map(t=><option key={t.id} value={t.id}>{t.name} • {t.aspect_ratio}</option>)}</select><button className="ghost" onClick={()=>{const n=newTemplate(stationSlug,presetTemplates[0]);setTemplateDraft(n);setSelectedTemplateId(n.id);setFormat(n.aspect_ratio as FormatKey)}}>＋ Nieuw</button></div>
       </section>
+      {!templateDraft?<div className="card empty-live-state"><strong>Kies of maak een template</strong><span>Daarna verschijnt links het voorbeeld en rechts alleen de velden die je aanpast.</span></div>:<>
+        <section className="social-template-preview-pane">
+          <div className="social-preview-toolbar"><div><strong>Voorbeeld</strong><span>{formatInfo.w} × {formatInfo.h}px</span></div><button className="ghost" onClick={()=>void renderPng(format,true)}>↓ Download PNG</button></div>
+          <div className={`social-artboard template-preview-artboard ratio-${format.replace(":","-")}`} style={{fontFamily:`${brand.font_family},sans-serif`,color:brand.text_color,background:visual.backgroundImage?`linear-gradient(rgba(7,8,20,${visual.overlay/100}),rgba(7,8,20,${visual.overlay/100})),url(${visual.backgroundImage}) center/cover`:`linear-gradient(145deg,${brand.primary_color},${brand.secondary_color} 62%,${brand.background_color})`,textAlign:visual.align}}>
+            {visual.accentBar&&<span className="social-accent-edge" style={{background:brand.accent_color}}/>}
+            <div className="social-preview-brand">{brand.logo_url?<img src={brand.logo_url} alt=""/>:<strong>{brand.brand_name}</strong>}</div>
+            <span className="social-preview-label" style={{background:brand.accent_color}}>{replaceVars(visual.label,ctx)}</span>
+            {visual.showArtwork&&<div className={`social-preview-artwork ${visual.artworkShape}`}>{visual.artworkImage?<img src={visual.artworkImage} alt=""/>:<span>FOTO</span>}</div>}
+            <div className="social-preview-copy"><h2>{previewHeadline}</h2><h3>{previewSubline}</h3></div><div className="social-preview-footer">{previewFooter}</div>
+          </div>
+          <div className="template-preset-strip"><strong>Snelle starters</strong>{presetTemplates.map(p=><button key={p.name} onClick={()=>{const n=newTemplate(stationSlug,p);setTemplateDraft(n);setSelectedTemplateId(n.id);setFormat(p.format)}}>＋ {p.name}</button>)}</div>
+        </section>
+        <section className="card social-template-config-v16 tophub-fields">
+          <div className="section-head"><div><span className="eyebrow">VUL DE VELDEN IN</span><h3>{templateDraft.name}</h3><p>Geen lagenchaos: de vaste huisstijl blijft in het template, de beheerder past hier alleen de relevante onderdelen aan.</p></div></div>
+          <div className="template-config-grid one-column">
+            <label>Naam template<input value={templateDraft.name} onChange={e=>patchTemplate({name:e.target.value})}/></label>
+            <label>Station<input value={brand.brand_name||stationSlug} disabled/></label>
+            <div className="two-form-cols"><label>Type<input value={templateDraft.content_type} onChange={e=>patchTemplate({content_type:e.target.value})}/></label><label>Formaat<select value={format} onChange={e=>{const x=e.target.value as FormatKey;setFormat(x);patchTemplate({aspect_ratio:x})}}>{(Object.keys(formats) as FormatKey[]).map(k=><option key={k}>{k}</option>)}</select></label></div>
+            <label>Label / rubriek<input value={cfg(templateDraft).label} onChange={e=>patchVisual({label:e.target.value})}/></label>
+            <label>Hoofdtekst<input value={cfg(templateDraft).headline} onChange={e=>patchVisual({headline:e.target.value})}/></label>
+            <label>Subtekst<input value={cfg(templateDraft).subline} onChange={e=>patchVisual({subline:e.target.value})}/></label>
+            <label>Footer<input value={cfg(templateDraft).footer} onChange={e=>patchVisual({footer:e.target.value})}/></label>
+            <div className="two-form-cols"><label>Uitlijning<select value={cfg(templateDraft).align} onChange={e=>patchVisual({align:e.target.value as "left"|"center"})}><option value="left">Links</option><option value="center">Midden</option></select></label><label>Artworkvorm<select value={cfg(templateDraft).artworkShape} onChange={e=>patchVisual({artworkShape:e.target.value as VisualConfig["artworkShape"]})}><option value="circle">Cirkel</option><option value="rounded">Afgerond</option><option value="square">Vierkant</option></select></label></div>
+            <label>Donkere overlay <input type="range" min="0" max="75" value={cfg(templateDraft).overlay} onChange={e=>patchVisual({overlay:Number(e.target.value)})}/><small>{cfg(templateDraft).overlay}%</small></label>
+          </div>
+          <div className="template-switch-row"><label><input type="checkbox" checked={cfg(templateDraft).showArtwork} onChange={e=>patchVisual({showArtwork:e.target.checked})}/> Foto / artwork tonen</label><label><input type="checkbox" checked={cfg(templateDraft).accentBar} onChange={e=>patchVisual({accentBar:e.target.checked})}/> Accentbalk</label></div>
+          <div className="asset-picker-row compact"><strong>Achtergrond</strong><button className="ghost" onClick={()=>patchVisual({backgroundImage:""})}>Huisstijlgradient</button>{assets.slice(0,8).map(a=><button key={a.id} onClick={()=>patchVisual({backgroundImage:a.public_url})}><img src={a.public_url} alt=""/></button>)}</div>
+          <div className="asset-picker-row compact"><strong>Foto / artwork</strong><button className="ghost" onClick={()=>patchVisual({artworkImage:""})}>Leeg</button>{assets.slice(0,8).map(a=><button key={a.id} onClick={()=>patchVisual({artworkImage:a.public_url})}><img src={a.public_url} alt=""/></button>)}</div>
+          <details className="social-editor-details"><summary>Caption-template en variabelen</summary><label className="field">Caption template<textarea className="input textarea" value={templateDraft.caption_template} onChange={e=>patchTemplate({caption_template:e.target.value})}/></label><div className="variable-strip">{variables.map(v=><button key={v} onClick={()=>patchTemplate({caption_template:`${templateDraft.caption_template}${templateDraft.caption_template.endsWith(" ")?"":" "}${v}`})}>{v}</button>)}</div></details>
+          <div className="social-panel-actions"><button className="primary" disabled={busy} onClick={()=>void persistTemplate()}>Opslaan</button>{!templateDraft.id.startsWith("new-")&&<button className="ghost danger-text" onClick={()=>void removeTemplate()}>Verwijder</button>}</div>
+        </section>
+      </>}
     </div>}
 
     {tab==="calendar"&&<div className="social-phase2-calendar">
       <div className="page-intro sub-intro">
         <div><h3>Contentkalender & review</h3><p>Plan de maand, vraag feedback, keur posts goed en houd alle opmerkingen bij.</p></div>
-        <div className="button-row"><button className="ghost" onClick={()=>setCalendarMonth(addMonths(calendarMonth,-1))}>‹ Vorige</button><button className="ghost" onClick={()=>setCalendarMonth(monthStart(new Date()))}>Deze maand</button><button className="ghost" onClick={()=>setCalendarMonth(addMonths(calendarMonth,1))}>Volgende ›</button><button className="primary soft" onClick={()=>setTab("studio")}>＋ Nieuwe post</button></div>
+        <div className="button-row"><button className="ghost" onClick={()=>setCalendarMonth(addMonths(calendarMonth,-1))}>‹ Vorige</button><button className="ghost" onClick={()=>setCalendarMonth(monthStart(new Date()))}>Deze maand</button><button className="ghost" onClick={()=>setCalendarMonth(addMonths(calendarMonth,1))}>Volgende ›</button>{canEditContent&&<button className="primary soft" onClick={()=>setTab("studio")}>＋ Nieuwe post</button>}</div>
       </div>
 
       <div className="social-calendar-summary">
@@ -563,9 +567,9 @@ export default function SocialStudioModule({stationSlug}:{stationSlug:string}){
 
             <div className="social-review-actions">
               <button disabled={busy} className="review-request" onClick={()=>void workflow(selectedCalendarPost,"review_requested",reviewComment)}>👀 Vraag review</button>
-              <button disabled={busy} className="review-approve" onClick={()=>void workflow(selectedCalendarPost,"approved",reviewComment)}>✓ Goedkeuren</button>
+              {canApprove&&<><button disabled={busy} className="review-approve" onClick={()=>void workflow(selectedCalendarPost,"approved",reviewComment)}>✓ Goedkeuren</button>
               <button disabled={busy} className="review-changes" onClick={()=>void workflow(selectedCalendarPost,"changes_requested",reviewComment)}>↺ Aanpassing nodig</button>
-              <button disabled={busy} className="review-publish" onClick={()=>void workflow(selectedCalendarPost,"published",reviewComment)}>● Markeer gepubliceerd</button>
+              <button disabled={busy} className="review-publish" onClick={()=>void workflow(selectedCalendarPost,"published",reviewComment)}>● Markeer gepubliceerd</button></>}
             </div>
 
             <div className="social-review-timeline">
