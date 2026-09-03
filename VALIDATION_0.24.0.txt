@@ -1,0 +1,59 @@
+VLACORA HUB 0.24.0 VALIDATION
+
+BUILD / RELEASE
+- [x] TypeScript/TSX syntax parse across repository: 0 syntax errors.
+- [x] Targeted semantic typecheck with temporary external-module stubs: no errors in new/changed Social Template Builder, renderer, Social Studio, Team Rights, permissions, charts or chart-memory files.
+- [x] npm run prebuild: PASS.
+- [x] App Router route handlers remain on globalThis.Request.
+- [x] No external-stubs.d.ts in release source.
+- [x] globals.css prebuild check: no mixed-support start/end values.
+- [ ] Full dependency-backed next build could not be run in the artifact environment because npm install timed out; Vercel remains the authoritative full Next.js build.
+
+HITLIJSTEN
+- [x] Excel-like sheet editor with inline editable rows.
+- [x] Position, song memory, artist, title, previous, trend, weeks, peak and notes visible as columns.
+- [x] Drag/drop + up/down reordering.
+- [x] Persistent PostgreSQL song memory via hub_chart_song_memory.
+- [x] Song dropdown combines remembered chart songs and VLACORA music sources.
+- [x] Excel bulk import remains available.
+- [x] Weekly, historical, annual and special charts retained.
+
+MENU / RIGHTS
+- [x] Every personal/main menu item now has a PermissionKey, including Voor mij, Mijn uitzending and Meldingen.
+- [x] `none` hides a module completely from the sidebar.
+- [x] Team & rechten shows a live menu preview for the selected user.
+- [x] Separate BEHEER group remains visible on every HUB route when the user has matching permissions.
+- [x] New separate Social Templatebouwer permission and menu item.
+- [x] Menu is not rendered before permissions have loaded, preventing a flash of modules a user should not see.
+
+SOCIAL STUDIO / TEMPLATE BUILDER
+- [x] Daily Social Studio no longer contains the complex template editor.
+- [x] Social beheer is separate for brand kit / assets.
+- [x] Templatebouwer is a dedicated admin route.
+- [x] Builder uses layer-based JSON stored in existing hub_social_templates.config (no new database table required).
+- [x] Builder supports text, image, logo, dynamic post-image, rectangle, ellipse and line layers.
+- [x] Layers can be dragged, resized, hidden, locked, duplicated, deleted and reordered.
+- [x] Exact x/y/width/height, rotation and opacity controls.
+- [x] Text controls: font, size, weight, alignment, color, background, padding, radius, line height and variables.
+- [x] Image controls: source, fit, radius, border and asset selection.
+- [x] Canvas controls: colors, gradient, background image, grid, snap, zoom and format.
+- [x] Undo / redo.
+- [x] Template PNG test export.
+- [x] New distinct starter designs: Neon Release, Chart Shock, Takeover Frame, Story Radar, Editorial Quote, Event Cutout.
+- [x] Social Studio detects builder templates and shows only variables actually used by that template.
+- [x] Social Studio can export builder templates to PNG through the same layer renderer.
+- [x] Legacy Social templates continue to render as fallback, so existing data is not broken.
+
+BACKEND
+- [x] Supabase Auth remains mandatory login / identity.
+- [x] Existing hub_social_templates table reused; builder structure lives in JSONB config.
+- [x] Migration 037_hitlist_song_memory.sql is included and already applied to the connected project.
+- [x] No Playout One / Rotation One / SHOUTcast listener functionality reintroduced.
+
+EXECUTED VALIDATION IN ARTIFACT ENVIRONMENT
+- PASS: npm run prebuild.
+- PASS: TypeScript parser/transpile check across 70 TS/TSX files: 0 syntax errors.
+- PASS: local @/ import resolution check across 69 application TS/TSX files: 0 missing imports.
+- PASS: active app/components/lib scan: no Rotation One, Playout One, SHOUTcast or listener-statistics references.
+- PASS: live Supabase migration 037 applied; hub_chart_song_memory exists and was seeded from existing charts.
+- NOTE: clean npm install was attempted but dependency download timed out in this artifact environment, so a full local Next.js npm run build could not be completed here. Vercel remains the final dependency-backed build check.

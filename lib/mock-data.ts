@@ -25,5 +25,10 @@ export const navItems = [
   ["presentatie", "✎", "Presentatie"],
   ["social", "✦", "Social Studio"],
   ["team", "♙", "Team"],
-  ["beheer", "⚙", "Beheer"]
+  ["beheer", "⚙", "Beheer"],
+  ["hitlijst-beheer", "↕", "Hitlijstbeheer"],
+  ["social-beheer", "✦", "Social beheer"],
+  ["social-templatebouwer", "▦", "Templatebouwer"]
 ] as const;
+
+export const adminNavSlugs = ["beheer","stations","team","sjablonen","hitlijst-beheer","social-beheer","social-templatebouwer"] as const;

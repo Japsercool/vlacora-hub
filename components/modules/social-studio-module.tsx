@@ -2,17 +2,19 @@
 
 import { useEffect,useMemo,useState } from "react";
 import AttachmentPanel from "@/components/attachment-panel";
+import SocialTemplateRenderer from "@/components/social-template-renderer";
 import { useCollaboration } from "@/components/collaboration/collaboration-provider";
 import { can,type PermissionMap } from "@/lib/permissions";
+import { BUILDER_STARTERS,isBuilderConfig,renderBuilderCanvas,starterTemplate,variablesUsed,type BuilderConfig } from "@/lib/social-template-builder";
 import { loadSharedHitlists,loadSharedProgramming } from "@/lib/supabase/hub-data";
 import {
-  addSocialReviewEvent,deleteSocialAsset,deleteSocialCopyBlock,deleteSocialPost,deleteSocialTemplate,
+  addSocialReviewEvent,deleteSocialAsset,deleteSocialCopyBlock,deleteSocialPost,
   loadBrandKit,loadSocialAssets,loadSocialCopyBlocks,loadSocialPeople,loadSocialPosts,loadSocialReviewEvents,loadSocialTemplates,
-  saveBrandKit,saveSocialCopyBlock,saveSocialPost,saveSocialTemplate,uploadSocialAsset,
+  saveBrandKit,saveSocialCopyBlock,saveSocialPost,uploadSocialAsset,
   type BrandKit,type SocialAsset,type SocialCopyBlock,type SocialPerson,type SocialPost,type SocialReviewEvent,type SocialTemplate
 } from "@/lib/supabase/social";
 
-type Tab="studio"|"brand"|"templates"|"calendar"|"copy"|"assets";
+type Tab="studio"|"brand"|"calendar"|"copy"|"assets";
 type FormatKey="1:1"|"4:5"|"9:16"|"16:9";
 type Context={
   station:string;artist:string;title:string;program:string;presenter:string;
@@ -23,6 +25,7 @@ type VisualConfig={
   backgroundImage:string;artworkImage:string;
   showArtwork:boolean;artworkShape:"circle"|"rounded"|"square";
   align:"left"|"center";overlay:number;accentBar:boolean;
+  layout:"split"|"poster"|"chart"|"show"|"minimal"|"alert";
 };
 
 const uid=()=>Math.random().toString(36).slice(2)+Date.now().toString(36);
@@ -34,14 +37,6 @@ const formats:Record<FormatKey,{w:number;h:number;label:string}>={
 };
 const variables=["{station}","{artist}","{title}","{program}","{presenter}","{chart_position}","{previous_position}","{next_show}","{date}","{time}","{cta}"];
 
-const presetTemplates:Array<{name:string;contentType:string;format:FormatKey;caption:string;config:VisualConfig}>= [
-  {name:"Now Playing",contentType:"nowplaying",format:"4:5",caption:"🎵 Nu op {station}: {artist} — {title}. {cta} #nowplaying",config:{label:"NOW PLAYING",headline:"{artist}",subline:"{title}",footer:"{station} • {time}",backgroundImage:"",artworkImage:"",showArtwork:true,artworkShape:"circle",align:"left",overlay:28,accentBar:true}},
-  {name:"Straks in de show",contentType:"program",format:"4:5",caption:"🎙️ Straks op {station}: {program} met {presenter}. Vanaf {time}.",config:{label:"STRAKS",headline:"{program}",subline:"met {presenter}",footer:"{station} • {time}",backgroundImage:"",artworkImage:"",showArtwork:true,artworkShape:"rounded",align:"left",overlay:34,accentBar:true}},
-  {name:"Hitlijst positie",contentType:"chart",format:"4:5",caption:"🏆 #{chart_position} deze week: {artist} — {title}. Bekijk de volledige lijst bij {station}.",config:{label:"DE HITLIJST",headline:"#{chart_position} • {artist}",subline:"{title}",footer:"vorige week #{previous_position}",backgroundImage:"",artworkImage:"",showArtwork:true,artworkShape:"rounded",align:"left",overlay:30,accentBar:true}},
-  {name:"Presentator quote",contentType:"quote",format:"1:1",caption:"💬 {presenter}: “{title}” — {program} op {station}.",config:{label:"ON AIR",headline:"“{title}”",subline:"— {presenter}",footer:"{program} • {station}",backgroundImage:"",artworkImage:"",showArtwork:false,artworkShape:"circle",align:"center",overlay:22,accentBar:false}},
-  {name:"Gast in de studio",contentType:"guest",format:"9:16",caption:"🎤 Vandaag te gast in {program}: {title}. Luister mee op {station}.",config:{label:"TE GAST",headline:"{title}",subline:"in {program}",footer:"{station} • {time}",backgroundImage:"",artworkImage:"",showArtwork:true,artworkShape:"rounded",align:"left",overlay:36,accentBar:true}},
-  {name:"Winactie",contentType:"contest",format:"4:5",caption:"🎁 WIN! {title}. Doe mee via {station}. {cta}",config:{label:"WINACTIE",headline:"{title}",subline:"Doe mee en maak kans",footer:"{station}",backgroundImage:"",artworkImage:"",showArtwork:true,artworkShape:"rounded",align:"left",overlay:30,accentBar:true}}
-];
 
 const defaultContext=(stationSlug:string):Context=>({
   station:stationSlug==="all"?"VLACORA":stationSlug,artist:"Joel Corry",title:"Whisper",program:"",presenter:"",
@@ -74,7 +69,8 @@ function cfg(template:SocialTemplate|null):VisualConfig{
     artworkShape:(x.artworkShape==="square"||x.artworkShape==="rounded")?x.artworkShape:"circle",
     align:x.align==="center"?"center":"left",
     overlay:Number.isFinite(Number(x.overlay))?Number(x.overlay):28,
-    accentBar:x.accentBar!==false
+    accentBar:x.accentBar!==false,
+    layout:(x.layout==="split"||x.layout==="poster"||x.layout==="chart"||x.layout==="show"||x.layout==="minimal"||x.layout==="alert")?x.layout:"split"
   };
 }
 function loadImage(src:string){return new Promise<HTMLImageElement>((resolve,reject)=>{const image=new Image();if(/^https?:/i.test(src))image.crossOrigin="anonymous";image.onload=()=>resolve(image);image.onerror=reject;image.src=src})}
@@ -118,15 +114,12 @@ function reviewLabel(type:SocialReviewEvent["event_type"]){
 function newCopyBlock(stationSlug:string,category="Algemeen",content=""):SocialCopyBlock{
   return{id:`new-${uid()}`,station_slug:stationSlug,name:"Nieuw copyblok",category,content,active:true};
 }
-function newTemplate(stationSlug:string,preset=presetTemplates[0]):SocialTemplate{
-  return{id:`new-${uid()}`,station_slug:stationSlug,name:preset.name,content_type:preset.contentType,aspect_ratio:preset.format,caption_template:preset.caption,config:preset.config,active:true};
-}
 function newPost(stationSlug:string,template:SocialTemplate,ctx:Context):SocialPost{
-  return{id:`new-${uid()}`,station_slug:stationSlug,template_id:template.id.startsWith("new-")?null:template.id,title:replaceVars(String(cfg(template).headline),ctx),status:"concept",format:template.aspect_ratio||"4:5",payload:ctx,caption:replaceVars(template.caption_template,ctx),scheduled_at:null,published_at:null,platforms:["Instagram"],campaign:"",content_pillar:"",objective:"",assigned_to:null,reviewer_id:null,due_at:null,publication_url:"",internal_notes:"",checklist:{copy:false,visual:false,rights:false,links:false}};
+  return{id:`new-${uid()}`,station_slug:stationSlug,template_id:template.id.startsWith("new-")?null:template.id,title:isBuilderConfig(template.config)?(ctx.title||template.name):replaceVars(String(cfg(template).headline),ctx),status:"concept",format:template.aspect_ratio||"4:5",payload:ctx,caption:replaceVars(template.caption_template,ctx),scheduled_at:null,published_at:null,platforms:["Instagram"],campaign:"",content_pillar:"",objective:"",assigned_to:null,reviewer_id:null,due_at:null,publication_url:"",internal_notes:"",checklist:{copy:false,visual:false,rights:false,links:false}};
 }
 
-export default function SocialStudioModule({stationSlug,permissions}:{stationSlug:string;permissions?:PermissionMap|null}){
-  const[tab,setTab]=useState<Tab>("studio");
+export default function SocialStudioModule({stationSlug,permissions,initialTab="studio"}:{stationSlug:string;permissions?:PermissionMap|null;initialTab?:Tab}){
+  const[tab,setTab]=useState<Tab>(initialTab);
   const[brand,setBrand]=useState<BrandKit>(()=>defaultBrand(stationSlug));
   const[templates,setTemplates]=useState<SocialTemplate[]>([]);
   const[posts,setPosts]=useState<SocialPost[]>([]);
@@ -156,11 +149,7 @@ export default function SocialStudioModule({stationSlug,permissions}:{stationSlu
   const canTemplates=!permissions||can(permissions.social_templates,"view");
   const canAssets=!permissions||can(permissions.social_assets,"view");
   const canApprove=!permissions||can(permissions.social_approval,"publish");
-  const visibleTabs=([
-    ["studio","Studio",canContent],["brand","Brand kit",canTemplates],
-    ["templates","Templates",canTemplates],["calendar","Contentkalender",canCalendar],
-    ["copy","Copyblokken",canAssets],["assets","Assets",canAssets]
-  ] as [Tab,string,boolean][]).filter(x=>x[2]);
+  const visibleTabs=((initialTab==="brand"?[["brand","Brand kit",canTemplates],["assets","Assets",canAssets]]:[["studio","Content maken",canContent],["calendar","Contentkalender",canCalendar],["copy","Copyblokken",canAssets],["assets","Assets",canAssets]]) as [Tab,string,boolean][]).filter(x=>x[2]);
 
   useEffect(()=>{if(!visibleTabs.some(([key])=>key===tab)&&visibleTabs[0])setTab(visibleTabs[0][0])},[tab,permissions]);
 
@@ -173,7 +162,7 @@ export default function SocialStudioModule({stationSlug,permissions}:{stationSlu
         loadBrandKit(stationSlug),loadSocialTemplates(stationSlug),loadSocialPosts(stationSlug),loadSocialAssets(stationSlug),loadSocialCopyBlocks(stationSlug),loadSocialPeople()
       ]);
       setBrand(kit);setCtx(x=>({...x,station:kit.brand_name||stationSlug,cta:kit.default_cta||x.cta}));
-      const nextTemplates=cloudTemplates.length?cloudTemplates:presetTemplates.map(p=>newTemplate(stationSlug,p));
+      const nextTemplates=cloudTemplates.length?cloudTemplates:BUILDER_STARTERS.map(p=>starterTemplate(stationSlug,p));
       setTemplates(nextTemplates);
       const first=nextTemplates[0];if(first){setSelectedTemplateId(first.id);setTemplateDraft(first);setFormat((first.aspect_ratio as FormatKey)||"4:5")}
       setPosts(cloudPosts);setAssets(cloudAssets);setCopyBlocks(cloudCopyBlocks);setPeople(cloudPeople);
@@ -185,6 +174,8 @@ export default function SocialStudioModule({stationSlug,permissions}:{stationSlu
   const selectedTemplate=useMemo(()=>templateDraft&&templateDraft.id===selectedTemplateId?templateDraft:templates.find(x=>x.id===selectedTemplateId)||templateDraft||templates[0]||null,[templates,selectedTemplateId,templateDraft]);
   const selectedCalendarPost=useMemo(()=>posts.find(x=>x.id===selectedCalendarPostId)||null,[posts,selectedCalendarPostId]);
   const calendarCells=useMemo(()=>monthCells(calendarMonth),[calendarMonth]);
+  const builderConfig=(selectedTemplate&&isBuilderConfig(selectedTemplate.config)?selectedTemplate.config:null) as BuilderConfig|null;
+  const builderVariables=builderConfig?variablesUsed(builderConfig):[];
   const visual={...cfg(selectedTemplate),artworkImage:ctx.artworkImage||cfg(selectedTemplate).artworkImage};
   const liveCaption=currentPost?.caption??replaceVars(selectedTemplate?.caption_template||"",ctx);
   const previewHeadline=replaceVars(visual.headline,ctx);
@@ -225,7 +216,7 @@ export default function SocialStudioModule({stationSlug,permissions}:{stationSlu
       }catch{}
       next.station=brand.brand_name||stationSlug;next.cta=brand.default_cta||next.cta;
       setCtx(next);
-      setCurrentPost(post=>post?{...post,payload:next,title:replaceVars(visual.headline,next),caption:replaceVars(selectedTemplate?.caption_template||post.caption,next)}:post);
+      setCurrentPost(post=>post?{...post,payload:next,title:builderConfig?(next.title||post.title):replaceVars(visual.headline,next),caption:replaceVars(selectedTemplate?.caption_template||post.caption,next)}:post);
       flash(notes.length?`Automatisch ingevuld: ${notes.join(", ")}`:"Geen gekoppelde HUB-data gevonden; handmatig verder werken.");
     }finally{setBusy(false)}
   }
@@ -234,8 +225,6 @@ export default function SocialStudioModule({stationSlug,permissions}:{stationSlu
     setSelectedTemplateId(template.id);setTemplateDraft(template);setFormat((template.aspect_ratio as FormatKey)||"4:5");
     setCurrentPost(newPost(stationSlug,template,ctx));setTab("studio");
   }
-  function patchTemplate(patch:Partial<SocialTemplate>){if(templateDraft)setTemplateDraft({...templateDraft,...patch})}
-  function patchVisual(patch:Partial<VisualConfig>){if(templateDraft)patchTemplate({config:{...cfg(templateDraft),...patch}})}
   function patchContext(key:keyof Context,value:string){
     const next={...ctx,[key]:value};setCtx(next);
     setCurrentPost(post=>post?{...post,payload:next}:post);
@@ -250,26 +239,13 @@ export default function SocialStudioModule({stationSlug,permissions}:{stationSlu
     setCurrentPost(post=>post?{...post,checklist:{...(post.checklist||{}),[key]:!Boolean(post.checklist?.[key])}}:post);
   }
 
-  async function persistTemplate(){
-    if(!templateDraft)return;
-    setBusy(true);try{
-      const saved=await saveSocialTemplate({...templateDraft,aspect_ratio:format});
-      setTemplates(rows=>[saved,...rows.filter(x=>x.id!==templateDraft.id&&x.id!==saved.id)]);
-      setTemplateDraft(saved);setSelectedTemplateId(saved.id);flash("Social template centraal opgeslagen");
-    }catch(e){flash(e instanceof Error?e.message:"Template opslaan mislukt")}finally{setBusy(false)}
-  }
-  async function removeTemplate(){
-    if(!templateDraft||templateDraft.id.startsWith("new-"))return;
-    if(!confirm(`Template “${templateDraft.name}” verwijderen?`))return;
-    try{await deleteSocialTemplate(templateDraft.id);setTemplates(rows=>rows.filter(x=>x.id!==templateDraft.id));setTemplateDraft(null);setSelectedTemplateId("");flash("Template verwijderd")}catch(e){flash(e instanceof Error?e.message:"Verwijderen mislukt")}
-  }
   async function persistBrand(){
     setBusy(true);try{await saveBrandKit(brand);setCtx(x=>({...x,station:brand.brand_name||stationSlug,cta:brand.default_cta||x.cta}));flash("Brand kit centraal opgeslagen")}catch(e){flash(e instanceof Error?e.message:"Brand kit opslaan mislukt")}finally{setBusy(false)}
   }
   async function persistPost(){
     if(!selectedTemplate)return;
     const base=currentPost||newPost(stationSlug,selectedTemplate,ctx);
-    const post:SocialPost={...base,format,template_id:selectedTemplate.id.startsWith("new-")?null:selectedTemplate.id,payload:ctx,title:replaceVars(visual.headline,ctx),caption:base.caption||replaceVars(selectedTemplate.caption_template,ctx)};
+    const post:SocialPost={...base,format,template_id:selectedTemplate.id.startsWith("new-")?null:selectedTemplate.id,payload:ctx,title:builderConfig?(ctx.title||base.title||selectedTemplate.name):replaceVars(visual.headline,ctx),caption:base.caption||replaceVars(selectedTemplate.caption_template,ctx)};
     setBusy(true);try{
       const saved=await saveSocialPost(post);
       setCurrentPost(saved);
@@ -380,22 +356,25 @@ export default function SocialStudioModule({stationSlug,permissions}:{stationSlu
 
   async function renderPng(targetFormat:FormatKey,download=true){
     if(!selectedTemplate)return;
-    const f=formats[targetFormat];const canvas=document.createElement("canvas");canvas.width=f.w;canvas.height=f.h;const g=canvas.getContext("2d");if(!g)return;
+    const f=formats[targetFormat];
+    if(isBuilderConfig(selectedTemplate.config)){
+      const canvas=await renderBuilderCanvas(selectedTemplate.config,ctx,brand,{width:f.w,height:f.h});
+      if(download){const a=document.createElement("a");a.href=canvas.toDataURL("image/png");a.download=`${ctx.station}-${selectedTemplate.name}-${targetFormat}.png`.replace(/[^a-z0-9._-]+/gi,"-").toLowerCase();a.click()}
+      return canvas;
+    }
+    const canvas=document.createElement("canvas");canvas.width=f.w;canvas.height=f.h;const g=canvas.getContext("2d");if(!g)return;
     const v=cfg(selectedTemplate),scale=f.w/1080;
     if(v.backgroundImage){try{const im=await loadImage(v.backgroundImage);const ratio=Math.max(f.w/im.width,f.h/im.height);const dw=im.width*ratio,dh=im.height*ratio;g.drawImage(im,(f.w-dw)/2,(f.h-dh)/2,dw,dh)}catch{g.fillStyle=brand.background_color;g.fillRect(0,0,f.w,f.h)}}else{
       const grad=g.createLinearGradient(0,0,f.w,f.h);grad.addColorStop(0,brand.primary_color);grad.addColorStop(.62,brand.secondary_color);grad.addColorStop(1,brand.background_color);g.fillStyle=grad;g.fillRect(0,0,f.w,f.h);
     }
     if(v.overlay>0){g.fillStyle=`rgba(7,8,20,${Math.min(.75,v.overlay/100)})`;g.fillRect(0,0,f.w,f.h)}
     if(v.accentBar){g.fillStyle=brand.accent_color;g.fillRect(0,0,18*scale,f.h)}
-    const left=v.align==="center"?f.w/2:78*scale;const textAlign=v.align==="center"?"center":"left";g.textAlign=textAlign as CanvasTextAlign;
-    if(brand.logo_url){try{const logo=await loadImage(brand.logo_url);const maxW=260*scale,maxH=110*scale;const r=Math.min(maxW/logo.width,maxH/logo.height);g.drawImage(logo,v.align==="center"?(f.w-logo.width*r)/2:78*scale,58*scale,logo.width*r,logo.height*r)}catch{}}
+    const centered=v.align==="center"||v.layout==="alert"||v.layout==="minimal";const left=centered?f.w/2:78*scale;const textAlign=centered?"center":"left";g.textAlign=textAlign as CanvasTextAlign;
+    if(brand.logo_url){try{const logo=await loadImage(brand.logo_url);const maxW=260*scale,maxH=110*scale;const r=Math.min(maxW/logo.width,maxH/logo.height);g.drawImage(logo,centered?(f.w-logo.width*r)/2:78*scale,58*scale,logo.width*r,logo.height*r)}catch{}}
     else{g.fillStyle=brand.text_color;g.font=`900 ${50*scale}px ${brand.font_family}, Arial`;g.fillText(brand.brand_name||ctx.station,left,105*scale)}
-    g.fillStyle=brand.accent_color;const label=replaceVars(v.label,ctx).toUpperCase();g.font=`900 ${25*scale}px ${brand.font_family}, Arial`;const labelWidth=Math.min(f.w*.72,g.measureText(label).width+42*scale);const labelX=v.align==="center"?(f.w-labelWidth)/2:78*scale;g.fillRect(labelX,190*scale,labelWidth,58*scale);g.fillStyle=brand.text_color;g.textAlign="center";g.fillText(label,labelX+labelWidth/2,229*scale);
-    const artwork=v.artworkImage;if(v.showArtwork&&artwork){try{const image=await loadImage(artwork);const size=Math.min(f.w*.42,f.h*.32);const x=v.align==="center"?(f.w-size)/2:f.w-size-80*scale;const y=310*scale;g.save();if(v.artworkShape==="circle"){g.beginPath();g.arc(x+size/2,y+size/2,size/2,0,Math.PI*2);g.clip()}else if(v.artworkShape==="rounded"){const r=36*scale;g.beginPath();g.roundRect(x,y,size,size,r);g.clip()}g.drawImage(image,x,y,size,size);g.restore()}catch{}}
-    g.textAlign=textAlign as CanvasTextAlign;g.fillStyle=brand.text_color;g.font=`900 ${Math.max(48,78*scale)}px ${brand.font_family}, Arial`;
-    const headlineY=v.showArtwork&&artwork?f.h*.62:f.h*.45;wrap(g,previewHeadline,left,headlineY,v.align==="center"?f.w*.82:f.w*.78,86*scale,3);
-    g.font=`600 ${Math.max(34,46*scale)}px ${brand.font_family}, Arial`;g.globalAlpha=.86;wrap(g,previewSubline,left,headlineY+145*scale,v.align==="center"?f.w*.82:f.w*.75,55*scale,3);g.globalAlpha=1;
-    g.font=`800 ${Math.max(23,27*scale)}px ${brand.font_family}, Arial`;g.globalAlpha=.8;g.fillText(previewFooter,left,f.h-88*scale);g.globalAlpha=1;
+    g.fillStyle=brand.accent_color;const label=replaceVars(v.label,ctx).toUpperCase();g.font=`900 ${25*scale}px ${brand.font_family}, Arial`;const labelWidth=Math.min(f.w*.72,g.measureText(label).width+42*scale);const labelX=centered?(f.w-labelWidth)/2:78*scale;g.fillRect(labelX,190*scale,labelWidth,58*scale);g.fillStyle=brand.text_color;g.textAlign="center";g.fillText(label,labelX+labelWidth/2,229*scale);
+    const artwork=v.artworkImage;if(v.showArtwork&&artwork){try{const image=await loadImage(artwork);let aw=Math.min(f.w*.42,f.h*.32),ah=aw,ax=centered?(f.w-aw)/2:f.w-aw-80*scale,ay=310*scale;if(v.layout==="split"){aw=f.w*.47;ah=aw;ax=f.w-aw-58*scale;ay=f.h*.25}else if(v.layout==="chart"){aw=f.w*.27;ah=aw;ax=f.w-aw-70*scale;ay=f.h-ah-105*scale}else if(v.layout==="show"){aw=f.w*.88;ah=f.h*.52;ax=f.w*.06;ay=f.h*.18}else if(v.layout==="poster"){aw=f.w*.58;ah=f.h;ax=f.w-aw;ay=0}else if(v.layout==="alert"){aw=f.w*.34;ah=aw;ax=(f.w-aw)/2;ay=f.h*.27}g.save();if(v.artworkShape==="circle"&&Math.abs(aw-ah)<2){g.beginPath();g.arc(ax+aw/2,ay+ah/2,aw/2,0,Math.PI*2);g.clip()}else if(v.artworkShape==="rounded"){const r=36*scale;g.beginPath();g.roundRect(ax,ay,aw,ah,r);g.clip()}g.drawImage(image,ax,ay,aw,ah);g.restore()}catch{}}
+    let textX=left,headlineY=f.h*.57,maxWidth=centered?f.w*.82:f.w*.78,headlineSize=Math.max(48,78*scale),subSize=Math.max(34,46*scale);if(v.layout==="split"){textX=78*scale;headlineY=f.h*.62;maxWidth=f.w*.43;headlineSize=Math.max(44,70*scale)}else if(v.layout==="chart"){textX=78*scale;headlineY=f.h*.55;maxWidth=f.w*.62;headlineSize=Math.max(75,128*scale)}else if(v.layout==="show"){textX=78*scale;headlineY=f.h*.76;maxWidth=f.w*.82;headlineSize=Math.max(48,76*scale)}else if(v.layout==="poster"){textX=78*scale;headlineY=f.h*.61;maxWidth=f.w*.46;headlineSize=Math.max(44,72*scale)}else if(v.layout==="minimal"){headlineY=f.h*.43;headlineSize=Math.max(45,72*scale)}else if(v.layout==="alert"){headlineY=f.h*.66;headlineSize=Math.max(58,92*scale);subSize=Math.max(32,42*scale)}g.textAlign=(v.layout==="split"||v.layout==="chart"||v.layout==="poster")?"left":textAlign as CanvasTextAlign;g.fillStyle=brand.text_color;g.font=`900 ${headlineSize}px ${brand.font_family}, Arial`;wrap(g,previewHeadline,textX,headlineY,maxWidth,headlineSize*1.04,3);g.font=`600 ${subSize}px ${brand.font_family}, Arial`;g.globalAlpha=.88;wrap(g,previewSubline,textX,headlineY+headlineSize*1.55,maxWidth,subSize*1.18,3);g.globalAlpha=1;g.font=`800 ${Math.max(23,27*scale)}px ${brand.font_family}, Arial`;g.globalAlpha=.8;g.fillText(previewFooter,textX,f.h-72*scale);g.globalAlpha=1;
     if(download){const a=document.createElement("a");a.href=canvas.toDataURL("image/png");a.download=`${ctx.station}-${selectedTemplate.name}-${targetFormat}.png`.replace(/[^a-z0-9._-]+/gi,"-").toLowerCase();a.click()}
     return canvas;
   }
@@ -419,7 +398,7 @@ export default function SocialStudioModule({stationSlug,permissions}:{stationSlu
 
   return <div className="social-studio-v16">
     <div className="page-intro social-studio-intro">
-      <div><span className="eyebrow">VLACORA CONTENT</span><h2>Social Studio</h2><p>Maak visuals zoals in een eenvoudige grafische template-editor: kies een template, vul alleen de nodige velden in en plan daarna review/publicatie.</p></div>
+      <div><span className="eyebrow">VLACORA CONTENT</span><h2>Social Studio</h2><p>Kies een template uit de aparte Templatebouwer, vul alleen de inhoud in en plan daarna review/publicatie. De grafische opbouw kan hier niet per ongeluk verschoven worden.</p></div>
       <div className="button-row"><button className="ghost" disabled={busy} onClick={()=>void autofill()}>⚡ Vul HUB-data in</button>{canEditContent&&<button className="primary" disabled={busy||!selectedTemplate} onClick={()=>void persistPost()}>Bewaar concept</button>}</div>
     </div>
     {notice&&<div className="inline-notice standalone">{notice}</div>}
@@ -429,18 +408,21 @@ export default function SocialStudioModule({stationSlug,permissions}:{stationSlu
 
     {tab==="studio"&&selectedTemplate&&<div className="social-workbench">
       <section className="card social-composer social-fields-panel">
-        <div className="section-head"><div><span className="eyebrow">VELDEN INVULLEN</span><h3>{currentPost?.title||selectedTemplate.name}</h3><p>Alleen de invulvelden voor deze post. De live preview blijft links zichtbaar, zoals in je TOPhub-voorbeeld.</p></div><span className="badge badge-blue">{selectedTemplate.name}</span></div>
-        <label className="field">Template<select className="select" value={selectedTemplate.id} onChange={e=>{const x=templates.find(t=>t.id===e.target.value);if(x)chooseTemplate(x)}}>{templates.map(t=><option key={t.id} value={t.id}>{t.name}</option>)}</select></label>
-        <div className="social-format-row compact">{(Object.keys(formats) as FormatKey[]).map(key=><button key={key} className={format===key?"active":""} onClick={()=>setFormat(key)}>{formats[key].label}</button>)}</div>
-        <div className="social-photo-field"><div><strong>Afbeelding / DJ-foto</strong><small>Deze foto hoort bij deze post en verandert het template zelf niet.</small></div><div className="social-photo-actions"><label className="ghost file-button">{assetUpload?"Uploaden…":"Foto kiezen"}<input type="file" accept="image/png,image/jpeg,image/webp" hidden onChange={e=>void handleStudioPhoto(e.target.files?.[0])}/></label>{ctx.artworkImage&&<button className="ghost" onClick={()=>patchContext("artworkImage","")}>Verwijder</button>}</div>{assets.length>0&&<div className="studio-asset-strip">{assets.slice(0,8).map(a=><button key={a.id} className={ctx.artworkImage===a.public_url?"selected":""} onClick={()=>patchContext("artworkImage",a.public_url)}><img src={a.public_url} alt=""/></button>)}</div>}</div>
+        <div className="section-head"><div><span className="eyebrow">VELDEN INVULLEN</span><h3>{currentPost?.title||selectedTemplate.name}</h3><p>Alleen de inhoud die dit template nodig heeft. De lagen en vormgeving worden centraal beheerd in de aparte Templatebouwer.</p></div><span className="badge badge-blue">{selectedTemplate.name}</span></div>
+        <div className="social-template-select-row"><label className="field">Template<select className="select" value={selectedTemplate.id} onChange={e=>{const x=templates.find(t=>t.id===e.target.value);if(x)chooseTemplate(x)}}>{templates.map(t=><option key={t.id} value={t.id}>{t.name}</option>)}</select></label><a className="ghost social-builder-link" href={`/hub/${stationSlug}/social-templatebouwer`}>Open Templatebouwer →</a></div>
+        {builderConfig?<div className="social-format-row compact builder-format-locked"><span>Formaat uit template</span><strong>{formats[format].label}</strong></div>:<div className="social-format-row compact">{(Object.keys(formats) as FormatKey[]).map(key=><button key={key} className={format===key?"active":""} onClick={()=>setFormat(key)}>{formats[key].label}</button>)}</div>}
+        {(!builderConfig||builderConfig.layers.some(layer=>layer.type==="image"&&layer.source==="post-image"))&&<div className="social-photo-field"><div><strong>Afbeelding / DJ-foto</strong><small>Deze foto vult de invulbare fotolaag van het gekozen template.</small></div><div className="social-photo-actions"><label className="ghost file-button">{assetUpload?"Uploaden…":"Foto kiezen"}<input type="file" accept="image/png,image/jpeg,image/webp" hidden onChange={e=>void handleStudioPhoto(e.target.files?.[0])}/></label>{ctx.artworkImage&&<button className="ghost" onClick={()=>patchContext("artworkImage","")}>Verwijder</button>}</div>{assets.length>0&&<div className="studio-asset-strip">{assets.slice(0,8).map(a=><button key={a.id} className={ctx.artworkImage===a.public_url?"selected":""} onClick={()=>patchContext("artworkImage",a.public_url)}><img src={a.public_url} alt=""/></button>)}</div>}</div>}
         <div className="social-context-grid clean">
-          <label>Artiest<input value={ctx.artist} onChange={e=>patchContext("artist",e.target.value)}/></label>
-          <label>Titel / onderwerp<input value={ctx.title} onChange={e=>patchContext("title",e.target.value)}/></label>
-          <label>Programma<input value={ctx.program} onChange={e=>patchContext("program",e.target.value)}/></label>
-          <label>Presentator<input value={ctx.presenter} onChange={e=>patchContext("presenter",e.target.value)}/></label>
-          <label>Hitlijstpositie<input value={ctx.chartPosition} onChange={e=>patchContext("chartPosition",e.target.value)}/></label>
-          <label>Vorige positie<input value={ctx.previousPosition} onChange={e=>patchContext("previousPosition",e.target.value)}/></label>
-          <label>Volgende show<input value={ctx.nextShow} onChange={e=>patchContext("nextShow",e.target.value)}/></label>
+          {(!builderConfig||builderVariables.includes("{artist}"))&&<label>Artiest<input value={ctx.artist} onChange={e=>patchContext("artist",e.target.value)}/></label>}
+          {(!builderConfig||builderVariables.includes("{title}"))&&<label>Titel / onderwerp<input value={ctx.title} onChange={e=>patchContext("title",e.target.value)}/></label>}
+          {(!builderConfig||builderVariables.includes("{program}"))&&<label>Programma<input value={ctx.program} onChange={e=>patchContext("program",e.target.value)}/></label>}
+          {(!builderConfig||builderVariables.includes("{presenter}"))&&<label>Presentator<input value={ctx.presenter} onChange={e=>patchContext("presenter",e.target.value)}/></label>}
+          {(!builderConfig||builderVariables.includes("{chart_position}"))&&<label>Hitlijstpositie<input value={ctx.chartPosition} onChange={e=>patchContext("chartPosition",e.target.value)}/></label>}
+          {(!builderConfig||builderVariables.includes("{previous_position}"))&&<label>Vorige positie<input value={ctx.previousPosition} onChange={e=>patchContext("previousPosition",e.target.value)}/></label>}
+          {(!builderConfig||builderVariables.includes("{next_show}"))&&<label>Volgende show<input value={ctx.nextShow} onChange={e=>patchContext("nextShow",e.target.value)}/></label>}
+          {builderConfig&&builderVariables.includes("{date}")&&<label>Datum<input value={ctx.date} onChange={e=>patchContext("date",e.target.value)}/></label>}
+          {builderConfig&&builderVariables.includes("{time}")&&<label>Tijd<input value={ctx.time} onChange={e=>patchContext("time",e.target.value)}/></label>}
+          {builderConfig&&builderVariables.includes("{cta}")&&<label>CTA<input value={ctx.cta} onChange={e=>patchContext("cta",e.target.value)}/></label>}
         </div>
         <details className="social-editor-details" open><summary>Caption & tekst</summary><div className="social-caption-head"><strong>Caption</strong><button onClick={()=>void copyCaption()}>Kopieer</button></div><textarea className="social-caption-editor" value={currentPost?.caption??liveCaption} onChange={e=>setCurrentPost(p=>p?{...p,caption:e.target.value}:p)} /><div className="variable-strip">{variables.map(v=><button key={v} onClick={()=>setCurrentPost(p=>p?{...p,caption:`${p.caption}${p.caption.endsWith(" ")?"":" "}${v}`}:p)}>{v}</button>)}</div></details>{currentPost&&!currentPost.id.startsWith("new-")&&<div className="social-post-attachments"><AttachmentPanel stationSlug={stationSlug} entityType="social_post" entityId={currentPost.id} title="Bestanden bij deze socialpost"/></div>}
         <details className="social-editor-details"><summary>Planning, kanalen & goedkeuring</summary><div className="social-post-controls"><label>Status<select value={currentPost?.status||"concept"} onChange={e=>setCurrentPost(p=>p?{...p,status:e.target.value as SocialPost["status"]}:p)}><option value="concept">Concept</option><option value="review">Klaar voor review</option><option value="approved">Goedgekeurd</option><option value="published">Gepubliceerd</option></select></label><label>Planning<input type="datetime-local" value={toLocalInput(currentPost?.scheduled_at||null)} onChange={e=>setCurrentPost(p=>p?{...p,scheduled_at:fromLocalInput(e.target.value)}:p)}/></label></div><div className="social-platform-picker">{["Instagram","Instagram Story","Facebook","TikTok","YouTube Shorts","LinkedIn"].map(platform=><button key={platform} className={(currentPost?.platforms||[]).includes(platform)?"active":""} onClick={()=>togglePlatform(platform)}>{platform}</button>)}</div><div className="social-brief-grid"><label>Campagne<input value={currentPost?.campaign||""} onChange={e=>patchPost({campaign:e.target.value})}/></label><label>Contentpijler<input value={currentPost?.content_pillar||""} onChange={e=>patchPost({content_pillar:e.target.value})}/></label><label>Doel<input value={currentPost?.objective||""} onChange={e=>patchPost({objective:e.target.value})}/></label><label>Deadline<input type="datetime-local" value={toLocalInput(currentPost?.due_at||null)} onChange={e=>patchPost({due_at:fromLocalInput(e.target.value)})}/></label><label>Eigenaar<select value={currentPost?.assigned_to||""} onChange={e=>patchPost({assigned_to:e.target.value||null})}><option value="">Niet toegewezen</option>{people.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select></label><label>Reviewer<select value={currentPost?.reviewer_id||""} onChange={e=>patchPost({reviewer_id:e.target.value||null})}><option value="">Geen vaste reviewer</option>{people.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select></label></div><div className="social-checklist">{[["copy","Copy klaar"],["visual","Visual klaar"],["rights","Rechten gecheckt"],["links","Links/CTA gecheckt"]].map(([key,label])=><label key={key}><input type="checkbox" checked={Boolean(currentPost?.checklist?.[key])} onChange={()=>toggleChecklist(key)}/><span>{label}</span></label>)}</div><label className="field">Interne notitie<textarea className="input" value={currentPost?.internal_notes||""} onChange={e=>patchPost({internal_notes:e.target.value})}/></label>{currentPost?.status==="published"&&<label className="field">Link naar publicatie<input className="input" value={currentPost?.publication_url||""} onChange={e=>patchPost({publication_url:e.target.value})}/></label>}</details>
@@ -448,22 +430,22 @@ export default function SocialStudioModule({stationSlug,permissions}:{stationSlu
       </section>
 
       <section className="social-preview-stage">
-        <div className="social-preview-toolbar"><div><strong>Live preview</strong><span>{formatInfo.w} × {formatInfo.h}</span></div><div className="button-row"><button className="ghost" onClick={()=>void renderPng(format,true)}>PNG huidig</button><button className="primary soft" onClick={()=>void exportPack()}>Export geselecteerd</button></div></div>
-        <div className="social-export-set">{(Object.keys(formats) as FormatKey[]).map(key=><label key={key}><input type="checkbox" checked={exportFormats[key]} onChange={e=>setExportFormats({...exportFormats,[key]:e.target.checked})}/><span>{formats[key].label}</span></label>)}</div>
-        <div className={`social-artboard ratio-${format.replace(":","-")}`} style={{fontFamily:`${brand.font_family},sans-serif`,color:brand.text_color,background:visual.backgroundImage?`linear-gradient(rgba(7,8,20,${visual.overlay/100}),rgba(7,8,20,${visual.overlay/100})),url(${visual.backgroundImage}) center/cover`:`linear-gradient(145deg,${brand.primary_color},${brand.secondary_color} 62%,${brand.background_color})`,textAlign:visual.align}}>
+        <div className="social-preview-toolbar"><div><strong>Live preview</strong><span>{formatInfo.w} × {formatInfo.h}</span></div><div className="button-row"><button className="primary soft" onClick={()=>void renderPng(format,true)}>PNG downloaden</button>{!builderConfig&&<button className="ghost" onClick={()=>void exportPack()}>Export geselecteerd</button>}</div></div>
+        {!builderConfig&&<div className="social-export-set">{(Object.keys(formats) as FormatKey[]).map(key=><label key={key}><input type="checkbox" checked={exportFormats[key]} onChange={e=>setExportFormats({...exportFormats,[key]:e.target.checked})}/><span>{formats[key].label}</span></label>)}</div>}
+        {builderConfig?<SocialTemplateRenderer config={builderConfig} ctx={ctx} brand={brand} className={`ratio-${format.replace(":","-")}`}/>:<div className={`social-artboard social-layout-${visual.layout} ratio-${format.replace(":","-")}`} style={{fontFamily:`${brand.font_family},sans-serif`,color:brand.text_color,background:visual.backgroundImage?`linear-gradient(rgba(7,8,20,${visual.overlay/100}),rgba(7,8,20,${visual.overlay/100})),url(${visual.backgroundImage}) center/cover`:`linear-gradient(145deg,${brand.primary_color},${brand.secondary_color} 62%,${brand.background_color})`,textAlign:visual.align}}>
           {visual.accentBar&&<span className="social-accent-edge" style={{background:brand.accent_color}}/>}
           <div className="social-preview-brand">{brand.logo_url?<img src={brand.logo_url} alt=""/>:<strong>{brand.brand_name}</strong>}</div>
           <span className="social-preview-label" style={{background:brand.accent_color}}>{replaceVars(visual.label,ctx)}</span>
           {visual.showArtwork&&<div className={`social-preview-artwork ${visual.artworkShape}`}>{visual.artworkImage?<img src={visual.artworkImage} alt=""/>:<span>♫</span>}</div>}
           <div className="social-preview-copy"><h2>{previewHeadline}</h2><h3>{previewSubline}</h3></div>
           <div className="social-preview-footer">{previewFooter}</div>
-        </div>
+        </div>}
         <div className="card social-autofill-card"><div><strong>Automatische variabelen</strong><span>Programmering en de recentste hitlijst worden alleen opgehaald wanneer je de HUB-data vernieuwt.</span></div><button className="ghost" disabled={busy} onClick={()=>void autofill()}>⚡ Vernieuw data</button></div>
       </section>
     </div>}
 
     {tab==="brand"&&<div className="social-brand-layout">
-      <section className="card"><div className="section-head"><div><h3>Brand kit • {stationSlug}</h3><p>De basisstijl voor alle nieuwe social visuals.</p></div><button className="primary" disabled={busy} onClick={()=>void persistBrand()}>Opslaan</button></div>
+      <section className="card"><div className="section-head"><div><h3>Brand kit • {stationSlug}</h3><p>Logo, kleuren en basisstijl. De laagopbouw zelf beheer je voortaan in Templatebouwer.</p></div><button className="primary" disabled={busy} onClick={()=>void persistBrand()}>Opslaan</button></div>
         <div className="brand-kit-grid">
           <label>Merknaam<input value={brand.brand_name} onChange={e=>setBrand({...brand,brand_name:e.target.value})}/></label>
           <label>Logo URL<input value={brand.logo_url} onChange={e=>setBrand({...brand,logo_url:e.target.value})} placeholder="of kies een asset hieronder"/></label>
@@ -477,45 +459,6 @@ export default function SocialStudioModule({stationSlug,permissions}:{stationSlu
       </section>
       <section className="card brand-preview-card" style={{background:`linear-gradient(140deg,${brand.primary_color},${brand.secondary_color} 65%,${brand.background_color})`,color:brand.text_color,fontFamily:`${brand.font_family},sans-serif`}}><span className="eyebrow" style={{color:brand.text_color}}>BRAND PREVIEW</span>{brand.logo_url?<img src={brand.logo_url} alt=""/>:<h2>{brand.brand_name}</h2>}<b style={{background:brand.accent_color}}>{brand.default_cta}</b><p>{brand.default_hashtags}</p></section>
       <section className="card brand-assets"><div className="section-head"><div><h3>Snel logo kiezen</h3><p>Gebruik één van de centrale assets.</p></div></div><div className="mini-asset-grid">{assets.slice(0,8).map(a=><button key={a.id} onClick={()=>setBrand({...brand,logo_url:a.public_url})}><img src={a.public_url} alt=""/><span>{a.name}</span></button>)}</div></section>
-    </div>}
-
-    {tab==="templates"&&<div className="social-template-editor-tophub">
-      <section className="card social-template-toolbar-tophub">
-        <div><span className="eyebrow">GRAFISCHE TEMPLATES</span><h3>{templateDraft?.name||"Kies een template"}</h3><p>Een rustige editor: voorbeeld links, alleen de bewerkbare velden rechts.</p></div>
-        <div className="template-toolbar-controls"><select className="select" value={selectedTemplateId} onChange={e=>{const t=templates.find(x=>x.id===e.target.value);if(t){setSelectedTemplateId(t.id);setTemplateDraft(t);setFormat((t.aspect_ratio as FormatKey)||"4:5")}}}><option value="">Kies template…</option>{templates.map(t=><option key={t.id} value={t.id}>{t.name} • {t.aspect_ratio}</option>)}</select><button className="ghost" onClick={()=>{const n=newTemplate(stationSlug,presetTemplates[0]);setTemplateDraft(n);setSelectedTemplateId(n.id);setFormat(n.aspect_ratio as FormatKey)}}>＋ Nieuw</button></div>
-      </section>
-      {!templateDraft?<div className="card empty-live-state"><strong>Kies of maak een template</strong><span>Daarna verschijnt links het voorbeeld en rechts alleen de velden die je aanpast.</span></div>:<>
-        <section className="social-template-preview-pane">
-          <div className="social-preview-toolbar"><div><strong>Voorbeeld</strong><span>{formatInfo.w} × {formatInfo.h}px</span></div><button className="ghost" onClick={()=>void renderPng(format,true)}>↓ Download PNG</button></div>
-          <div className={`social-artboard template-preview-artboard ratio-${format.replace(":","-")}`} style={{fontFamily:`${brand.font_family},sans-serif`,color:brand.text_color,background:visual.backgroundImage?`linear-gradient(rgba(7,8,20,${visual.overlay/100}),rgba(7,8,20,${visual.overlay/100})),url(${visual.backgroundImage}) center/cover`:`linear-gradient(145deg,${brand.primary_color},${brand.secondary_color} 62%,${brand.background_color})`,textAlign:visual.align}}>
-            {visual.accentBar&&<span className="social-accent-edge" style={{background:brand.accent_color}}/>}
-            <div className="social-preview-brand">{brand.logo_url?<img src={brand.logo_url} alt=""/>:<strong>{brand.brand_name}</strong>}</div>
-            <span className="social-preview-label" style={{background:brand.accent_color}}>{replaceVars(visual.label,ctx)}</span>
-            {visual.showArtwork&&<div className={`social-preview-artwork ${visual.artworkShape}`}>{visual.artworkImage?<img src={visual.artworkImage} alt=""/>:<span>FOTO</span>}</div>}
-            <div className="social-preview-copy"><h2>{previewHeadline}</h2><h3>{previewSubline}</h3></div><div className="social-preview-footer">{previewFooter}</div>
-          </div>
-          <div className="template-preset-strip"><strong>Snelle starters</strong>{presetTemplates.map(p=><button key={p.name} onClick={()=>{const n=newTemplate(stationSlug,p);setTemplateDraft(n);setSelectedTemplateId(n.id);setFormat(p.format)}}>＋ {p.name}</button>)}</div>
-        </section>
-        <section className="card social-template-config-v16 tophub-fields">
-          <div className="section-head"><div><span className="eyebrow">VUL DE VELDEN IN</span><h3>{templateDraft.name}</h3><p>Geen lagenchaos: de vaste huisstijl blijft in het template, de beheerder past hier alleen de relevante onderdelen aan.</p></div></div>
-          <div className="template-config-grid one-column">
-            <label>Naam template<input value={templateDraft.name} onChange={e=>patchTemplate({name:e.target.value})}/></label>
-            <label>Station<input value={brand.brand_name||stationSlug} disabled/></label>
-            <div className="two-form-cols"><label>Type<input value={templateDraft.content_type} onChange={e=>patchTemplate({content_type:e.target.value})}/></label><label>Formaat<select value={format} onChange={e=>{const x=e.target.value as FormatKey;setFormat(x);patchTemplate({aspect_ratio:x})}}>{(Object.keys(formats) as FormatKey[]).map(k=><option key={k}>{k}</option>)}</select></label></div>
-            <label>Label / rubriek<input value={cfg(templateDraft).label} onChange={e=>patchVisual({label:e.target.value})}/></label>
-            <label>Hoofdtekst<input value={cfg(templateDraft).headline} onChange={e=>patchVisual({headline:e.target.value})}/></label>
-            <label>Subtekst<input value={cfg(templateDraft).subline} onChange={e=>patchVisual({subline:e.target.value})}/></label>
-            <label>Footer<input value={cfg(templateDraft).footer} onChange={e=>patchVisual({footer:e.target.value})}/></label>
-            <div className="two-form-cols"><label>Uitlijning<select value={cfg(templateDraft).align} onChange={e=>patchVisual({align:e.target.value as "left"|"center"})}><option value="left">Links</option><option value="center">Midden</option></select></label><label>Artworkvorm<select value={cfg(templateDraft).artworkShape} onChange={e=>patchVisual({artworkShape:e.target.value as VisualConfig["artworkShape"]})}><option value="circle">Cirkel</option><option value="rounded">Afgerond</option><option value="square">Vierkant</option></select></label></div>
-            <label>Donkere overlay <input type="range" min="0" max="75" value={cfg(templateDraft).overlay} onChange={e=>patchVisual({overlay:Number(e.target.value)})}/><small>{cfg(templateDraft).overlay}%</small></label>
-          </div>
-          <div className="template-switch-row"><label><input type="checkbox" checked={cfg(templateDraft).showArtwork} onChange={e=>patchVisual({showArtwork:e.target.checked})}/> Foto / artwork tonen</label><label><input type="checkbox" checked={cfg(templateDraft).accentBar} onChange={e=>patchVisual({accentBar:e.target.checked})}/> Accentbalk</label></div>
-          <div className="asset-picker-row compact"><strong>Achtergrond</strong><button className="ghost" onClick={()=>patchVisual({backgroundImage:""})}>Huisstijlgradient</button>{assets.slice(0,8).map(a=><button key={a.id} onClick={()=>patchVisual({backgroundImage:a.public_url})}><img src={a.public_url} alt=""/></button>)}</div>
-          <div className="asset-picker-row compact"><strong>Foto / artwork</strong><button className="ghost" onClick={()=>patchVisual({artworkImage:""})}>Leeg</button>{assets.slice(0,8).map(a=><button key={a.id} onClick={()=>patchVisual({artworkImage:a.public_url})}><img src={a.public_url} alt=""/></button>)}</div>
-          <details className="social-editor-details"><summary>Caption-template en variabelen</summary><label className="field">Caption template<textarea className="input textarea" value={templateDraft.caption_template} onChange={e=>patchTemplate({caption_template:e.target.value})}/></label><div className="variable-strip">{variables.map(v=><button key={v} onClick={()=>patchTemplate({caption_template:`${templateDraft.caption_template}${templateDraft.caption_template.endsWith(" ")?"":" "}${v}`})}>{v}</button>)}</div></details>
-          <div className="social-panel-actions"><button className="primary" disabled={busy} onClick={()=>void persistTemplate()}>Opslaan</button>{!templateDraft.id.startsWith("new-")&&<button className="ghost danger-text" onClick={()=>void removeTemplate()}>Verwijder</button>}</div>
-        </section>
-      </>}
     </div>}
 
     {tab==="calendar"&&<div className="social-phase2-calendar">
@@ -615,7 +558,7 @@ export default function SocialStudioModule({stationSlug,permissions}:{stationSlu
         <label className={`social-dropzone ${assetUpload?"busy":""}`}>{assetUpload?"Uploaden…":"Klik om PNG/JPG/WEBP te uploaden (max. 5 MB)"}<input type="file" accept="image/png,image/jpeg,image/webp" disabled={assetUpload} onChange={e=>{const file=e.target.files?.[0];if(file)void handleAsset(file);e.currentTarget.value=""}}/></label>
         <div className="usage-note compact"><strong>Zuinig</strong><span>Geen automatische uploads of thumbnails. Alleen bestanden die je bewust kiest gaan naar Storage.</span></div>
       </section>
-      <section className="social-asset-grid-v16">{assets.map(asset=><article className="card" key={asset.id}><img src={asset.public_url} alt=""/><strong>{asset.name}</strong><small>{asset.tags?.join(" • ")||"geen tags"}</small><div className="button-row"><button className="ghost" onClick={()=>{if(templateDraft)patchVisual({artworkImage:asset.public_url});setTab("templates")}}>Gebruik</button><button className="mini-btn danger" onClick={()=>void removeAsset(asset)}>×</button></div></article>)}</section>
+      <section className="social-asset-grid-v16">{assets.map(asset=><article className="card" key={asset.id}><img src={asset.public_url} alt=""/><strong>{asset.name}</strong><small>{asset.tags?.join(" • ")||"geen tags"}</small><div className="button-row"><button className="ghost" onClick={()=>{patchContext("artworkImage",asset.public_url);setTab("studio")}}>Gebruik in post</button><button className="mini-btn danger" onClick={()=>void removeAsset(asset)}>×</button></div></article>)}</section>
     </div>}
   </div>
 }

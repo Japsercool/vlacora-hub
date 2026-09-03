@@ -1,59 +1,41 @@
-VLACORA HUB 0.23.4
-Route cleanup + stale stub self-healing release.
+VLACORA HUB 0.24.0
+Hitlijst Sheet + Beheercentrum + Social Template Builder release.
 
-0.23.4 deployment hardening:
-- prebuild now automatically removes stale external-stubs.d.ts files left behind by an older Git overlay/commit before Next.js starts.
-- tsconfig explicitly excludes external-stubs.d.ts as a second safety layer.
-- .gitignore prevents the legacy stub from being added again when it is no longer tracked.
-- App Router handlers remain on globalThis.Request; Supabase auth flow is unchanged.
+Nieuw in 0.24.0
+- Hitlijsten hebben nu een Excel-achtige sheeteditor met vaste kolommen voor positie, songgeheugen, artiest, titel, vorige positie, trend, weken, peak en notitie.
+- Songs worden centraal per station onthouden in PostgreSQL via hub_chart_song_memory. Een dropdown stelt eerder gebruikte songs, songs uit VLACORA Muziek en songs uit eerdere hitlijsten opnieuw voor.
+- Drag & drop / omhoog / omlaag voor posities blijft beschikbaar; trend, weken en peak worden automatisch opnieuw berekend op basis van de vorige en historische edities.
+- Excel/CSV blijft bedoeld voor bulkimport/export, terwijl dagelijkse correcties rechtstreeks in de sheet kunnen gebeuren.
+- Apart BEHEER-blok in de zijbalk op elke HUB-pagina voor gebruikers met beheerrechten.
+- Nieuwe beheeronderdelen: Hitlijstbeheer, Social beheer en Social Templatebouwer, naast Stations, Team, Sjablonen en centraal Beheer.
+- Teamrechten bepalen zowel toegang als zichtbaarheid van hoofdmenu en beheermenu.
+- Menurechten zijn nu volledig per gebruiker instelbaar: Voor mij, Mijn uitzending en Meldingen kunnen ook afzonderlijk verborgen worden.
+- Team & rechten toont live welke hoofdmenu- en BEHEER-items de geselecteerde gebruiker daadwerkelijk zal zien.
+- Social Templatebouwer gebruikt nu een echte layer-based builderarchitectuur; de gewone Social Studio bevat geen template-editor meer.
+- Social Studio is opgesplitst in dagelijkse contentworkflow en apart template-/brandbeheer.
+- Nieuwe sociale ontwerpstijlen verschillen visueel sterk van elkaar (release, chart, show, takeover, event, update, quote, winactie).
+- Volwaardige Social Templatebouwer met canvas, lagen, tekst/afbeelding/vormen, positie, schaal, rotatie, layer-volgorde, kleuren, fonts, assets, variabelen en meerdere formaten.
+- Nieuwe template-starters: Neon Release, Chart Shock, Takeover Frame, Story Radar, Editorial Quote en Event Cutout.
+- Social templates blijven station-specifiek en worden centraal opgeslagen in Supabase/PostgreSQL.
 
-Backend:
-- Supabase Auth remains the mandatory login/identity layer.
-- Supabase PostgreSQL is the current application database.
-- Supabase Storage is used for profile/program/social assets and generic private HUB attachments.
-- Architecture remains prepared for a later external PostgreSQL application-data backend while keeping Supabase Auth.
+Behouden uit 0.23.x
+- Supabase Auth blijft de verplichte login/identity-laag.
+- Centrale zenders in hub_stations met toevoegen, wijzigen, deactiveren/verwijderen en configuratie kopiëren.
+- Programma's gekoppeld aan echte accounts; DJ-/profiel- en programmacovers.
+- Persoonlijke agenda is privé voor uitsluitend de eigenaar.
+- Afwezigheden, impact op programma's en admin/beheerder-vervanging.
+- Redactie Talk-workflow + automatische versiegeschiedenis.
+- Wekelijkse, jaarlijkse en speciale hitlijsten met historische edities en Excel-import.
+- Muziek-/format-/playlistvoorstellen met Spotify/YouTube en uitleg.
+- Generieke private bijlagen voor Messenger, meldingen, taken, redactie, socials, communicatie, voorstellen enz.
+- Geen Playout One, Rotation One, SHOUTcast/listener-statistieken of playout monitoring in actieve applicatiecode.
 
-0.23.0 workflow features retained:
-- Real superadmin station management via hub_stations; add/deactivate/delete persists in PostgreSQL.
-- Copy station configuration by selectable sections (programming, program pages/team, templates, social/brand kit, settings, contacts) or select all.
-- Personal calendar is private to its owner, including from admins; station and VLACORA calendars are separate shared scopes.
-- Programs are linked to real Supabase accounts through hub_program_team (primary presenter + extra team/co-presenters).
-- Presenter dashboards and “Mijn programma / Mijn uitzending” use account IDs rather than name matching.
-- Presenter/profile photos and program cover images.
-- Absence impact + replacement workflow with program overrides.
-- Editorial Talk-first workflow and automatic version history.
-- Weekly, annual and special hitlists, historical editions, Excel import and trend/weeks/peak calculations.
-- Excel parser supports the supplied Super 50 layout with DW / Artiest / Titel.
-- Music/format/playlist proposals with Spotify/YouTube links, target folder/program, explanation and review status.
-- Generic private HUB attachments for incidents, messenger, tasks, admin requests, content inbox, editorial, social, official communications and music proposals.
-- Official communication stored in PostgreSQL + attachments.
-- Social Studio reorganized toward a calmer TOPhub-inspired workflow.
-- Muziekmappen PDF removed.
-- No Playout One, Rotation One, SHOUTcast/listener statistics or playout monitoring in active application code.
+Database
+- Nieuwe migratie: 037_hitlist_song_memory.sql
+- Current backend: Supabase Auth + Supabase PostgreSQL + Supabase Storage.
+- Architectuur blijft voorbereid op een latere externe PostgreSQL application-data backend met behoud van Supabase Auth.
 
-0.23.1 build/security hardening:
-- Removed the accidental external-stubs.d.ts release file that overrode Next.js/React/Supabase typings and caused invalid route-handler validation.
-- Traffic GET route now uses the native Request contract and URL(req.url) query parsing.
-- Removed stale announcement/modal code in hub-app.tsx that referenced deleted variables and would have caused the next TypeScript failure.
-- Fixed the CSS flex-end compatibility warning; local PostCSS/Autoprefixer validation reports zero warnings.
-- Hardened calendar selected-options typing and Excel sheet typing.
-- Supabase Auth is mandatory for /hub; there is no unauthenticated setup-mode bypass.
-- Removed remaining active-code legacy Rotation naming/fallbacks.
-- Added migration 036 to revoke anonymous execution on chat SECURITY DEFINER helper functions.
-- Legacy listener/radio integration objects were removed from the active Supabase database; Supabase Auth/users were not touched.
-
-Migrations relevant to the standalone workflow:
-- 029_standalone_stations.sql
-- 030_calendar_social_workflow.sql
-- 031_hub_workflow_round2.sql
-- 032_music_proposals_and_attachments.sql
-- 033_v023_function_acl_hardening.sql
-- 034_program_visuals_and_station_copy.sql
-- 035_official_communications.sql
-- 036_chat_helper_anon_acl_hardening.sql
-
-
-0.23.2/0.23.3 route hardening:
-- Both App Router GET handlers now explicitly use globalThis.Request, eliminating any ambiguity with NextRequest declarations.
-- Added scripts/prebuild-check.mjs and npm prebuild: deployment stops before Next.js when a route.ts reintroduces NextRequest or a mixed-support CSS start/end value.
-- Replaced all remaining flex/grid start/end compatibility values in globals.css with flex-start/flex-end.
+Build hardening
+- App Router route handlers gebruiken globalThis.Request.
+- Prebuild verwijdert stale external-stubs.d.ts en blokkeert regressies.
+- globals.css gebruikt flex-start/flex-end voor Autoprefixer-compatibiliteit.

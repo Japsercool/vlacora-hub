@@ -3,10 +3,11 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { navItems } from "@/lib/mock-data";
+import { adminNavSlugs,navItems } from "@/lib/mock-data";
 import MessengerModule from "@/components/modules/messenger-module";
 import PresentationModule from "@/components/modules/presentation-module";
 import SocialStudioModule from "@/components/modules/social-studio-module";
+import SocialTemplateBuilderModule from "@/components/modules/social-template-builder-module";
 import CalendarModule from "@/components/modules/calendar-module";
 import MusicLibraryModule from "@/components/modules/music-library-module";
 import MusicProposalsModule from "@/components/modules/music-proposals-module";
@@ -78,9 +79,10 @@ function HubAppInner({ stationSlug, moduleSlug }: Props) {
     return()=>{alive=false};
   },[]);
 
-  const visibleNavItems=useMemo(()=>navItems.filter(([slug])=>{const key=modulePermission[slug];return key===null||!permissions||can(permissions[key],"view")}),[permissions]);
+  const visibleNavItems=useMemo(()=>permissions?navItems.filter(([slug])=>!adminNavSlugs.includes(slug as any)).filter(([slug])=>{const key=modulePermission[slug];return key===null||can(permissions[key],"view")}):[],[permissions]);
+  const visibleAdminItems=useMemo(()=>permissions?navItems.filter(([slug])=>adminNavSlugs.includes(slug as any)).filter(([slug])=>{const key=modulePermission[slug];return key===null||can(permissions[key],"view")}):[],[permissions]);
   const currentPermissionKey=modulePermission[moduleSlug];
-  const hasModuleAccess=currentPermissionKey===null||!permissions||can(permissions[currentPermissionKey],"view");
+  const hasModuleAccess=Boolean(permissions)&&(currentPermissionKey===null||can(permissions[currentPermissionKey],"view"));
   const moduleName = useMemo(() => navItems.find((n) => n[0] === moduleSlug)?.[2] || "Dashboard", [moduleSlug]);
 
 
@@ -89,6 +91,7 @@ function HubAppInner({ stationSlug, moduleSlug }: Props) {
       <aside className="sidebar">
         <div className="brand"><div className="brand-mark">V</div><div><div className="brand-name">VLACORA</div><div className="brand-sub">HUB</div></div></div>
         <div className="station-mini"><span className="station-dot" style={{ background: station.accent }} /><div><strong>{station.name}</strong><small>Multi-station workspace</small></div></div>
+        {!permissions&&<div className="sidebar-rights-loading">Menu laden…</div>}
         <nav className="nav">
           {visibleNavItems.map(([slug, icon, label]) => (
             <Link key={slug} href={`/hub/${station.slug}/${slug}`} className={moduleSlug === slug ? "nav-item active" : "nav-item"}>
@@ -97,6 +100,7 @@ function HubAppInner({ stationSlug, moduleSlug }: Props) {
             </Link>
           ))}
         </nav>
+        {visibleAdminItems.length>0&&<div className="sidebar-admin-menu"><div className="sidebar-section-title">BEHEER</div><nav className="nav admin-nav">{visibleAdminItems.map(([slug,icon,label])=><Link key={slug} href={`/hub/${station.slug}/${slug}`} className={moduleSlug===slug?"nav-item active admin-item":"nav-item admin-item"}><span className="nav-icon">{icon}</span><span>{label}</span></Link>)}</nav></div>}
         <AccountWidget />
       </aside>
 
@@ -115,7 +119,8 @@ function HubAppInner({ stationSlug, moduleSlug }: Props) {
         </header>
 
         <div className="content">
-          {!hasModuleAccess && <div className="card empty-live-state"><strong>Geen toegang tot dit onderdeel</strong><span>Een superadmin kan dit per gebruiker aanpassen bij Team & rechten.</span></div>}
+          {!permissions&&<div className="card empty-live-state"><strong>Rechten laden…</strong><span>VLACORA bepaalt eerst welke onderdelen voor jouw account zichtbaar zijn.</span></div>}
+          {permissions&&!hasModuleAccess && <div className="card empty-live-state"><strong>Geen toegang tot dit onderdeel</strong><span>Een superadmin kan dit per gebruiker aanpassen bij Team & rechten.</span></div>}
           {hasModuleAccess && moduleSlug === "dashboard" && <>
             <section className="hero">
               <div><div className="hero-kicker">TODAY • LIVE WERKPLEK</div><h2>{collaboration.currentUser?.name?`Welkom, ${collaboration.currentUser.name}.`:"Vandaag in VLACORA"}</h2><p>Dit vraagt vandaag aandacht binnen {station.name}.</p></div>
@@ -178,11 +183,13 @@ function HubAppInner({ stationSlug, moduleSlug }: Props) {
 
           {hasModuleAccess && moduleSlug === "verkeer" && <TrafficModule stationSlug={station.slug} />}
 
-          {hasModuleAccess && moduleSlug === "hitlijsten" && <ChartsModule stationSlug={station.slug} stationName={station.name} />}
+          {hasModuleAccess && (moduleSlug === "hitlijsten" || moduleSlug === "hitlijst-beheer") && <ChartsModule stationSlug={station.slug} stationName={station.name} />}
 
           {hasModuleAccess && moduleSlug === "presentatie" && <PresentationModule stationSlug={station.slug} />}
 
-          {hasModuleAccess && moduleSlug === "social" && <SocialStudioModule stationSlug={station.slug} permissions={permissions} />}
+          {hasModuleAccess && (moduleSlug === "social" || moduleSlug === "social-beheer") && <SocialStudioModule stationSlug={station.slug} permissions={permissions} initialTab={moduleSlug==="social-beheer"?"brand":"studio"} />}
+
+          {hasModuleAccess && moduleSlug === "social-templatebouwer" && <SocialTemplateBuilderModule stationSlug={station.slug} permissions={permissions} />}
 
           {hasModuleAccess && moduleSlug === "team" && <TeamRightsModule stationSlug={station.slug} />}
 

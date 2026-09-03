@@ -1,18 +1,18 @@
 export type PermissionLevel = "none" | "view" | "edit" | "publish" | "admin";
 
 export type PermissionKey =
-  | "dashboard" | "stations" | "taken" | "meldpunt" | "messenger" | "communicatie"
+  | "dashboard" | "voor_mij" | "mijn_uitzending" | "meldingen" | "stations" | "taken" | "meldpunt" | "messenger" | "communicatie"
   | "kalender" | "programmering" | "programmas" | "afwezigheden" | "contacten"
   | "sjablonen" | "muziek" | "muziek_voorstellen" | "meetings"
   | "redactie" | "redactie_versies" | "verkeer"
   | "hitlijsten" | "hitlijsten_import" | "presentatie"
-  | "social_content" | "social_calendar" | "social_templates" | "social_assets" | "social_approval"
+  | "social_content" | "social_calendar" | "social_templates" | "social_template_builder" | "social_assets" | "social_approval"
   | "team" | "beheer";
 
 export type PermissionMap = Record<PermissionKey, PermissionLevel>;
 
 export const permissionLabels: Record<PermissionKey,string> = {
-  dashboard:"Dashboard", stations:"Zenders bekijken", taken:"Taken", meldpunt:"Meldpunt",
+  dashboard:"Dashboard", voor_mij:"Voor mij", mijn_uitzending:"Mijn uitzending", meldingen:"Meldingen", stations:"Zenders bekijken", taken:"Taken", meldpunt:"Meldpunt",
   messenger:"Messenger", communicatie:"Officiële communicatie", kalender:"Gedeelde agenda",
   programmering:"Programmering", programmas:"Programmapagina's", afwezigheden:"Afwezigheden & vervanging",
   contacten:"Contacten", sjablonen:"Algemene sjablonen", muziek:"Muziekinformatie",
@@ -20,16 +20,16 @@ export const permissionLabels: Record<PermissionKey,string> = {
   redactie:"Redactie / talks", redactie_versies:"Redactie-versiegeschiedenis", verkeer:"Verkeer",
   hitlijsten:"Hitlijsten", hitlijsten_import:"Hitlijsten importeren", presentatie:"Presentatie",
   social_content:"Social • Content maken", social_calendar:"Social • Contentkalender",
-  social_templates:"Social • Templates & brand kit", social_assets:"Social • Assets & copyblokken",
+  social_templates:"Social • Brand kit & beheer", social_template_builder:"Social • Templatebouwer", social_assets:"Social • Assets & copyblokken",
   social_approval:"Social • Goedkeuren & publiceren", team:"Team & gebruikers", beheer:"Superbeheer"
 };
 
 export const permissionGroups: Array<{label:string;keys:PermissionKey[]}> = [
-  {label:"Algemeen",keys:["dashboard","stations","taken","meldpunt","messenger","communicatie","kalender"]},
+  {label:"Algemeen & persoonlijk menu",keys:["dashboard","voor_mij","mijn_uitzending","meldingen","stations","taken","meldpunt","messenger","communicatie","kalender"]},
   {label:"Zender & programma's",keys:["programmering","programmas","afwezigheden","contacten","sjablonen"]},
   {label:"Muziek",keys:["muziek","muziek_voorstellen","meetings","hitlijsten","hitlijsten_import"]},
   {label:"Redactie",keys:["redactie","redactie_versies","verkeer","presentatie"]},
-  {label:"Social media",keys:["social_content","social_calendar","social_templates","social_assets","social_approval"]},
+  {label:"Social media",keys:["social_content","social_calendar","social_templates","social_template_builder","social_assets","social_approval"]},
   {label:"Beheer",keys:["team","beheer"]}
 ];
 
@@ -40,43 +40,43 @@ function withLevels(levels:Partial<PermissionMap>):PermissionMap { return {...ba
 export const rolePresets: Record<string,PermissionMap> = {
   "Superadmin": base("admin"),
   "Stationmanager": withLevels({
-    dashboard:"view",stations:"view",taken:"admin",meldpunt:"admin",messenger:"edit",communicatie:"publish",kalender:"admin",
+    dashboard:"view",voor_mij:"view",mijn_uitzending:"view",meldingen:"view",stations:"view",taken:"admin",meldpunt:"admin",messenger:"edit",communicatie:"publish",kalender:"admin",
     programmering:"publish",programmas:"publish",afwezigheden:"admin",contacten:"publish",sjablonen:"admin",
     muziek:"publish",muziek_voorstellen:"publish",meetings:"publish",redactie:"publish",redactie_versies:"publish",verkeer:"publish",
     hitlijsten:"publish",hitlijsten_import:"publish",presentatie:"edit",
-    social_content:"publish",social_calendar:"publish",social_templates:"admin",social_assets:"publish",social_approval:"publish",
+    social_content:"publish",social_calendar:"publish",social_templates:"admin",social_template_builder:"admin",social_assets:"publish",social_approval:"publish",
     team:"admin",beheer:"edit"
   }),
   "Muziekredactie": withLevels({
-    dashboard:"view",stations:"view",taken:"edit",meldpunt:"edit",messenger:"edit",communicatie:"edit",kalender:"view",
+    dashboard:"view",voor_mij:"view",mijn_uitzending:"view",meldingen:"view",stations:"view",taken:"edit",meldpunt:"edit",messenger:"edit",communicatie:"edit",kalender:"view",
     programmering:"view",programmas:"view",afwezigheden:"view",contacten:"view",sjablonen:"edit",
     muziek:"publish",muziek_voorstellen:"publish",meetings:"publish",redactie:"edit",redactie_versies:"view",verkeer:"edit",
     hitlijsten:"publish",hitlijsten_import:"publish",presentatie:"edit",
     social_content:"edit",social_calendar:"view",social_assets:"view"
   }),
   "Redactie": withLevels({
-    dashboard:"view",stations:"view",taken:"edit",meldpunt:"edit",messenger:"edit",communicatie:"edit",kalender:"edit",
+    dashboard:"view",voor_mij:"view",mijn_uitzending:"view",meldingen:"view",stations:"view",taken:"edit",meldpunt:"edit",messenger:"edit",communicatie:"edit",kalender:"edit",
     programmering:"view",programmas:"edit",afwezigheden:"view",contacten:"view",sjablonen:"publish",
     muziek:"view",muziek_voorstellen:"edit",meetings:"view",redactie:"publish",redactie_versies:"publish",verkeer:"publish",
     hitlijsten:"view",presentatie:"publish",social_content:"edit",social_calendar:"view",social_assets:"view"
   }),
   "Presentator": withLevels({
-    dashboard:"view",stations:"view",taken:"edit",meldpunt:"edit",messenger:"edit",communicatie:"view",kalender:"view",
+    dashboard:"view",voor_mij:"view",mijn_uitzending:"view",meldingen:"view",stations:"view",taken:"edit",meldpunt:"edit",messenger:"edit",communicatie:"view",kalender:"view",
     programmering:"view",programmas:"view",afwezigheden:"edit",contacten:"view",sjablonen:"view",muziek:"view",
     muziek_voorstellen:"edit",redactie:"edit",redactie_versies:"view",verkeer:"view",presentatie:"edit",
     social_content:"edit",social_calendar:"view",social_assets:"view"
   }),
   "Social & Marketing": withLevels({
-    dashboard:"view",stations:"view",taken:"edit",meldpunt:"edit",messenger:"edit",communicatie:"edit",kalender:"edit",
+    dashboard:"view",voor_mij:"view",mijn_uitzending:"view",meldingen:"view",stations:"view",taken:"edit",meldpunt:"edit",messenger:"edit",communicatie:"edit",kalender:"edit",
     programmering:"view",programmas:"view",contacten:"view",sjablonen:"edit",muziek:"view",hitlijsten:"view",presentatie:"view",
-    social_content:"publish",social_calendar:"publish",social_templates:"publish",social_assets:"publish",social_approval:"publish"
+    social_content:"publish",social_calendar:"publish",social_templates:"publish",social_template_builder:"publish",social_assets:"publish",social_approval:"publish"
   }),
   "Techniek": withLevels({
-    dashboard:"view",stations:"view",taken:"edit",meldpunt:"admin",messenger:"edit",communicatie:"view",kalender:"edit",
+    dashboard:"view",voor_mij:"view",mijn_uitzending:"none",meldingen:"view",stations:"view",taken:"edit",meldpunt:"admin",messenger:"edit",communicatie:"view",kalender:"edit",
     programmering:"view",programmas:"view",contacten:"view",sjablonen:"admin",verkeer:"view",beheer:"admin"
   }),
   "Kijker": withLevels({
-    dashboard:"view",stations:"view",communicatie:"view",kalender:"view",programmering:"view",programmas:"view",contacten:"view",
+    dashboard:"view",voor_mij:"view",mijn_uitzending:"none",meldingen:"view",stations:"view",communicatie:"view",kalender:"view",programmering:"view",programmas:"view",contacten:"view",
     sjablonen:"view",muziek:"view",verkeer:"view",hitlijsten:"view",social_calendar:"view"
   })
 };
@@ -95,10 +95,10 @@ export function resolvePermissions(role:string,value:any):PermissionMap {
 }
 
 export const modulePermission: Record<string,PermissionKey|null> = {
-  dashboard:"dashboard", "voor-mij":null, "mijn-uitzending":null, meldingen:null,
+  dashboard:"dashboard", "voor-mij":"voor_mij", "mijn-uitzending":"mijn_uitzending", meldingen:"meldingen",
   stations:"stations", taken:"taken", meldpunt:"meldpunt", aanvragen:"beheer", "content-inbox":"redactie",
   messenger:"messenger", communicatie:"communicatie", kalender:"kalender", programmering:"programmering",
   programmas:"programmas", afwezigheden:"afwezigheden", contacten:"contacten", sjablonen:"sjablonen",
   muziek:"muziek", "muziek-voorstellen":"muziek_voorstellen", meetings:"meetings", redactie:"redactie", verkeer:"verkeer", hitlijsten:"hitlijsten",
-  presentatie:"presentatie", social:"social_content", team:"team", beheer:"beheer"
+  presentatie:"presentatie", social:"social_content", "social-beheer":"social_templates", "social-templatebouwer":"social_template_builder", "hitlijst-beheer":"hitlijsten", team:"team", beheer:"beheer"
 };

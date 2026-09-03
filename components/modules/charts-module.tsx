@@ -5,6 +5,7 @@ import jsPDF from "jspdf";
 import type { MusicSong } from "@/components/modules/music-library-module";
 import { isSupabaseBrowserConfigured } from "@/lib/supabase/client";
 import { loadSharedHitlists, syncSharedHitlists, type SharedHitlist } from "@/lib/supabase/hub-data";
+import { loadChartSongMemory,rememberChartSongs,type ChartSongMemory } from "@/lib/supabase/chart-memory";
 import { useHubStation } from "@/lib/hub-stations";
 import { emitActivity } from "@/lib/collaboration/activity";
 
@@ -57,6 +58,8 @@ export default function ChartsModule({stationSlug,stationName}:{stationSlug:stri
   const[cloudActive,setCloudActive]=useState(false);
   const[syncing,setSyncing]=useState(false);
   const[dragIndex,setDragIndex]=useState<number|null>(null);
+  const[songMemory,setSongMemory]=useState<ChartSongMemory[]>([]);
+  const[memorySearch,setMemorySearch]=useState("");
 
   const selected=charts.find(x=>x.id===selectedId)||charts[0]||null;
   useEffect(()=>{emitActivity({detail:selected?`Hitlijsten • ${selected.name} • ${selected.editionLabel}`:"Hitlijsten • overzicht",entityType:"hitlist",entityId:selected?.id})},[selected?.id,selected?.name,selected?.editionLabel]);
@@ -65,7 +68,7 @@ export default function ChartsModule({stationSlug,stationName}:{stationSlug:stri
   const previous=selected?.previousEditionId?charts.find(x=>x.id===selected.previousEditionId)||null:null;
 
   useEffect(()=>{if(!selectedId&&charts[0])setSelectedId(charts[0].id);if(selectedId&&!charts.some(x=>x.id===selectedId))setSelectedId(charts[0]?.id||"")},[charts,selectedId]);
-  useEffect(()=>{refreshSources()},[stationSlug]);
+  useEffect(()=>{refreshSources();void refreshMemory()},[stationSlug]);
   useEffect(()=>{
     let alive=true;setCloudReady(false);
     if(!isSupabaseBrowserConfigured()){setCloudActive(false);setCloudReady(true);return()=>{alive=false}};
@@ -80,6 +83,12 @@ export default function ChartsModule({stationSlug,stationName}:{stationSlug:stri
   },[charts,cloudReady,cloudActive,stationSlug]);
 
   function flash(x:string){setNotice(x);setTimeout(()=>setNotice(""),2800)}
+  async function refreshMemory(){
+    try{setSongMemory(await loadChartSongMemory(stationSlug))}catch{setSongMemory([])}
+  }
+  async function rememberSongs(songs:Array<{artist:string;title:string;songId?:string}>){
+    try{await rememberChartSongs(stationSlug,songs);void refreshMemory()}catch{}
+  }
   function refreshSources(){
     try{const raw=localStorage.getItem(`vlacora:${stationSlug}:music:catalog`);setLocalSongs(raw?JSON.parse(raw):[])}catch{setLocalSongs([])}
     try{const raw=localStorage.getItem(`vlacora:${stationSlug}:programming:v10`);setPrograms(raw?JSON.parse(raw):[])}catch{setPrograms([])}
@@ -124,7 +133,16 @@ export default function ChartsModule({stationSlug,stationName}:{stationSlug:stri
     if(!selected||!song.artist.trim()||!song.title.trim())return;
     if(selected.entries.some(e=>songKey(e.artist,e.title)===songKey(song.artist,song.title)))return flash("Deze song staat al in de hitlijst.");
     if(selected.entries.length>=selected.size)return flash(`Deze hitlijst is ingesteld op Top ${selected.size}. Verhoog eerst de grootte.`);
-    setEntries([...selected.entries,{id:uid(),songId:song.id,artist:song.artist.trim(),title:song.title.trim(),previousPosition:null,weeks:1,peak:selected.entries.length+1,notes:""}]);
+    const entry={id:uid(),songId:song.id,artist:song.artist.trim(),title:song.title.trim(),previousPosition:null,weeks:1,peak:selected.entries.length+1,notes:""};
+    setEntries([...selected.entries,entry]);void rememberSongs([{artist:entry.artist,title:entry.title,songId:entry.songId}]);
+  }
+  function addBlankEntry(){
+    if(!selected)return;if(selected.entries.length>=selected.size)return flash(`Top ${selected.size} is al volledig.`);
+    setEntries([...selected.entries,{id:uid(),artist:"",title:"",previousPosition:null,weeks:1,peak:selected.entries.length+1,notes:""}]);
+  }
+  function chooseMemory(entryId:string,key:string){
+    const song=memoryOptions.find(x=>x.key===key);if(!song)return;updateEntry(entryId,{artist:song.artist,title:song.title,songId:song.songId||undefined});
+    void rememberSongs([{artist:song.artist,title:song.title,songId:song.songId||undefined}]);
   }
   function move(index:number,to:number){if(!selected||to<0||to>=selected.entries.length||to===index)return;const a=[...selected.entries];const[item]=a.splice(index,1);a.splice(to,0,item);setEntries(a)}
   function removeEntry(id:string){if(!selected)return;setEntries(selected.entries.filter(e=>e.id!==id))}
@@ -138,7 +156,7 @@ export default function ChartsModule({stationSlug,stationName}:{stationSlug:stri
       if(!artist||!title){skipped++;continue}if(entries.some(e=>songKey(e.artist,e.title)===songKey(artist,title))){skipped++;continue}
       entries.push({id:uid(),artist,title,previousPosition:null,weeks:1,peak:entries.length+1,notes:""});added++;
     }
-    setEntries(entries);setBulkText("");flash(`${added} songs toegevoegd${skipped?` • ${skipped} overgeslagen`:""}`);
+    setEntries(entries);setBulkText("");void rememberSongs(entries.slice(-added).map(e=>({artist:e.artist,title:e.title,songId:e.songId})));flash(`${added} songs toegevoegd${skipped?` • ${skipped} overgeslagen`:""}`);
   }
   async function importExcel(file:File|undefined){
     if(!selected||!file)return;setBusy(true);
@@ -153,7 +171,7 @@ export default function ChartsModule({stationSlug,stationName}:{stationSlug:stri
       if(!parsed.length)throw new Error("Geen tabel met positie/DW, Artiest en Titel gevonden.");
       parsed.sort((a,b)=>a.rank-b.rank);const entries:HitlistEntry[]=[];let matched=0;
       for(const row of parsed.slice(0,selected.size)){const exact=localSongs.find(s=>songKey(s.artist,s.title)===songKey(row.artist,row.title));const titleMatch=!exact?localSongs.find(s=>normalized(s.title)===normalized(row.title)&&normalized(s.artist).includes(normalized(row.artist).split(" ")[0]||"___")):undefined;if(exact||titleMatch)matched++;entries.push({id:uid(),songId:(exact||titleMatch)?.id,artist:row.artist,title:row.title,previousPosition:null,weeks:1,peak:row.rank,notes:""})}
-      const updated={...selected,entries,sourceLabel:`Excel • ${file.name} • ${sheetName}`,updatedAt:new Date().toISOString()};setCharts(recalculateHistories(charts.map(c=>c.id===selected.id?updated:c)));setShowSources(false);flash(`${entries.length} posities geïmporteerd • ${matched} herkend in VLACORA Muziek`);
+      const updated={...selected,entries,sourceLabel:`Excel • ${file.name} • ${sheetName}`,updatedAt:new Date().toISOString()};setCharts(recalculateHistories(charts.map(c=>c.id===selected.id?updated:c)));void rememberSongs(entries.map(e=>({artist:e.artist,title:e.title,songId:e.songId})));setShowSources(false);flash(`${entries.length} posities geïmporteerd • ${matched} herkend in VLACORA Muziek`);
     }catch(e){flash(e instanceof Error?e.message:"Excel import mislukt")}finally{setBusy(false)}
   }
   function exportCsv(){
@@ -238,6 +256,13 @@ export default function ChartsModule({stationSlug,stationName}:{stationSlug:stri
     return{newCount:selected.entries.filter(e=>e.previousPosition==null).length,climber:up?`▲ ${up.delta} • ${up.artist}`:"—",faller:down?`▼ ${Math.abs(down.delta)} • ${down.artist}`:"—",longest:longest?`${longest.weeks} wk • ${longest.artist}`:"—"};
   },[selected]);
   const duplicateCount=useMemo(()=>{if(!selected)return 0;const seen=new Set<string>();let d=0;selected.entries.forEach(e=>{const k=songKey(e.artist,e.title);if(seen.has(k))d++;seen.add(k)});return d},[selected]);
+  const memoryOptions=useMemo(()=>{
+    const map=new Map<string,{key:string;artist:string;title:string;songId?:string;source:string;useCount:number}>();
+    for(const row of songMemory)map.set(songKey(row.artist,row.title),{key:songKey(row.artist,row.title),artist:row.artist,title:row.title,songId:row.songId||undefined,source:"Hitlijstgeheugen",useCount:row.useCount});
+    for(const s of localSongs){const key=songKey(s.artist,s.title);if(!map.has(key))map.set(key,{key,artist:s.artist,title:s.title,songId:s.id,source:s.musicFolder||"Muziek",useCount:0})}
+    for(const chart of charts)for(const e of chart.entries){const key=songKey(e.artist,e.title);if(e.artist&&e.title&&!map.has(key))map.set(key,{key,artist:e.artist,title:e.title,songId:e.songId,source:"Eerdere hitlijst",useCount:0})}
+    const q=normalized(memorySearch);return[...map.values()].filter(x=>!q||normalized(`${x.artist} ${x.title}`).includes(q)).sort((a,b)=>b.useCount-a.useCount||`${a.artist}${a.title}`.localeCompare(`${b.artist}${b.title}`)).slice(0,350);
+  },[songMemory,localSongs,charts,memorySearch]);
   const activePrograms=Array.from(new Set(programs.filter(p=>p.active!==false).map(p=>p.name).filter(Boolean))).sort();
 
   if(stationSlug==="all")return <div className="card"><div className="empty-live-state"><strong>Kies eerst één station</strong><span>Hitlijsten zijn station-specifiek.</span></div></div>;
@@ -270,20 +295,20 @@ export default function ChartsModule({stationSlug,stationName}:{stationSlug:stri
 
       <div className="chart-v11-main">
         {!selected?<div className="card"><div className="empty-live-state"><strong>Maak je eerste hitlijst</strong><span>Daarna verschijnt hier de volledige rangschikking.</span></div></div>:<>
-          <div className="card chart-header-card"><div className="chart-header-main"><div><span className="eyebrow">{selected.status.toUpperCase()}</span><h2>{selected.name}</h2><p>{selected.editionLabel} • Top {selected.size} • {selected.chartKind==="weekly"?"wekelijkse lijst":selected.chartKind==="annual"?"jaarlijst":"speciale lijst"} • geldig {selected.validFrom||"—"} t/m {selected.validTo||"—"}</p></div><div className="button-row"><button className="ghost" onClick={nextEdition}>Volgende editie</button><button className="ghost" onClick={duplicate}>Dupliceren</button><button className="primary soft" onClick={()=>patch({status:selected.status==="published"?"draft":"published"})}>{selected.status==="published"?"Terug naar concept":"Publiceren"}</button></div></div>
+          <div className="card chart-header-card"><div className="chart-header-main"><div><span className="eyebrow">{selected.status.toUpperCase()}</span><h2>{selected.name}</h2><p>{selected.editionLabel} • Top {selected.size} • {selected.chartKind==="weekly"?"wekelijkse lijst":selected.chartKind==="annual"?"jaarlijst":"speciale lijst"} • geldig {selected.validFrom||"—"} t/m {selected.validTo||"—"}</p></div><div className="button-row"><button className="ghost" onClick={exportCsv}>CSV</button><button className="ghost" onClick={exportPdf}>PDF</button><button className="ghost" onClick={nextEdition}>Volgende editie</button><button className="ghost" onClick={duplicate}>Dupliceren</button><button className="primary soft" onClick={()=>patch({status:selected.status==="published"?"draft":"published"})}>{selected.status==="published"?"Terug naar concept":"Publiceren"}</button></div></div>
             <div className="metric-grid compact chart-metrics"><div><span>Nieuwe</span><strong>{metrics.newCount}</strong></div><div><span>Grootste stijger</span><strong>{metrics.climber}</strong></div><div><span>Grootste daler</span><strong>{metrics.faller}</strong></div><div><span>Langst genoteerd</span><strong>{metrics.longest}</strong></div></div>
             {(selected.entries.length!==selected.size||duplicateCount>0)&&<div className="chart-validation"><strong>Controle</strong><span>{selected.entries.length}/{selected.size} posities gevuld{duplicateCount?` • ${duplicateCount} dubbele song(s)`:""}.</span></div>}
           </div>
 
-          <div className="card chart-settings-card"><div className="module-title-row"><div><h3>Editie-instellingen</h3><small>Programmering en geldigheidsperiode blijven aan deze editie gekoppeld.</small></div><div className="button-row"><button className="ghost" onClick={exportCsv}>CSV</button><button className="ghost" onClick={exportPdf}>PDF</button></div></div><div className="chart-settings-grid">
+          <details className="card chart-settings-card chart-settings-details"><summary><div><strong>Editie-instellingen</strong><small>Naam, type, programma, geldigheid en vorige editie</small></div><span>Open instellingen ▾</span></summary><div className="chart-settings-grid">
             <label className="field">Naam<input className="input" value={selected.name} onChange={e=>patch({name:e.target.value})}/></label><label className="field">Editie<input className="input" value={selected.editionLabel} onChange={e=>patch({editionLabel:e.target.value})}/></label>
             <label className="field">Type<select className="select" value={selected.chartKind||"weekly"} onChange={e=>{const kind=e.target.value as Hitlist["chartKind"];patch({chartKind:kind,recurrence:kind==="weekly"?"weekly":kind==="annual"?"annual":"none",editionWeek:kind==="weekly"?(selected.editionWeek||isoWeek(selected.publishDate||today())):null})}}><option value="weekly">Wekelijkse hitlijst</option><option value="annual">Jaarlijst / jaarlijks</option><option value="special">Special / eenmalig</option></select></label><label className="field">Reeks<input className="input" value={selected.seriesKey||seriesKeyFor(selected.name)} onChange={e=>patch({seriesKey:e.target.value})} placeholder="bv. super-50"/></label><label className="field">Top<select className="select" value={selected.size} onChange={e=>patch({size:Number(e.target.value)})}>{Array.from(new Set([...SIZES,selected.size])).sort((a,b)=>a-b).map(n=><option value={n} key={n}>Top {n}</option>)}</select></label>
             <label className="field">Programma<select className="select" value={selected.programName||""} onChange={e=>patch({programName:e.target.value})}><option value="">Niet gekoppeld</option>{activePrograms.map(n=><option key={n}>{n}</option>)}</select></label>
             <label className="field">Geldig van<input type="date" className="input" value={selected.validFrom||""} onChange={e=>patch({validFrom:e.target.value})}/></label><label className="field">Geldig t/m<input type="date" className="input" value={selected.validTo||""} onChange={e=>patch({validTo:e.target.value})}/></label>
             <label className="field">Publicatiedatum<input type="date" className="input" value={selected.publishDate||""} onChange={e=>patch({publishDate:e.target.value})}/></label><label className="field">Vorige editie<select className="select" value={selected.previousEditionId||""} onChange={e=>{const next={...selected,previousEditionId:e.target.value};const entries=historyFor(selected.entries,next);setCharts(recalculateHistories(charts.map(c=>c.id===selected.id?{...next,entries,updatedAt:new Date().toISOString()}:c)))}}><option value="">Geen</option>{orderedCharts.filter(c=>c.id!==selected.id).map(c=><option value={c.id} key={c.id}>{c.name} • {c.editionLabel}</option>)}</select></label>
-          </div>{selected.sourceLabel&&<div className="import-source-note">Bron: {selected.sourceLabel}</div>}<label className="field">Notities<textarea className="input textarea" value={selected.notes||""} onChange={e=>patch({notes:e.target.value})} placeholder="Uitzendafspraken, sponsor, voice-over, herhaling…"/></label></div>
+          </div>{selected.sourceLabel&&<div className="import-source-note">Bron: {selected.sourceLabel}</div>}<label className="field">Notities<textarea className="input textarea" value={selected.notes||""} onChange={e=>patch({notes:e.target.value})} placeholder="Uitzendafspraken, sponsor, voice-over, herhaling…"/></label></details>
 
-          <div className="card chart-source-card"><div className="module-title-row"><div><h3>Songs toevoegen</h3><small>Kies uit VLACORA Muziek, voeg handmatig toe of plak een lijst uit Excel.</small></div><button className="ghost" onClick={()=>setShowSources(!showSources)}>{showSources?"Verberg bronnen":"+ Songs toevoegen"}</button></div>
+          <div className="card chart-source-card"><div className="module-title-row"><div><h3>Werkblad & songs</h3><small>Werk zoals in Excel: voeg rijen toe, kies een onthouden song of plak/importeer een hele lijst.</small></div><div className="button-row"><button className="ghost" onClick={addBlankEntry}>＋ Lege rij</button><button className="ghost" onClick={()=>setShowBulk(!showBulk)}>⇧ Plak uit Excel</button><button className="primary soft" onClick={()=>setShowSources(!showSources)}>{showSources?"Bronnen sluiten":"＋ Songs"}</button></div></div>
             {showSources&&<div className="chart-source-grid">
               <div className="chart-source-box"><strong>VLACORA muziekbibliotheek</strong><select className="select" value={selectedLocalSong} onChange={e=>setSelectedLocalSong(e.target.value)}><option value="">Kies song…</option>{localSongs.slice().sort((a,b)=>`${a.artist}${a.title}`.localeCompare(`${b.artist}${b.title}`)).map(s=><option value={s.id} key={s.id}>{s.artist} — {s.title} • {s.musicFolder}</option>)}</select><button className="ghost" disabled={!selectedLocalSong} onClick={()=>{const s=localSongs.find(x=>x.id===selectedLocalSong);if(s)addEntry({id:s.id,artist:s.artist,title:s.title})}}>Toevoegen</button>{!localSongs.length&&<small>Open Muziek om eerst songs toe te voegen.</small>}</div>
               <div className="chart-source-box"><strong>Handmatig</strong><input className="input" value={manualArtist} onChange={e=>setManualArtist(e.target.value)} placeholder="Artiest"/><input className="input" value={manualTitle} onChange={e=>setManualTitle(e.target.value)} placeholder="Titel"/><button className="ghost" onClick={()=>{addEntry({artist:manualArtist,title:manualTitle});setManualArtist("");setManualTitle("")}}>Toevoegen</button></div>
@@ -292,8 +317,8 @@ export default function ChartsModule({stationSlug,stationName}:{stationSlug:stri
             {showBulk&&<div className="chart-bulk-box"><textarea className="input textarea" value={bulkText} onChange={e=>setBulkText(e.target.value)} placeholder={'ANOTR\tTalk To You\nBebe Rexha\tNew Religion\nHUGEL - Movin To The Sun'}/><div className="button-row"><button className="ghost" onClick={()=>setShowBulk(false)}>Annuleren</button><button className="primary" onClick={addBulk}>Lijst toevoegen</button></div></div>}
           </div>
 
-          <div className="card table-card chart-table-card"><div className="module-title-row"><div><h3>Rangschikking</h3><small>Sleep regels of gebruik de pijlen. Vorige positie, trend, weken en peak worden automatisch berekend.</small></div><strong>{selected.entries.length}/{selected.size}</strong></div>
-            {selected.entries.length===0?<div className="empty-live-state"><strong>Deze editie is leeg</strong><span>Voeg songs toe via de VLACORA-muziekbibliotheek, handmatig of via bulk plakken.</span></div>:<div className="chart-table-scroll"><table className="chart-editor-table"><thead><tr><th>#</th><th>Vorige</th><th>Artiest</th><th>Titel</th><th>Trend</th><th>Weken</th><th>Peak</th><th>Notitie</th><th></th></tr></thead><tbody>{selected.entries.map((e,i)=><tr key={e.id} draggable onDragStart={()=>setDragIndex(i)} onDragOver={ev=>ev.preventDefault()} onDrop={()=>{if(dragIndex!=null)move(dragIndex,i);setDragIndex(null)}} className={dragIndex===i?"dragging":""}><td className="chart-rank"><span className="drag-handle">⋮⋮</span><strong>{i+1}</strong></td><td>{e.previousPosition==null?<span className="new-chip">NEW</span>:e.previousPosition}</td><td><input className="chart-cell-input" value={e.artist} onChange={ev=>updateEntry(e.id,{artist:ev.target.value})}/></td><td><input className="chart-cell-input" value={e.title} onChange={ev=>updateEntry(e.id,{title:ev.target.value})}/></td><td className={trendText(e,i).startsWith("▲")?"positive":trendText(e,i).startsWith("▼")?"negative":""}>{trendText(e,i)}</td><td>{e.weeks}</td><td>{e.peak}</td><td><input className="chart-cell-input note" value={e.notes} onChange={ev=>updateEntry(e.id,{notes:ev.target.value})} placeholder="optioneel"/></td><td><div className="chart-row-actions"><button className="mini-btn" disabled={i===0} onClick={()=>move(i,i-1)}>↑</button><button className="mini-btn" disabled={i===selected.entries.length-1} onClick={()=>move(i,i+1)}>↓</button><button className="mini-btn danger" onClick={()=>removeEntry(e.id)}>×</button></div></td></tr>)}</tbody></table></div>}
+          <div className="card table-card chart-table-card"><div className="module-title-row chart-sheet-head"><div><h3>Hitlijstwerkblad</h3><small>Direct typen, slepen en kiezen uit songs die VLACORA uit vorige edities en de muziekbibliotheek onthoudt.</small></div><div className="chart-sheet-tools"><input className="input" value={memorySearch} onChange={e=>setMemorySearch(e.target.value)} placeholder="Filter onthouden songs…"/><strong>{selected.entries.length}/{selected.size}</strong></div></div>
+            {selected.entries.length===0?<div className="empty-live-state"><strong>Deze editie is leeg</strong><span>Klik op Lege rij, kies een onthouden song of importeer/plak rechtstreeks uit Excel.</span><button className="primary soft" onClick={addBlankEntry}>＋ Eerste rij</button></div>:<div className="chart-table-scroll chart-sheet-scroll"><table className="chart-editor-table chart-sheet"><thead><tr><th>#</th><th>Songgeheugen</th><th>Artiest</th><th>Titel</th><th>Vorige</th><th>Trend</th><th>Weken</th><th>Peak</th><th>Notitie</th><th></th></tr></thead><tbody>{selected.entries.map((e,i)=><tr key={e.id} draggable onDragStart={()=>setDragIndex(i)} onDragOver={ev=>ev.preventDefault()} onDrop={()=>{if(dragIndex!=null)move(dragIndex,i);setDragIndex(null)}} className={dragIndex===i?"dragging":""}><td className="chart-rank"><span className="drag-handle">⋮⋮</span><strong>{i+1}</strong></td><td><select className="chart-memory-select" value="" onChange={ev=>chooseMemory(e.id,ev.target.value)}><option value="">▾ Kies onthouden song…</option>{memoryOptions.map(s=><option key={s.key} value={s.key}>{s.artist} — {s.title}{s.useCount?` • ${s.useCount}×`:""}</option>)}</select></td><td><input className="chart-cell-input" value={e.artist} onChange={ev=>updateEntry(e.id,{artist:ev.target.value})} onBlur={()=>{if(e.artist&&e.title)void rememberSongs([{artist:e.artist,title:e.title,songId:e.songId}])}} placeholder="Artiest"/></td><td><input className="chart-cell-input" value={e.title} onChange={ev=>updateEntry(e.id,{title:ev.target.value})} onBlur={()=>{if(e.artist&&e.title)void rememberSongs([{artist:e.artist,title:e.title,songId:e.songId}])}} placeholder="Titel"/></td><td>{e.previousPosition==null?<span className="new-chip">NEW</span>:e.previousPosition}</td><td className={trendText(e,i).startsWith("▲")?"positive":trendText(e,i).startsWith("▼")?"negative":""}>{trendText(e,i)}</td><td>{e.weeks}</td><td>{e.peak}</td><td><input className="chart-cell-input note" value={e.notes} onChange={ev=>updateEntry(e.id,{notes:ev.target.value})} placeholder="optioneel"/></td><td><div className="chart-row-actions"><button className="mini-btn" disabled={i===0} onClick={()=>move(i,i-1)}>↑</button><button className="mini-btn" disabled={i===selected.entries.length-1} onClick={()=>move(i,i+1)}>↓</button><button className="mini-btn danger" onClick={()=>removeEntry(e.id)}>×</button></div></td></tr>)}</tbody></table><button className="chart-add-row" onClick={addBlankEntry} disabled={selected.entries.length>=selected.size}>＋ Nieuwe rij onderaan</button></div>}
           </div>
 
           <div className="chart-footer-actions"><button className="ghost" onClick={()=>patch({status:"archived"})}>Archiveer editie</button><button className="ghost danger-text" onClick={deleteChart}>Verwijder hitlijst</button></div>
