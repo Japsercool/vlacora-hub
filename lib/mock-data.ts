@@ -28,14 +28,9 @@ export const navItems = [
   ["meetings", "◎", "Muziekmeetings"],
   ["redactie", "✎", "Redactie"],
   ["verkeer", "⌁", "Verkeer"],
-  ["playlists", "≡", "Playlists"],
   ["hitlijsten", "↕", "Hitlijsten"],
   ["presentatie", "✎", "Presentatie"],
   ["social", "✦", "Social Studio"],
-  ["statistieken", "▥", "Luistercijfers"],
-  ["control", "⌁", "On-Air Control"],
-  ["playout", "▶", "Playout One"],
-  ["radio-api", "↔", "Radio API"],
   ["team", "♙", "Team"],
   ["beheer", "⚙", "Beheer"]
 ] as const;
@@ -59,14 +54,3 @@ export const chart = [
   ["7", "9", "Calvin Harris & Jazzy", "Satisfy", "▲ 2", "6", "6"]
 ];
 
-export const initialPlaylist = [
-  "TOTH - Versuz Radio",
-  "HUGEL - Movin' To The Sun",
-  "Sweeper - Only The Best Club Music",
-  "Bebe Rexha - New Religion",
-  "Commercial block",
-  "Topic & Becky G - Sorry Papi",
-  "Station ID",
-  "Joel Corry - Whisper",
-  "News 17:00"
-];

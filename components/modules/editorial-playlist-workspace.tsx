@@ -3,7 +3,7 @@
 import { useEffect,useMemo,useRef,useState } from "react";
 import type { EditorialItem,EditorialType } from "@/components/modules/editorial-module";
 import { loadEditorialTemplates,type EditorialTemplateRecord,type EditorialTemplateSlot } from "@/lib/supabase/editorial";
-import { broadPlaylistLabel,canonicalPlaylistType } from "@/lib/radio/item-types";
+import { broadPlaylistLabel,canonicalPlaylistType } from "@/lib/editorial-item-types";
 import { fetchTrafficSnapshot,loadTrafficSettings } from "@/lib/traffic/client";
 import { useCollaboration } from "@/components/collaboration/collaboration-provider";
 import { emitActivity } from "@/lib/collaboration/activity";
@@ -321,16 +321,16 @@ export default function EditorialPlaylistWorkspace(props:Props){
           id:uid(),
           time:next[next.length-1]?.time||hour,
           type:"talk",
-          title:`Ontbreekt: ${slot.categoryLabel||slot.label||"playlisttype"}`,
+          title:`Ontbreekt: ${slot.categoryLabel||slot.label||"draaiboektype"}`,
           duration:"00:00",
           presenterText:"",
-          notes:`Geen item uit echte playlist gevonden voor ${slot.categoryLabel||slot.categoryKey||"type"}`,
+          notes:`Geen item uit huidige draaiboek gevonden voor ${slot.categoryLabel||slot.categoryKey||"type"}`,
           source:"VLACORA"
         });
       }
     }
 
-    // Keep every Rotation One item that was not consumed in its original order.
+    // Keep every existing item that was not consumed in its original order.
     next.push(...playlist.filter(item=>unused.has(item.id)));
     setPlaylist(next);
     setTemplateMessage(`${template.name} toegepast • ${next.length} items`);
@@ -341,7 +341,7 @@ export default function EditorialPlaylistWorkspace(props:Props){
 
   return <div className={`topplaylist-shell ${live?"live-mode":""}`}>
     <div className="topplaylist-header">
-      <div className="topplaylist-brand"><span className="topplaylist-logo">♫</span><div><strong>{stationName} playlist</strong><small>Redactionele werkplek</small></div></div>
+      <div className="topplaylist-brand"><span className="topplaylist-logo">♫</span><div><strong>{stationName} draaiboek</strong><small>Redactionele werkplek</small></div></div>
       <div className="topplaylist-date-nav">
         <button className="square-nav" onClick={()=>setDate(shiftDate(date,-1))}>‹</button>
         <label className="topplaylist-date-input"><span>▣</span><input type="date" value={date} onChange={e=>setDate(e.target.value)}/></label>
@@ -377,7 +377,7 @@ export default function EditorialPlaylistWorkspace(props:Props){
         </div>
         <span className="template-picker-meta">{syncLabel||templateMessage}</span>
       </div>
-      <div className="button-row"><span className={`workspace-save-label ${saveLabel?.includes("mislukt")?"error":saveLabel?.startsWith("✓")?"saved":""}`}>{saveLabel||"—"}</span><button className="ghost" onClick={()=>void onSave?.()}>💾 Opslaan</button><button className="ghost" onClick={()=>void onPull()}>↻ Rotation One</button><span className="version-badge">rev {playlistVersion}</span></div>
+      <div className="button-row"><span className={`workspace-save-label ${saveLabel?.includes("mislukt")?"error":saveLabel?.startsWith("✓")?"saved":""}`}>{saveLabel||"—"}</span><button className="ghost" onClick={()=>void onSave?.()}>💾 Opslaan</button><button className="ghost" onClick={()=>void onPull()}>↻ Herladen</button><span className="version-badge">rev {playlistVersion}</span></div>
     </div>
 
     <div className="topplaylist-main">
@@ -387,7 +387,7 @@ export default function EditorialPlaylistWorkspace(props:Props){
           <span>{visible.length} zichtbaar · {hidden} verborgen</span><span>✎ Filters actief</span>
         </div>
         <div className="topplaylist-list">
-          {visible.length===0&&<div className="topplaylist-empty"><strong>Nog niets zichtbaar</strong><span>Haal de echte Rotation One-playlist op of pas een redactietemplate toe.</span></div>}
+          {visible.length===0&&<div className="topplaylist-empty"><strong>Nog niets zichtbaar</strong><span>Voeg redactie-items toe of pas een redactietemplate toe.</span></div>}
           {visible.map(item=>{
             const kind=itemKind(item);
             const isTalk=!["music","commercial","imaging","promo","link"].includes(kind);

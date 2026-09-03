@@ -27,15 +27,6 @@ insert into public.profiles(id,display_name)
 select id,coalesce(raw_user_meta_data->>'display_name',split_part(email,'@',1)) from auth.users
 on conflict(id) do nothing;
 
-create table if not exists public.radio_stations (
-  source text not null,
-  external_id text not null,
-  name text not null,
-  raw jsonb,
-  updated_at timestamptz not null default now(),
-  primary key(source,external_id)
-);
-
 create table if not exists public.station_programs (
   id text primary key,
   station_slug text not null,
@@ -53,22 +44,12 @@ create table if not exists public.station_programs (
 create index if not exists station_programs_station_day_idx on public.station_programs(station_slug,day,start_time);
 
 alter table public.profiles enable row level security;
-alter table public.radio_stations enable row level security;
 alter table public.station_programs enable row level security;
 
 drop policy if exists "team can read profiles" on public.profiles;
 create policy "team can read profiles" on public.profiles for select to authenticated using(true);
 drop policy if exists "users can update own profile" on public.profiles;
 create policy "users can update own profile" on public.profiles for update to authenticated using(auth.uid()=id) with check(auth.uid()=id);
-
-drop policy if exists "team can read radio stations" on public.radio_stations;
-create policy "team can read radio stations" on public.radio_stations for select to authenticated using(true);
-drop policy if exists "team can insert radio stations" on public.radio_stations;
-create policy "team can insert radio stations" on public.radio_stations for insert to authenticated with check(true);
-drop policy if exists "team can update radio stations" on public.radio_stations;
-create policy "team can update radio stations" on public.radio_stations for update to authenticated using(true) with check(true);
-drop policy if exists "team can delete radio stations" on public.radio_stations;
-create policy "team can delete radio stations" on public.radio_stations for delete to authenticated using(true);
 
 drop policy if exists "team can read programming" on public.station_programs;
 create policy "team can read programming" on public.station_programs for select to authenticated using(true);

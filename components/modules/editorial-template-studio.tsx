@@ -2,7 +2,7 @@
 
 import { useEffect,useMemo,useState } from "react";
 import type { EditorialItem } from "@/components/modules/editorial-module";
-import { canonicalPlaylistType } from "@/lib/radio/item-types";
+import { canonicalPlaylistType } from "@/lib/editorial-item-types";
 import { deleteEditorialTemplate,loadEditorialTemplates,saveEditorialTemplate,type EditorialTemplateAssignment,type EditorialTemplateRecord,type EditorialTemplateSlot } from "@/lib/supabase/editorial";
 import { isSupabaseBrowserConfigured } from "@/lib/supabase/client";
 
@@ -66,7 +66,7 @@ const defaultSequence:EditorialTemplateSlot[]=[
   {id:uid(),type:"number",label:"Nummer",durationSec:0,content:"",required:false,permanentMessage:""}
 ];
 
-function labelFor(type:EditorialTemplateSlot["type"]){return type==="category"?"Playlistcategorie":slotButtons.find(x=>x.type===type)?.label||type}
+function labelFor(type:EditorialTemplateSlot["type"]){return type==="category"?"Draaiboekcategorie":slotButtons.find(x=>x.type===type)?.label||type}
 function chipClass(type:EditorialTemplateSlot["type"]){return type==="category"?"category":type==="number"?"number":type==="commercial"?"commercial":type==="link"?"link":type==="tease"?"tease":"talk"}
 function isTalk(type:EditorialTemplateSlot["type"]){return["talk","required_talk","browse","tease","traffic","weather","news"].includes(type)}
 function blank(stationSlug:string):EditorialTemplateRecord{
@@ -201,11 +201,11 @@ export default function EditorialTemplateStudio({stationSlug,playlist}:{stationS
 
             <div className="real-category-section">
               <div className="real-category-head">
-                <div><strong>Types uit de echte playlist</strong><span>Alleen algemene itemtypes die werkelijk in het geladen Rotation One-uur voorkomen.</span></div>
+                <div><strong>Types uit de huidige draaiboek</strong><span>Alleen algemene itemtypes die werkelijk in het huidige draaiboek voorkomen.</span></div>
                 <span className="real-category-count">{playlistCategories.length} gevonden</span>
               </div>
               {playlistCategories.length===0?
-                <div className="real-category-empty">Haal eerst op het tabblad <b>Playlist</b> een echte Rotation One-playlist op. Daarna verschijnen hier automatisch knoppen zoals Muziek, Jingle / imaging en Advertentie.</div>:
+                <div className="real-category-empty">Voeg eerst items toe aan het draaiboek. Daarna verschijnen hier automatisch de beschikbare itemtypes.</div>:
                 <div className="real-category-buttons">{playlistCategories.map(cat=><button key={cat.key} className="real-category-button" title={`${cat.count} item(s)${cat.examples.length?` • bv. ${cat.examples.join(", ")}`:""}`} onClick={()=>addCategorySlot(cat)}>＋ <b>{cat.label}</b><span>{cat.count}</span></button>)}</div>}
             </div>
 
@@ -223,7 +223,7 @@ export default function EditorialTemplateStudio({stationSlug,playlist}:{stationS
                 <input className="slot-name" value={slot.label} onChange={e=>patchSlot(slot.id,{label:e.target.value})}/>
                 <label className="slot-sec">◷ <input type="number" min="0" value={slot.durationSec} onChange={e=>patchSlot(slot.id,{durationSec:Number(e.target.value)})}/> sec</label>
                 <button className={`content-button ${slot.content?"filled":""}`} onClick={()=>patchSlot(slot.id,{content:slot.content||" "})}>✎ Inhoud{slot.content?" ✓":""}</button>
-              </>:<span className="slot-spacer">{slot.type==="category"?<small className="category-source-note">echte playlistcategorie</small>:null}</span>}
+              </>:<span className="slot-spacer">{slot.type==="category"?<small className="category-source-note">huidige draaiboekcategorie</small>:null}</span>}
               <button className="row-icon" onClick={()=>moveBy(slot.id,-1)}>⌃</button><button className="row-icon" onClick={()=>moveBy(slot.id,1)}>⌄</button><button className="row-icon danger" onClick={()=>patch({sequence:active.sequence.filter(x=>x.id!==slot.id)})}>×</button>
               {isTalk(slot.type)&&<div className="slot-detail-panel">
                 <select value={slot.permanentMessage} onChange={e=>patchSlot(slot.id,{permanentMessage:e.target.value})}><option value="">Geen permanent bericht gekoppeld</option><option value="station-default">Station standaardbericht</option><option value="program-default">Programma standaardbericht</option></select>
@@ -235,7 +235,7 @@ export default function EditorialTemplateStudio({stationSlug,playlist}:{stationS
 
           <div className="template-assignment-section">
             <div className="section-head"><div><h3>Toewijzingen</h3><p>Laat hetzelfde template automatisch gelden voor één of meerdere programma-uren.</p></div><button className="ghost" onClick={addAssignment}>＋ Toewijzing</button></div>
-            {assignments.length===0&&<div className="empty-live-state compact"><strong>Nog geen toewijzing</strong><span>Het template wordt pas automatisch aangeboden in de playlist wanneer dag en uur overeenkomen.</span></div>}
+            {assignments.length===0&&<div className="empty-live-state compact"><strong>Nog geen toewijzing</strong><span>Het template wordt pas automatisch aangeboden in het draaiboek wanneer dag en uur overeenkomen.</span></div>}
             {assignments.map(a=><div className="template-assignment-row" key={a.id}><input value={a.program} onChange={e=>patchAssignment(a.id,{program:e.target.value})} placeholder="Programma"/><select value={a.weekday} onChange={e=>patchAssignment(a.id,{weekday:Number(e.target.value)})}>{weekdays.map((d,i)=><option value={i} key={d}>{d}</option>)}</select><label>uur <input type="number" min="0" max="23" value={a.hour} onChange={e=>patchAssignment(a.id,{hour:Number(e.target.value)})}/></label><button onClick={()=>patch({assignments:active.assignments.filter(x=>x.id!==a.id)})}>×</button></div>)}
           </div>
 

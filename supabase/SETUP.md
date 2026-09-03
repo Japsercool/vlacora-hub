@@ -1,17 +1,20 @@
-# VLACORA real login - quick setup
+# VLACORA HUB 0.21.0 — Supabase setup
 
-1. Create a Supabase project.
-2. In **SQL Editor**, run `supabase/migrations/010_vlacora_hub_core.sql`.
-3. In **Authentication -> Users**, create the VLACORA team accounts.
-4. Connect the project globally to VLACORA using **one** of these options:
-   - Vercel Environment Variables: `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`; or
-   - paste those same public values into `lib/supabase/public-config.ts` before pushing to GitHub.
-5. Redeploy/open `/login` and sign in.
+VLACORA HUB uses Supabase as its current backend. The persistent data store is PostgreSQL.
 
-Once one global Supabase project is configured, `/hub/*` requires a real Supabase session.
+1. Create one Supabase project for VLACORA HUB.
+2. In **SQL Editor**, run the SQL files in `supabase/migrations/` in numeric order.
+3. For an existing 0.20.x database, at minimum apply every migration you have not yet run and finish with `029_standalone_stations.sql`.
+4. Create team accounts in **Authentication → Users**.
+5. Configure `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` in Vercel (or your local `.env`).
+6. Redeploy and sign in at `/login`.
 
-The Project URL and publishable key are public client configuration. Never paste a service-role key into public config.
+## Standalone stations
 
+Migration `029_standalone_stations.sql` creates `hub_stations`. All authenticated users may read the station registry; only users whose profile role is `superadmin` may add, change or delete stations.
 
-## Hitlijsten (0.11.0)
-Voer na de core migration ook `migrations/011_hitlists.sql` uit om hitlijsten voor het hele team te synchroniseren.
+## Future PostgreSQL move
+
+In **Alle zenders → Beheer → Database-backend**, a superadmin can already store the non-secret target metadata for a future PostgreSQL/self-hosted Supabase migration. Never store a PostgreSQL password in public configuration or browser storage. A future connection URL belongs in a server-side secret such as `VLACORA_POSTGRES_URL`.
+
+The Project URL and publishable key are public client configuration. Never expose a service-role key.

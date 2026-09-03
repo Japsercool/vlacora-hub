@@ -3,7 +3,7 @@
 import { useCallback,useEffect,useMemo,useState } from "react";
 import { createClient,isSupabaseBrowserConfigured } from "@/lib/supabase/client";
 import { useCollaboration } from "@/components/collaboration/collaboration-provider";
-import { readHubStations } from "@/lib/radio/hub-stations";
+import { readHubStations } from "@/lib/hub-stations";
 import { emitActivity } from "@/lib/collaboration/activity";
 
 type Person={id:string;name:string;email:string;role:string;jobTitle:string;initials:string};

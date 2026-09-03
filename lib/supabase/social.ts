@@ -44,9 +44,21 @@ export type SocialPost={
   approved_at?:string|null;
   approved_by?:string|null;
   changes_requested_at?:string|null;
+  platforms?:string[];
+  campaign?:string;
+  content_pillar?:string;
+  objective?:string;
+  assigned_to?:string|null;
+  reviewer_id?:string|null;
+  due_at?:string|null;
+  publication_url?:string;
+  internal_notes?:string;
+  checklist?:Record<string,boolean>;
   created_at?:string;
   updated_at?:string;
 };
+
+export type SocialPerson={id:string;name:string;email:string};
 
 export type SocialCopyBlock={
   id:string;
@@ -149,6 +161,14 @@ export async function deleteSocialTemplate(id:string){
   const{error}=await createClient().from("hub_social_templates").delete().eq("id",id);if(error)throw error;
 }
 
+
+export async function loadSocialPeople():Promise<SocialPerson[]>{
+  if(!isSupabaseBrowserConfigured())return[];
+  const{data,error}=await createClient().from("profiles").select("id,display_name,email").order("display_name");
+  if(error)throw error;
+  return(data||[]).map((x:any)=>({id:String(x.id),name:String(x.display_name||x.email||"Teamlid"),email:String(x.email||"")}));
+}
+
 export async function loadSocialPosts(stationSlug:string):Promise<SocialPost[]>{
   if(!isSupabaseBrowserConfigured())return[];
   const{data,error}=await createClient().from("hub_social_posts").select("*").eq("station_slug",stationSlug).order("scheduled_at",{ascending:true,nullsFirst:false}).order("created_at",{ascending:false});
@@ -172,6 +192,16 @@ export async function saveSocialPost(post:SocialPost):Promise<SocialPost>{
     approved_at:post.approved_at||null,
     approved_by:post.approved_by||null,
     changes_requested_at:post.changes_requested_at||null,
+    platforms:post.platforms||[],
+    campaign:post.campaign||"",
+    content_pillar:post.content_pillar||"",
+    objective:post.objective||"",
+    assigned_to:post.assigned_to||null,
+    reviewer_id:post.reviewer_id||null,
+    due_at:post.due_at||null,
+    publication_url:post.publication_url||"",
+    internal_notes:post.internal_notes||"",
+    checklist:post.checklist||{copy:false,visual:false,rights:false,links:false},
     updated_by:id,
     updated_at:new Date().toISOString()
   };

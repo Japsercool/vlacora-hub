@@ -54,7 +54,7 @@ export default function TrafficModule({stationSlug}:{stationSlug:string}){
 
   return <div className="traffic-page">
     <div className="page-intro traffic-intro">
-      <div><span className="eyebrow">VLAAMS VERKEERSCENTRUM • DATEX II V3</span><h2>Live verkeer</h2><p>Actuele files, incidenten en wegenwerken. VLACORA haalt de feed alleen op wanneer iemand expliciet live verkeersinfo vraagt.</p></div>
+      <div><span className="eyebrow">VLAAMS VERKEERSCENTRUM • DATEX II V3</span><h2>Live verkeer</h2><p>Actuele files, incidenten en wegenwerken. VLACORA gebruikt eerst het officiële menselijke verkeersoverzicht en DATEX alleen als fallback. Ophalen gebeurt uitsluitend op aanvraag.</p></div>
       <div className="button-row"><button className="ghost" disabled={saving} onClick={()=>void save()}>{saving?"Opslaan…":"Instellingen opslaan"}</button><button className="primary" disabled={busy} onClick={()=>void refresh(false)}>↻ {busy?"Laden…":"Vernieuw live"}</button></div>
     </div>
     {notice&&<div className="inline-notice standalone">{notice}</div>}

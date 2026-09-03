@@ -66,7 +66,6 @@ create table social_drafts (
 create table music_folders (
   id uuid primary key default gen_random_uuid(),
   station_id uuid not null references stations(id) on delete cascade,
-  rotation_one_folder_id text,
   name text not null,
   description text,
   sort_order integer not null default 0,

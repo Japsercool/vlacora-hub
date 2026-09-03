@@ -107,7 +107,7 @@ export function NotificationsPage({stationSlug}:{stationSlug:string}){
   const [filter,setFilter]=useState<"all"|"unread"|"required">("all");
   const list=useMemo(()=>c.notifications.filter(n=>filter==="unread"?!n.seenAt:filter==="required"?n.requiresAck&&!n.acknowledgedAt:true),[c.notifications,filter]);
   return <div>
-    <div className="page-intro"><div><h2>Meldingen</h2><p>Eén centrale inbox voor officiële communicatie, kritieke incidenten, mentions en later Rotation/Playout-waarschuwingen.</p><span className={`cloud-state ${c.configured?"online":"local"}`}>{c.configured?"Realtime Teamcloud":"Lokale setupmodus"}</span></div><button className="ghost" onClick={c.markAllSeen}>Alles gezien</button></div>
+    <div className="page-intro"><div><h2>Meldingen</h2><p>Eén centrale inbox voor officiële communicatie, kritieke incidenten, mentions en belangrijke teamwaarschuwingen.</p><span className={`cloud-state ${c.configured?"online":"local"}`}>{c.configured?"Realtime Teamcloud":"Lokale setupmodus"}</span></div><button className="ghost" onClick={c.markAllSeen}>Alles gezien</button></div>
     <div className="metric-grid notification-metrics">
       <div className="card"><span className="metric-label">Ongelezen</span><strong className="metric">{c.unreadCount}</strong><span className="muted">persoonlijk</span></div>
       <div className="card"><span className="metric-label">Moet ik zien</span><strong className="metric">{c.requiredCount}</strong><span className="muted">bevestiging verplicht</span></div>

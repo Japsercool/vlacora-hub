@@ -1,7 +1,0 @@
-VLACORA HUB 0.14.3 static validation
-[PASS] version 0.14.3
-[PASS] no-store
-[PASS] mapping refresh
-[PASS] 401 hint
-[PASS] playout central sync
-[PASS] shoutcast loading

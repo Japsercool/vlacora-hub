@@ -1,8 +1,0 @@
-VLACORA HUB 0.19.1 validation
-[PASS] package.json version bumped to 0.19.1
-[PASS] playlist styling overridden toward pre-0.19 layout
-[PASS] add-talk plus button alignment improved
-[PASS] quick actions added: Verkochte actie / Wedstrijd
-[PASS] template studio supports sold-action talk shortcuts
-[INFO] no database changes
-[INFO] no API changes

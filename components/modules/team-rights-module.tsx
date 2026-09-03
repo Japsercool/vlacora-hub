@@ -2,7 +2,7 @@
 
 import { useCallback,useEffect,useMemo,useState } from "react";
 import { createClient,isSupabaseBrowserConfigured } from "@/lib/supabase/client";
-import { HUB_STATIONS_EVENT,readHubStations,type HubStation } from "@/lib/radio/hub-stations";
+import { HUB_STATIONS_EVENT,hydrateHubStations,readHubStations,type HubStation } from "@/lib/hub-stations";
 import {
   PermissionKey,PermissionLevel,PermissionMap,permissionLabels,permissionLevels,rolePresets
 } from "@/lib/permissions";
@@ -40,7 +40,7 @@ export default function TeamRightsModule({stationSlug}:{stationSlug:string}){
   const canAdmin=currentRole==="superadmin";
 
   const flash=(x:string)=>{setNotice(x);setTimeout(()=>setNotice(""),3200)};
-  const refreshStations=useCallback(()=>setStations(readHubStations().filter(s=>s.slug!=="all")),[]);
+  const refreshStations=useCallback(()=>{setStations(readHubStations().filter(s=>s.slug!=="all"));void hydrateHubStations().then(()=>setStations(readHubStations().filter(s=>s.slug!=="all")))},[]);
   useEffect(()=>{refreshStations();window.addEventListener(HUB_STATIONS_EVENT,refreshStations as EventListener);return()=>window.removeEventListener(HUB_STATIONS_EVENT,refreshStations as EventListener)},[refreshStations]);
 
   const load=useCallback(async()=>{

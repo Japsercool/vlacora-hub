@@ -7,13 +7,11 @@ import {
   type MusicMeeting,type MusicMeetingReview,type MusicMeetingTrack
 } from "@/lib/supabase/music-meetings";
 import { createClient,isSupabaseBrowserConfigured } from "@/lib/supabase/client";
-import { pathFor,pathForFolder,radioRead,readIntegration,readMappings } from "@/lib/radio/client-config";
-import { useHubStation } from "@/lib/radio/hub-stations";
+import type { MusicSong } from "@/components/modules/music-library-module";
+import { useHubStation } from "@/lib/hub-stations";
 import { emitActivity } from "@/lib/collaboration/activity";
 
-type LiveFolder={id:string;name:string;count?:number};
-type LiveSong={id:string;artist:string;title:string;category?:string;year?:string;audioUrl?:string};
-type AddMode="rotation"|"manual";
+type AddMode="library"|"manual";
 const decisions=["A-hit","B-hit","C-hit","Testen","Later","Afwijzen"];
 
 function localInput(iso:string|null){
@@ -37,21 +35,17 @@ export default function MusicMeetingsModule({stationSlug}:{stationSlug:string}){
   const[busy,setBusy]=useState(false);
   const[showNewMeeting,setShowNewMeeting]=useState(false);
   const[showAdd,setShowAdd]=useState(false);
-  const[addMode,setAddMode]=useState<AddMode>("rotation");
+  const[addMode,setAddMode]=useState<AddMode>("library");
   const[newMeeting,setNewMeeting]=useState({title:"Nieuwe muziek",start:"",end:"",notes:""});
   const[manual,setManual]=useState({artist:"",title:"",category:"",audioUrl:""});
-  const[folders,setFolders]=useState<LiveFolder[]>([]);
-  const[selectedFolder,setSelectedFolder]=useState("");
-  const[liveSongs,setLiveSongs]=useState<LiveSong[]>([]);
-  const[rotationBusy,setRotationBusy]=useState(false);
   const[score,setScore]=useState("");
   const[decision,setDecision]=useState("");
   const[note,setNote]=useState("");
 
   const meeting=meetings.find(m=>m.id===selectedMeetingId)||null;
   const track=tracks.find(t=>t.id===selectedTrackId)||tracks[0]||null;
-  const mapping=readMappings()[stationSlug];
-  const rotationId=mapping?.rotationId||station.rotationId||"";
+  const[librarySongs,setLibrarySongs]=useState<MusicSong[]>([]);
+  useEffect(()=>{try{const raw=localStorage.getItem(`vlacora:${stationSlug}:music:catalog`);setLibrarySongs(raw?JSON.parse(raw):[])}catch{setLibrarySongs([])}},[stationSlug,showAdd]);
 
   function flash(message:string){setNotice(message);window.setTimeout(()=>setNotice(""),3000)}
 
@@ -119,28 +113,10 @@ export default function MusicMeetingsModule({stationSlug}:{stationSlug:string}){
     try{await deleteMusicMeeting(meeting.id);setSelectedMeetingId("");setTracks([]);await loadMeetings();flash("Meeting verwijderd")}catch(e){flash(e instanceof Error?e.message:"Meeting verwijderen mislukt")}
   }
 
-  async function loadFolders(){
-    const cfg=readIntegration("rotation");if(!cfg?.host)return flash("Rotation One is niet ingesteld.");if(!rotationId)return flash("Dit station is nog niet aan Rotation One gekoppeld.");if(!cfg.musicFoldersPath)return flash("Muziekmappen endpoint ontbreekt.");
-    setRotationBusy(true);
-    try{
-      const data=await radioRead("rotation",pathFor(cfg.musicFoldersPath,rotationId),"folders");const rows=data.folders||[];setFolders(rows);
-      if(rows[0]){setSelectedFolder(rows[0].id);await loadFolderSongs(rows[0].id)}
-      flash(`${rows.length} Rotation One-mappen geladen`);
-    }catch(e){flash(e instanceof Error?e.message:"Mappen laden mislukt")}
-    finally{setRotationBusy(false)}
-  }
-  async function loadFolderSongs(folderId:string){
-    const cfg=readIntegration("rotation");if(!cfg?.musicFolderItemsPath||!rotationId)return;
-    setRotationBusy(true);
-    try{const data=await radioRead("rotation",pathForFolder(cfg.musicFolderItemsPath,rotationId,folderId),"songs");setLiveSongs(data.songs||[])}
-    catch(e){setLiveSongs([]);flash(e instanceof Error?e.message:"Songs laden mislukt")}
-    finally{setRotationBusy(false)}
-  }
-  async function addRotationSong(song:LiveSong){
+  async function addLibrarySong(song:MusicSong){
     if(!meeting)return flash("Kies eerst een meeting.");
-    const folder=folders.find(f=>f.id===selectedFolder);
     try{
-      const added=await addMusicMeetingTracks(meeting.id,[{source:"rotation",sourceSongId:song.id,artist:song.artist,title:song.title,category:song.category||"",rotationFolder:folder?.name||"",audioUrl:song.audioUrl||""}]);
+      const added=await addMusicMeetingTracks(meeting.id,[{source:"manual",sourceSongId:song.id,artist:song.artist,title:song.title,category:song.category,musicFolder:song.musicFolder}]);
       setTracks(rows=>[...rows,...added]);setSelectedTrackId(added[0]?.id||selectedTrackId);flash(`${song.artist} – ${song.title} toegevoegd`);
     }catch(e){flash(e instanceof Error?e.message:"Song toevoegen mislukt")}
   }
@@ -200,12 +176,11 @@ export default function MusicMeetingsModule({stationSlug}:{stationSlug:string}){
 
     {!meeting?<div className="card empty-live-state"><strong>Nog geen meeting geselecteerd</strong><span>Kies hierboven een bestaande meeting of maak er één aan.</span></div>:<>
       {showAdd&&<div className="card meeting-add-songs">
-        <div className="section-head"><div><h3>Songs toevoegen aan {meeting.title}</h3><p>Handmatig of rechtstreeks uit de echte Rotation One-muziekmappen.</p></div><button className="mini-btn" onClick={()=>setShowAdd(false)}>×</button></div>
-        <div className="source-tabs"><button className={addMode==="rotation"?"active":""} onClick={()=>setAddMode("rotation")}>Rotation One</button><button className={addMode==="manual"?"active":""} onClick={()=>setAddMode("manual")}>Handmatig</button></div>
+        <div className="section-head"><div><h3>Songs toevoegen aan {meeting.title}</h3><p>Uit de VLACORA-muziekbibliotheek of handmatig.</p></div><button className="mini-btn" onClick={()=>setShowAdd(false)}>×</button></div>
+        <div className="source-tabs"><button className={addMode==="library"?"active":""} onClick={()=>setAddMode("library")}>VLACORA Muziek</button><button className={addMode==="manual"?"active":""} onClick={()=>setAddMode("manual")}>Handmatig</button></div>
         {addMode==="manual"?<div className="meeting-manual-add"><label className="field">Artiest<input className="input" value={manual.artist} onChange={e=>setManual({...manual,artist:e.target.value})}/></label><label className="field">Titel<input className="input" value={manual.title} onChange={e=>setManual({...manual,title:e.target.value})}/></label><label className="field">Categorie<input className="input" value={manual.category} onChange={e=>setManual({...manual,category:e.target.value})}/></label><label className="field">Preview/audio URL<input className="input" value={manual.audioUrl} onChange={e=>setManual({...manual,audioUrl:e.target.value})} placeholder="optioneel"/></label><button className="primary" onClick={()=>void addManualSong()}>Song toevoegen</button></div>
         :<div className="meeting-rotation-add">
-          <div className="meeting-folder-picker"><label className="field">Rotation One-map<select className="select" value={selectedFolder} onChange={e=>{setSelectedFolder(e.target.value);void loadFolderSongs(e.target.value)}}><option value="">Kies map…</option>{folders.map(f=><option key={f.id} value={f.id}>{f.name}{f.count!=null?` • ${f.count}`:""}</option>)}</select></label><button className="ghost" disabled={rotationBusy} onClick={()=>void loadFolders()}>↻ Mappen ophalen</button></div>
-          {!folders.length?<div className="empty-live-state compact"><strong>Haal eerst de Rotation One-mappen op</strong><span>Daarna kun je per song met één klik “Toevoegen” kiezen.</span></div>:<div className="meeting-song-picker">{liveSongs.map(song=><div key={song.id} className="meeting-song-option"><div><strong>{song.artist||"—"}</strong><span>{song.title}</span><small>{song.category||folders.find(f=>f.id===selectedFolder)?.name||""}</small></div><button className="mini-btn" onClick={()=>void addRotationSong(song)}>＋ Toevoegen</button></div>)}</div>}
+          {!librarySongs.length?<div className="empty-live-state compact"><strong>Je muziekbibliotheek is leeg</strong><span>Voeg eerst songs toe via VLACORA Muziek, of gebruik Handmatig.</span></div>:<div className="meeting-song-picker">{librarySongs.map(song=><div key={song.id} className="meeting-song-option"><div><strong>{song.artist||"—"}</strong><span>{song.title}</span><small>{song.musicFolder||song.category||"VLACORA"}</small></div><button className="mini-btn" onClick={()=>void addLibrarySong(song)}>＋ Toevoegen</button></div>)}</div>}
         </div>}
       </div>}
 
@@ -221,12 +196,12 @@ export default function MusicMeetingsModule({stationSlug}:{stationSlug:string}){
         </aside>
 
         <main className="card meeting-main-v182">
-          {!track?<div className="empty-live-state"><strong>Voeg een song toe</strong><span>Je meeting is klaar. Voeg nu songs toe uit Rotation One of handmatig.</span></div>:<>
-            <div className="section-head"><div><span className="eyebrow">{String(tracks.findIndex(x=>x.id===track.id)+1).padStart(2,"0")} / {tracks.length}</span><h2>{track.artist} – {track.title}</h2><p>{track.rotationFolder||track.category||track.source}</p></div><div className="button-row">{track.audioUrl&&<button className="primary soft" onClick={()=>window.open(track.audioUrl,"_blank")}>▶ Beluister</button>}<button className="mini-btn" onClick={()=>void moveTrack(-1)}>↑</button><button className="mini-btn" onClick={()=>void moveTrack(1)}>↓</button></div></div>
+          {!track?<div className="empty-live-state"><strong>Voeg een song toe</strong><span>Je meeting is klaar. Voeg nu songs toe uit VLACORA Muziek of handmatig.</span></div>:<>
+            <div className="section-head"><div><span className="eyebrow">{String(tracks.findIndex(x=>x.id===track.id)+1).padStart(2,"0")} / {tracks.length}</span><h2>{track.artist} – {track.title}</h2><p>{track.musicFolder||track.category||track.source}</p></div><div className="button-row">{track.audioUrl&&<button className="primary soft" onClick={()=>window.open(track.audioUrl,"_blank")}>▶ Beluister</button>}<button className="mini-btn" onClick={()=>void moveTrack(-1)}>↑</button><button className="mini-btn" onClick={()=>void moveTrack(1)}>↓</button></div></div>
             <div className="meeting-score-row"><div className="score-big">{teamAverage==null?"—":teamAverage.toFixed(1).replace(".",",")}<small>/10 teamgemiddelde</small></div><label className="field meeting-own-score">Mijn score<input className="input" type="number" min="0" max="10" step=".1" value={score} onChange={e=>setScore(e.target.value)} placeholder="0–10"/></label></div>
             <div className="decision-grid">{decisions.map((x,i)=><button className={`decision d${i} ${decision===x?"selected-decision":""}`} onClick={()=>setDecision(x)} key={x}>{x}</button>)}</div>
             <label className="field">Notitie<textarea className="input textarea" value={note} onChange={e=>setNote(e.target.value)} placeholder="Waarom wel/niet? Daytime fit, energie, doelgroep, rotatie…"/></label>
-            <div className="meeting-review-meta"><span>{reviews.length} beoordeling{reviews.length===1?"":"en"} voor deze song</span><span>{track.source==="rotation"?`Rotation One • ${track.sourceSongId||"song"}`:"Handmatig toegevoegd"}</span></div>
+            <div className="meeting-review-meta"><span>{reviews.length} beoordeling{reviews.length===1?"":"en"} voor deze song</span><span>{track.sourceSongId?"Uit VLACORA Muziek":"Handmatig toegevoegd"}</span></div>
             <div className="button-row meeting-save-row"><button className="ghost danger-text" onClick={()=>void removeTrack()}>Verwijder uit meeting</button><button className="primary" onClick={()=>void saveReviewAndNext()}>Beoordeling opslaan & volgende →</button></div>
           </>}
         </main>

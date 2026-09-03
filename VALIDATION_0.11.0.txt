@@ -1,9 +1,0 @@
-VLACORA HUB 0.11.0 validation
-
-- New ChartsModule parser validation: OK
-- hub-app parser validation after module replacement: OK
-- Supabase hub-data parser validation: OK
-- Radio demo Top 50 block removed from hub-app: OK
-- Hitlists start empty per station (no fixed demo chart): OK
-- Supabase migration 011_hitlists.sql included: OK
-- Full npm/Next production build was not executed locally because node_modules are not bundled; Vercel installs dependencies during deploy.

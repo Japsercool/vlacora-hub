@@ -3,19 +3,17 @@
 import { useEffect,useMemo,useState } from "react";
 import { useCollaboration } from "@/components/collaboration/collaboration-provider";
 import { loadSharedHitlists,loadSharedProgramming } from "@/lib/supabase/hub-data";
-import { hydrateSharedIntegrationSettings } from "@/lib/supabase/settings";
-import { pathFor,radioRead,readIntegration,readMappings } from "@/lib/radio/client-config";
 import {
   addSocialReviewEvent,deleteSocialAsset,deleteSocialCopyBlock,deleteSocialPost,deleteSocialTemplate,
-  loadBrandKit,loadSocialAssets,loadSocialCopyBlocks,loadSocialPosts,loadSocialReviewEvents,loadSocialTemplates,
+  loadBrandKit,loadSocialAssets,loadSocialCopyBlocks,loadSocialPeople,loadSocialPosts,loadSocialReviewEvents,loadSocialTemplates,
   saveBrandKit,saveSocialCopyBlock,saveSocialPost,saveSocialTemplate,uploadSocialAsset,
-  type BrandKit,type SocialAsset,type SocialCopyBlock,type SocialPost,type SocialReviewEvent,type SocialTemplate
+  type BrandKit,type SocialAsset,type SocialCopyBlock,type SocialPerson,type SocialPost,type SocialReviewEvent,type SocialTemplate
 } from "@/lib/supabase/social";
 
 type Tab="studio"|"brand"|"templates"|"calendar"|"copy"|"assets";
 type FormatKey="1:1"|"4:5"|"9:16"|"16:9";
 type Context={
-  station:string;artist:string;title:string;program:string;presenter:string;listeners:string;
+  station:string;artist:string;title:string;program:string;presenter:string;
   chartPosition:string;previousPosition:string;nextShow:string;date:string;time:string;cta:string;
 };
 type VisualConfig={
@@ -32,7 +30,7 @@ const formats:Record<FormatKey,{w:number;h:number;label:string}>={
   "9:16":{w:1080,h:1920,label:"Story 9:16"},
   "16:9":{w:1600,h:900,label:"Banner 16:9"}
 };
-const variables=["{station}","{artist}","{title}","{program}","{presenter}","{listeners}","{chart_position}","{previous_position}","{next_show}","{date}","{time}","{cta}"];
+const variables=["{station}","{artist}","{title}","{program}","{presenter}","{chart_position}","{previous_position}","{next_show}","{date}","{time}","{cta}"];
 
 const presetTemplates:Array<{name:string;contentType:string;format:FormatKey;caption:string;config:VisualConfig}>= [
   {name:"Now Playing",contentType:"nowplaying",format:"4:5",caption:"🎵 Nu op {station}: {artist} — {title}. {cta} #nowplaying",config:{label:"NOW PLAYING",headline:"{artist}",subline:"{title}",footer:"{station} • {time}",backgroundImage:"",artworkImage:"",showArtwork:true,artworkShape:"circle",align:"left",overlay:28,accentBar:true}},
@@ -45,7 +43,7 @@ const presetTemplates:Array<{name:string;contentType:string;format:FormatKey;cap
 
 const defaultContext=(stationSlug:string):Context=>({
   station:stationSlug==="all"?"VLACORA":stationSlug,artist:"Joel Corry",title:"Whisper",program:"",presenter:"",
-  listeners:"",chartPosition:"1",previousPosition:"2",nextShow:"",date:new Date().toLocaleDateString("nl-BE"),
+  chartPosition:"1",previousPosition:"2",nextShow:"",date:new Date().toLocaleDateString("nl-BE"),
   time:new Date().toLocaleTimeString("nl-BE",{hour:"2-digit",minute:"2-digit"}),cta:"Luister nu live"
 });
 const defaultBrand=(stationSlug:string):BrandKit=>({
@@ -57,7 +55,7 @@ const defaultBrand=(stationSlug:string):BrandKit=>({
 function replaceVars(text:string,ctx:Context){
   return text
     .replaceAll("{station}",ctx.station).replaceAll("{artist}",ctx.artist).replaceAll("{title}",ctx.title)
-    .replaceAll("{program}",ctx.program).replaceAll("{presenter}",ctx.presenter).replaceAll("{listeners}",ctx.listeners)
+.replaceAll("{program}",ctx.program).replaceAll("{presenter}",ctx.presenter)
     .replaceAll("{chart_position}",ctx.chartPosition).replaceAll("{previous_position}",ctx.previousPosition)
     .replaceAll("{next_show}",ctx.nextShow).replaceAll("{date}",ctx.date).replaceAll("{time}",ctx.time).replaceAll("{cta}",ctx.cta);
 }
@@ -88,18 +86,6 @@ function wrap(ctx:CanvasRenderingContext2D,text:string,x:number,y:number,maxWidt
     }else line=test;
   }
   if(line&&lines<maxLines)ctx.fillText(line,x,y);
-}
-function normalizeNow(raw:any){
-  const root=raw?.now||raw?.snapshot?.now||raw?.raw?.now||raw?.raw||raw||{};
-  return{
-    artist:String(root.artist??root.performer??root.creator??""),
-    title:String(root.title??root.name??root.trackTitle??"")
-  };
-}
-function listenerCount(raw:any){
-  const root=raw?.shoutcast||raw?.streams?.[0]||raw?.stream||raw?.stats||raw||{};
-  const value=Number(root.listeners??root.currentlisteners??root.currentListeners??root.listener_count??0);
-  return Number.isFinite(value)?String(value):"";
 }
 function toLocalInput(iso:string|null){
   if(!iso)return"";
@@ -134,7 +120,7 @@ function newTemplate(stationSlug:string,preset=presetTemplates[0]):SocialTemplat
   return{id:`new-${uid()}`,station_slug:stationSlug,name:preset.name,content_type:preset.contentType,aspect_ratio:preset.format,caption_template:preset.caption,config:preset.config,active:true};
 }
 function newPost(stationSlug:string,template:SocialTemplate,ctx:Context):SocialPost{
-  return{id:`new-${uid()}`,station_slug:stationSlug,template_id:template.id.startsWith("new-")?null:template.id,title:replaceVars(String(cfg(template).headline),ctx),status:"concept",format:template.aspect_ratio||"4:5",payload:ctx,caption:replaceVars(template.caption_template,ctx),scheduled_at:null,published_at:null};
+  return{id:`new-${uid()}`,station_slug:stationSlug,template_id:template.id.startsWith("new-")?null:template.id,title:replaceVars(String(cfg(template).headline),ctx),status:"concept",format:template.aspect_ratio||"4:5",payload:ctx,caption:replaceVars(template.caption_template,ctx),scheduled_at:null,published_at:null,platforms:["Instagram"],campaign:"",content_pillar:"",objective:"",assigned_to:null,reviewer_id:null,due_at:null,publication_url:"",internal_notes:"",checklist:{copy:false,visual:false,rights:false,links:false}};
 }
 
 export default function SocialStudioModule({stationSlug}:{stationSlug:string}){
@@ -154,6 +140,7 @@ export default function SocialStudioModule({stationSlug}:{stationSlug:string}){
   const[assetUpload,setAssetUpload]=useState(false);
   const[copyBlocks,setCopyBlocks]=useState<SocialCopyBlock[]>([]);
   const[copyDraft,setCopyDraft]=useState<SocialCopyBlock|null>(null);
+  const[people,setPeople]=useState<SocialPerson[]>([]);
   const[calendarMonth,setCalendarMonth]=useState(()=>monthStart(new Date()));
   const[selectedCalendarPostId,setSelectedCalendarPostId]=useState("");
   const[reviewEvents,setReviewEvents]=useState<SocialReviewEvent[]>([]);
@@ -167,14 +154,14 @@ export default function SocialStudioModule({stationSlug}:{stationSlug:string}){
     if(stationSlug==="all"){setBrand(defaultBrand(stationSlug));setTemplates([]);setPosts([]);setAssets([]);return}
     setBusy(true);
     try{
-      const[kit,cloudTemplates,cloudPosts,cloudAssets,cloudCopyBlocks]=await Promise.all([
-        loadBrandKit(stationSlug),loadSocialTemplates(stationSlug),loadSocialPosts(stationSlug),loadSocialAssets(stationSlug),loadSocialCopyBlocks(stationSlug)
+      const[kit,cloudTemplates,cloudPosts,cloudAssets,cloudCopyBlocks,cloudPeople]=await Promise.all([
+        loadBrandKit(stationSlug),loadSocialTemplates(stationSlug),loadSocialPosts(stationSlug),loadSocialAssets(stationSlug),loadSocialCopyBlocks(stationSlug),loadSocialPeople()
       ]);
       setBrand(kit);setCtx(x=>({...x,station:kit.brand_name||stationSlug,cta:kit.default_cta||x.cta}));
       const nextTemplates=cloudTemplates.length?cloudTemplates:presetTemplates.map(p=>newTemplate(stationSlug,p));
       setTemplates(nextTemplates);
       const first=nextTemplates[0];if(first){setSelectedTemplateId(first.id);setTemplateDraft(first);setFormat((first.aspect_ratio as FormatKey)||"4:5")}
-      setPosts(cloudPosts);setAssets(cloudAssets);setCopyBlocks(cloudCopyBlocks);
+      setPosts(cloudPosts);setAssets(cloudAssets);setCopyBlocks(cloudCopyBlocks);setPeople(cloudPeople);
     }catch(e){flash(e instanceof Error?e.message:"Social Studio laden mislukt")}
     finally{setBusy(false)}
   }
@@ -210,16 +197,6 @@ export default function SocialStudioModule({stationSlug}:{stationSlug:string}){
     const next={...ctx,date:new Date().toLocaleDateString("nl-BE"),time:new Date().toLocaleTimeString("nl-BE",{hour:"2-digit",minute:"2-digit"})};
     const notes:string[]=[];
     try{
-      await hydrateSharedIntegrationSettings(stationSlug).catch(()=>false);
-      const mapping=readMappings()[stationSlug];
-      const pc=readIntegration("playout");
-      if(pc?.host&&pc.nowPath&&mapping?.playoutId){
-        try{const raw=await radioRead("playout",pathFor(pc.nowPath,mapping.playoutId),"now");const now=normalizeNow(raw);if(now.artist)next.artist=now.artist;if(now.title)next.title=now.title;notes.push("NOW") }catch{}
-      }
-      const sc=readIntegration("shoutcast");
-      if(sc?.host){
-        try{const raw=await radioRead("shoutcast",sc.statusPath||`/stats?sid=${sc.shoutcastSid||"1"}`,"shoutcast");const listeners=listenerCount(raw.shoutcast);if(listeners)next.listeners=listeners;notes.push("listeners")}catch{}
-      }
       try{
         const blocks=await loadSharedProgramming(stationSlug);const now=new Date();const weekday=now.getDay();const hm=now.getHours()*60+now.getMinutes();
         const current=blocks.find(x=>x.active&&x.day===weekday&&Number(x.start.slice(0,2))*60+Number(x.start.slice(3,5))<=hm&&Number(x.end.slice(0,2))*60+Number(x.end.slice(3,5))>hm);
@@ -234,7 +211,7 @@ export default function SocialStudioModule({stationSlug}:{stationSlug:string}){
       next.station=brand.brand_name||stationSlug;next.cta=brand.default_cta||next.cta;
       setCtx(next);
       setCurrentPost(post=>post?{...post,payload:next,title:replaceVars(visual.headline,next),caption:replaceVars(selectedTemplate?.caption_template||post.caption,next)}:post);
-      flash(notes.length?`Automatisch ingevuld: ${notes.join(", ")}`:"Geen live brondata gevonden; handmatig verder werken.");
+      flash(notes.length?`Automatisch ingevuld: ${notes.join(", ")}`:"Geen gekoppelde HUB-data gevonden; handmatig verder werken.");
     }finally{setBusy(false)}
   }
 
@@ -247,6 +224,15 @@ export default function SocialStudioModule({stationSlug}:{stationSlug:string}){
   function patchContext(key:keyof Context,value:string){
     const next={...ctx,[key]:value};setCtx(next);
     setCurrentPost(post=>post?{...post,payload:next}:post);
+  }
+  function patchPost(patch:Partial<SocialPost>){
+    setCurrentPost(post=>post?{...post,...patch}:post);
+  }
+  function togglePlatform(platform:string){
+    setCurrentPost(post=>{if(!post)return post;const current=post.platforms||[];return{...post,platforms:current.includes(platform)?current.filter(x=>x!==platform):[...current,platform]}});
+  }
+  function toggleChecklist(key:string){
+    setCurrentPost(post=>post?{...post,checklist:{...(post.checklist||{}),[key]:!Boolean(post.checklist?.[key])}}:post);
   }
 
   async function persistTemplate(){
@@ -311,19 +297,19 @@ export default function SocialStudioModule({stationSlug}:{stationSlug:string}){
         await collaboration.publishNotification({
           stationSlug,title:`Social review gevraagd: ${saved.title||"socialpost"}`,
           body:comment||"Een socialpost staat klaar om na te kijken.",category:"Social",
-          severity:"info",actionPath:`/hub/${stationSlug}/social`
+          severity:"info",actionPath:`/hub/${stationSlug}/social`,recipientUserId:saved.reviewer_id||null
         }).catch(()=>{});
       }else if(action==="changes_requested"){
         await collaboration.publishNotification({
           stationSlug,title:`Aanpassing gevraagd: ${saved.title||"socialpost"}`,
           body:comment||"De socialpost heeft nog aanpassingen nodig.",category:"Social",
-          severity:"warning",actionPath:`/hub/${stationSlug}/social`
+          severity:"warning",actionPath:`/hub/${stationSlug}/social`,recipientUserId:saved.assigned_to||null
         }).catch(()=>{});
       }else if(action==="approved"){
         await collaboration.publishNotification({
           stationSlug,title:`Socialpost goedgekeurd: ${saved.title||"socialpost"}`,
           body:comment||"De socialpost is klaar voor publicatie.",category:"Social",
-          severity:"info",actionPath:`/hub/${stationSlug}/social`
+          severity:"info",actionPath:`/hub/${stationSlug}/social`,recipientUserId:saved.assigned_to||null
         }).catch(()=>{});
       }
       flash(reviewLabel(action));
@@ -415,8 +401,8 @@ export default function SocialStudioModule({stationSlug}:{stationSlug:string}){
 
   return <div className="social-studio-v16">
     <div className="page-intro social-studio-intro">
-      <div><span className="eyebrow">VLACORA CONTENT</span><h2>Social Studio</h2><p>Branding, templates, live data, contentplanning en export in één lichte werkplek.</p></div>
-      <div className="button-row"><button className="ghost" disabled={busy} onClick={()=>void autofill()}>⚡ Vul live data in</button><button className="primary" disabled={busy||!selectedTemplate} onClick={()=>void persistPost()}>Bewaar concept</button></div>
+      <div><span className="eyebrow">VLACORA CONTENT</span><h2>Social Studio</h2><p>Van idee en briefing tot visual, caption, review, planning en publicatie-opvolging in één werkplek.</p></div>
+      <div className="button-row"><button className="ghost" disabled={busy} onClick={()=>void autofill()}>⚡ Vul HUB-data in</button><button className="primary" disabled={busy||!selectedTemplate} onClick={()=>void persistPost()}>Bewaar concept</button></div>
     </div>
     {notice&&<div className="inline-notice standalone">{notice}</div>}
     <div className="social-tabs">
@@ -433,7 +419,7 @@ export default function SocialStudioModule({stationSlug}:{stationSlug:string}){
           <label>Titel / onderwerp<input value={ctx.title} onChange={e=>patchContext("title",e.target.value)}/></label>
           <label>Programma<input value={ctx.program} onChange={e=>patchContext("program",e.target.value)}/></label>
           <label>Presentator<input value={ctx.presenter} onChange={e=>patchContext("presenter",e.target.value)}/></label>
-          <label>Listeners<input value={ctx.listeners} onChange={e=>patchContext("listeners",e.target.value)}/></label>
+          
           <label>Hitlijstpositie<input value={ctx.chartPosition} onChange={e=>patchContext("chartPosition",e.target.value)}/></label>
           <label>Vorige positie<input value={ctx.previousPosition} onChange={e=>patchContext("previousPosition",e.target.value)}/></label>
           <label>Volgende show<input value={ctx.nextShow} onChange={e=>patchContext("nextShow",e.target.value)}/></label>
@@ -449,6 +435,21 @@ export default function SocialStudioModule({stationSlug}:{stationSlug:string}){
           <label>Status<select value={currentPost?.status||"concept"} onChange={e=>setCurrentPost(p=>p?{...p,status:e.target.value as SocialPost["status"]}:p)}><option value="concept">Concept</option><option value="review">Klaar voor review</option><option value="approved">Goedgekeurd</option><option value="published">Gepubliceerd</option></select></label>
           <label>Planning<input type="datetime-local" value={toLocalInput(currentPost?.scheduled_at||null)} onChange={e=>setCurrentPost(p=>p?{...p,scheduled_at:fromLocalInput(e.target.value)}:p)}/></label>
         </div>
+        <div className="social-brief-card">
+          <div className="section-head"><div><h3>Briefing & workflow</h3><p>Leg vóór publicatie vast wie wat maakt, voor welk kanaal en met welk doel.</p></div></div>
+          <div className="social-platform-picker">{["Instagram","Instagram Story","Facebook","TikTok","YouTube Shorts","LinkedIn"].map(platform=><button key={platform} className={(currentPost?.platforms||[]).includes(platform)?"active":""} onClick={()=>togglePlatform(platform)}>{platform}</button>)}</div>
+          <div className="social-brief-grid">
+            <label>Campagne<input value={currentPost?.campaign||""} onChange={e=>patchPost({campaign:e.target.value})} placeholder="bv. Back to school"/></label>
+            <label>Contentpijler<input value={currentPost?.content_pillar||""} onChange={e=>patchPost({content_pillar:e.target.value})} placeholder="Muziek, programma, community…"/></label>
+            <label>Doel<input value={currentPost?.objective||""} onChange={e=>patchPost({objective:e.target.value})} placeholder="Informeren, engagement, promo…"/></label>
+            <label>Deadline<input type="datetime-local" value={toLocalInput(currentPost?.due_at||null)} onChange={e=>patchPost({due_at:fromLocalInput(e.target.value)})}/></label>
+            <label>Eigenaar<select value={currentPost?.assigned_to||""} onChange={e=>patchPost({assigned_to:e.target.value||null})}><option value="">Niet toegewezen</option>{people.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select></label>
+            <label>Reviewer<select value={currentPost?.reviewer_id||""} onChange={e=>patchPost({reviewer_id:e.target.value||null})}><option value="">Geen vaste reviewer</option>{people.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select></label>
+          </div>
+          <div className="social-checklist">{[["copy","Copy klaar"],["visual","Visual klaar"],["rights","Rechten gecheckt"],["links","Links/CTA gecheckt"]].map(([key,label])=><label key={key}><input type="checkbox" checked={Boolean(currentPost?.checklist?.[key])} onChange={()=>toggleChecklist(key)}/><span>{label}</span></label>)}</div>
+          <label className="field">Interne notitie<textarea className="input" value={currentPost?.internal_notes||""} onChange={e=>patchPost({internal_notes:e.target.value})} placeholder="Niet zichtbaar in de caption: briefing, beeldrechten, opmerkingen…"/></label>
+          {currentPost?.status==="published"&&<label className="field">Link naar publicatie<input className="input" value={currentPost?.publication_url||""} onChange={e=>patchPost({publication_url:e.target.value})} placeholder="https://…"/></label>}
+        </div>
       </section>
 
       <section className="social-preview-stage">
@@ -462,7 +463,7 @@ export default function SocialStudioModule({stationSlug}:{stationSlug:string}){
           <div className="social-preview-copy"><h2>{previewHeadline}</h2><h3>{previewSubline}</h3></div>
           <div className="social-preview-footer">{previewFooter}</div>
         </div>
-        <div className="card social-autofill-card"><div><strong>Automatische variabelen</strong><span>Playout NOW, SHOUTcast, programmering en de recentste hitlijst worden alleen opgehaald wanneer je op “Vul live data in” klikt.</span></div><button className="ghost" disabled={busy} onClick={()=>void autofill()}>⚡ Vernieuw data</button></div>
+        <div className="card social-autofill-card"><div><strong>Automatische variabelen</strong><span>Programmering en de recentste hitlijst worden alleen opgehaald wanneer je de HUB-data vernieuwt.</span></div><button className="ghost" disabled={busy} onClick={()=>void autofill()}>⚡ Vernieuw data</button></div>
       </section>
     </div>}
 
@@ -548,9 +549,17 @@ export default function SocialStudioModule({stationSlug}:{stationSlug:string}){
 
         <aside className="card social-review-panel">
           {!selectedCalendarPost?<div className="empty-live-state"><strong>Kies een socialpost</strong><span>Dan zie je hier planning, reviewstatus en opmerkingen.</span></div>:<>
-            <div className="social-review-head"><div><span className={`social-review-status ${selectedCalendarPost.status}`}>{statusLabel(selectedCalendarPost.status)}</span><h3>{selectedCalendarPost.title||"Socialpost"}</h3><p>{selectedCalendarPost.caption}</p></div><button className="mini-btn" onClick={()=>{setCurrentPost(selectedCalendarPost);setCtx({...defaultContext(stationSlug),...(selectedCalendarPost.payload as Partial<Context>)});setFormat((selectedCalendarPost.format as FormatKey)||"4:5");const tt=templates.find(x=>x.id===selectedCalendarPost.template_id);if(tt)chooseTemplate(tt);setTab("studio")}}>Bewerk</button></div>
+            <div className="social-review-head"><div><span className={`social-review-status ${selectedCalendarPost.status}`}>{statusLabel(selectedCalendarPost.status)}</span><h3>{selectedCalendarPost.title||"Socialpost"}</h3><p>{selectedCalendarPost.caption}</p></div><button className="mini-btn" onClick={()=>{setCurrentPost(selectedCalendarPost);setCtx({...defaultContext(stationSlug),...(selectedCalendarPost.payload as Partial<Context>)});setFormat((selectedCalendarPost.format as FormatKey)||"4:5");const tt=templates.find(x=>x.id===selectedCalendarPost.template_id);if(tt){setSelectedTemplateId(tt.id);setTemplateDraft(tt)}setTab("studio")}}>Bewerk</button></div>
 
             <label className="field">Publicatiemoment<input className="input" type="datetime-local" value={toLocalInput(selectedCalendarPost.scheduled_at)} onChange={e=>void reschedulePost(selectedCalendarPost,e.target.value)}/></label>
+            <div className="social-calendar-meta">
+              <div><span>Kanalen</span><strong>{selectedCalendarPost.platforms?.length?selectedCalendarPost.platforms.join(" • "):"Nog niet gekozen"}</strong></div>
+              <div><span>Campagne</span><strong>{selectedCalendarPost.campaign||"—"}</strong></div>
+              <div><span>Contentpijler</span><strong>{selectedCalendarPost.content_pillar||"—"}</strong></div>
+              <div><span>Eigenaar</span><strong>{people.find(p=>p.id===selectedCalendarPost.assigned_to)?.name||"Niet toegewezen"}</strong></div>
+              <div><span>Reviewer</span><strong>{people.find(p=>p.id===selectedCalendarPost.reviewer_id)?.name||"Niet toegewezen"}</strong></div>
+              <div><span>Checklist</span><strong>{Object.values(selectedCalendarPost.checklist||{}).filter(Boolean).length}/4 klaar</strong></div>
+            </div>
 
             <div className="social-review-actions">
               <button disabled={busy} className="review-request" onClick={()=>void workflow(selectedCalendarPost,"review_requested",reviewComment)}>👀 Vraag review</button>

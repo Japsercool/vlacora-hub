@@ -1,13 +1,26 @@
-VLACORA HUB 0.20.1
-DATEX traffic human-location parser fix.
+VLACORA HUB 0.22.0
+Standalone agenda + Social Studio workflow release.
 
-Fixes:
-- considers ALL public comments instead of only the first generic one;
-- prefers the most specific Dutch traffic description;
-- extracts Alert-C primary/secondary point names;
-- preserves human road names such as 'E40 - A10' and 'Ring 2 Antwerpen (R1)';
-- no longer exposes positive/negative coding direction as if it were a destination;
-- road filters work with E40/A10/R1 aliases;
-- radio text is built from human-readable road/location data.
+Current backend:
+- Supabase Auth
+- Supabase PostgreSQL
+- Row Level Security
 
-No database migration required.
+New:
+- Central hub_calendar_events + attendees
+- Personal / station / VLACORA-wide agenda
+- Manager calendar view per person
+- Social posts and music meetings in central calendar view
+- Social platforms, campaign, content pillar and objective
+- Social owner, reviewer and deadline
+- Social publication checklist, notes and publication URL
+- Targeted social workflow notifications
+
+Still standalone:
+- No Rotation/Playout integration code
+- No radio API proxy
+- No stream/listener statistics integration
+- No encoder/playout monitoring
+
+Migrations required for existing 0.21.0 databases:
+- supabase/migrations/030_calendar_social_workflow.sql

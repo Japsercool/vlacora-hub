@@ -9,7 +9,7 @@ type Incident={id:string;station_slug:string;category:string;title:string;descri
 type IncidentUpdate={id:string;incident_id:string;update_type:string;body:string;status:string|null;created_by:string|null;created_at:string};
 type Publish=(input:{stationSlug?:string|null;title:string;body?:string;category?:string;severity?:"info"|"warning"|"critical";requiresAck?:boolean;actionPath?:string})=>Promise<void>;
 
-const categories=["Programmering","Muziek","Technisch","Vormgeving","Facilities","Afwezigheid","Website / socials","Nieuws","Reclame","Rotation One","Playout One","Tip redactie","Ander"];
+const categories=["Programmering","Muziek","Technisch","Vormgeving","Facilities","Afwezigheid","Website / socials","Nieuws","Reclame","Tip redactie","Ander"];
 const statusOrder:Status[]=["Open","In behandeling","Wachten op info","Opgelost","Gesloten"];
 
 function ago(iso:string){const sec=Math.max(0,Math.floor((Date.now()-new Date(iso).getTime())/1000));if(sec<60)return "zojuist";if(sec<3600)return `${Math.floor(sec/60)} min geleden`;if(sec<86400)return `${Math.floor(sec/3600)} u geleden`;return new Date(iso).toLocaleDateString("nl-BE")}

@@ -1,8 +1,0 @@
-VLACORA HUB 0.14.5 CSS validation
-[INFO] literal \\n tokens repaired: 3
-[PASS] literal escaped newlines removed
-[PASS] balanced curly braces
-[PASS] station mapping styles retained
-[PASS] responsive mapping styles retained
-[PASS] version 0.14.5
-[PASS] no CSS lines start with stray backslash

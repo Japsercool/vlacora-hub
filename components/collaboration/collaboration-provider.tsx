@@ -77,8 +77,7 @@ const MODULES:Record<string,string>={
   dashboard:"TODAY","voor-mij":"Voor mij","mijn-uitzending":"Mijn uitzending",stations:"Stations",meldingen:"Meldingen",taken:"Taken",meldpunt:"Meldpunt",aanvragen:"Aanvragen","content-inbox":"Content-inbox",
   messenger:"Messenger",communicatie:"Communicatie",muziekmappen:"Muziekmappen PDF",kalender:"Kalender",
   programmering:"Programmering",programmas:"Programma-pagina's",afwezigheden:"Afwezigheden",contacten:"Contacten",sjablonen:"Sjablonen",muziek:"Muziek",meetings:"Muziekmeeting",redactie:"Redactie",verkeer:"Verkeer",
-  playlists:"Playlists",hitlijsten:"Hitlijsten",presentatie:"Presentatie",social:"Social Studio",
-  statistieken:"Luistercijfers",control:"On-Air Control",playout:"Playout One","radio-api":"Radio API",team:"Team",beheer:"Beheer"
+  hitlijsten:"Hitlijsten",presentatie:"Presentatie",social:"Social Studio",team:"Team",beheer:"Beheer"
 };
 const LOCAL_NOTIFICATIONS="vlacora:collaboration:notifications:v13";
 const LOCAL_RECEIPTS="vlacora:collaboration:receipts:v13";

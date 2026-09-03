@@ -1,6 +1,0 @@
-VLACORA HUB 0.13.1 static validation
-[PASS] Playout port default 5099
-[PASS] integration health endpoint default
-[PASS] integration stations endpoint default
-[PASS] status/NOW-NEXT endpoint default
-[PASS] no new polling loop added

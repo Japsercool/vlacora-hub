@@ -1,6 +1,0 @@
-VLACORA HUB 0.14.4 syntax validation
-[PASS] missing JSX closing brace fixed
-[PASS] radio-api-module.tsx parsed by TypeScript without TS1xxx syntax errors
-[PASS] admin-integrations-module.tsx parsed without TS1xxx syntax errors
-[PASS] editorial-module.tsx parsed without TS1xxx syntax errors
-[PASS] shoutcast-stats-module.tsx parsed without TS1xxx syntax errors

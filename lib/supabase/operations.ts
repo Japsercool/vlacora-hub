@@ -1,7 +1,6 @@
 "use client";
 
 import { createClient,isSupabaseBrowserConfigured } from "@/lib/supabase/client";
-import { pathFor,pathForFolder,radioRead,readIntegration,readMappings } from "@/lib/radio/client-config";
 
 export type TeamPerson={
   id:string;name:string;email:string;role:string;jobTitle:string;phone:string;initials:string;stations:string[];
@@ -41,7 +40,7 @@ export type PresenterDashboardData={
   program:StationProgram|null;nextProgram:StationProgram|null;profile:ProgramProfile|null;team:ProgramTeamMember[];
   requiredTalks:number;sponsorTalks:number;promos:number;trafficMoments:Array<{time:string;title:string;ready:boolean}>;
   importantMessages:number;messages:Array<{id:string;title:string;body:string;category:string;actionPath:string}>;
-  studioInfo:string;playlistReady:boolean;playlistItems:number;
+  studioInfo:string;editorialReady:boolean;editorialItems:number;
   tasks:Array<{id:string;title:string;dueAt:string|null;priority:string}>;
   warnings:OperationalWarning[];
 };
@@ -361,51 +360,7 @@ export async function runOperationalChecks(stationSlug:string,{force=false}:{for
     else await resolveOperationalWarning(stationSlug,"important-task-unassigned");
   }catch{}
 
-  try{
-    const mapping=readMappings()[stationSlug];
-    const cfg=readIntegration("rotation");
-    if(mapping?.rotationId&&cfg?.playlistPath){
-      const from=new Date(),to=new Date(Date.now()+30*60*60*1000);
-      let path=pathFor(cfg.playlistPath,mapping.rotationId);
-      const q=new URLSearchParams({from:from.toISOString(),to:to.toISOString()});path+=`${path.includes("?")?"&":"?"}${q}`;
-      const data=await radioRead("rotation",path,"playlist");
-      const items=Array.isArray(data.items)?data.items:[];
-      const latest=items.map((x:any)=>new Date(x.airTimeUtc||x.sourceHourStartUtc||0).getTime()).filter(Number.isFinite).sort((a:number,b:number)=>b-a)[0]||0;
-      const hours=(latest-Date.now())/3600000;
-      if(!items.length||hours<24)await upsertOperationalWarning({stationSlug,code:"playlist-coverage",severity:"critical",title:"Playlistdekking minder dan 24 uur",body:items.length?`Laatste gevonden item is ongeveer ${Math.max(0,Math.floor(hours))} uur vooruit.`:"Rotation One gaf geen items voor de komende 30 uur.",actionPath:`/hub/${stationSlug}/redactie`,source:"Rotation One"});
-      else await resolveOperationalWarning(stationSlug,"playlist-coverage");
 
-      const{data:stationSettings}=await supabase.from("hub_settings").select("value").eq("scope",`station:${stationSlug}`).eq("setting_key","station-settings").maybeSingle();
-      const newsEnabled=stationSettings?.value?.newsCheck!==false;
-      if(newsEnabled){
-        const threeHours=Date.now()+3*3600000;
-        const news=items.filter((x:any)=>String(x.type||"").toLowerCase()==="news"&&new Date(x.airTimeUtc||x.sourceHourStartUtc||0).getTime()<=threeHours);
-        if(!news.length)await upsertOperationalWarning({stationSlug,code:"news-missing",severity:"warning",title:"Geen nieuwsitem gevonden in de komende 3 uur",body:"Controleer of het nieuwsbestand en de nieuwsplanning klaarstaan.",actionPath:`/hub/${stationSlug}/redactie`,source:"Rotation One"});
-        else await resolveOperationalWarning(stationSlug,"news-missing");
-      }
-    }
-  }catch{}
-
-  try{
-    const mapping=readMappings()[stationSlug],cfg=readIntegration("playout");
-    if(mapping?.playoutId&&cfg?.host){
-      const path=pathFor(cfg.nowPath||"/api/v1/integration/stations/{stationId}/status",mapping.playoutId);
-      const response=await radioRead("playout",path,"raw");
-      let raw=response.raw??response;
-      if(typeof raw==="string"){try{raw=JSON.parse(raw)}catch{}}
-      const encoder=boolish(deepValue(raw,["encoderActive","encoderOnline","encoder","isEncoderActive"]));
-      const stream=boolish(deepValue(raw,["streamOnline","streaming","streamActive","isStreaming"]));
-      const heartbeatAge=Number(deepValue(raw,["heartbeatAgeSeconds","heartbeatAge","ageSeconds","lastHeartbeatAgeSeconds"]));
-      if(encoder===false)await upsertOperationalWarning({stationSlug,code:"encoder-offline",severity:"critical",title:"Encoder offline",body:"Playout One meldt dat de encoder niet actief is.",actionPath:`/hub/${stationSlug}/playout`,source:"Playout One"});
-      else await resolveOperationalWarning(stationSlug,"encoder-offline");
-      if(stream===false)await upsertOperationalWarning({stationSlug,code:"stream-offline",severity:"critical",title:"Stream offline",body:"Playout One meldt dat de stream niet actief is.",actionPath:`/hub/${stationSlug}/playout`,source:"Playout One"});
-      else await resolveOperationalWarning(stationSlug,"stream-offline");
-      if(Number.isFinite(heartbeatAge)&&heartbeatAge>90)await upsertOperationalWarning({stationSlug,code:"heartbeat-stale",severity:"critical",title:"Playout heartbeat verouderd",body:`Laatste heartbeat is ongeveer ${Math.round(heartbeatAge)} seconden oud.`,actionPath:`/hub/${stationSlug}/playout`,source:"Playout One"});
-      else if(Number.isFinite(heartbeatAge))await resolveOperationalWarning(stationSlug,"heartbeat-stale");
-    }
-  }catch{
-    try{await upsertOperationalWarning({stationSlug,code:"playout-unreachable",severity:"critical",title:"Playout One niet bereikbaar",body:"De live status kon niet worden gelezen tijdens de operationele controle.",actionPath:`/hub/${stationSlug}/playout`,source:"Playout One"})}catch{}
-  }
 
   return loadOperationalWarnings(stationSlug,true);
 }
@@ -421,14 +376,14 @@ export async function loadPresenterDashboard(stationSlug:string,userId:string):P
   const program=mine.find(p=>timeToMinutes(p.start)<=nowMin&&timeToMinutes(p.end)>nowMin)||mine.find(p=>timeToMinutes(p.start)>nowMin)||mine[0]||null;
   const nextProgram=program?todayPrograms.find(p=>timeToMinutes(p.start)>=timeToMinutes(program.end))||null:null;
   const profile=program?await loadProgramProfile(program):null,team=program?await loadProgramTeam(program.id):[];
-  let requiredTalks=0,sponsorTalks=0,promos=0;const trafficMoments:Array<{time:string;title:string;ready:boolean}>=[];let playlistItems=0;
+  let requiredTalks=0,sponsorTalks=0,promos=0,missingRequiredTalks=0;const trafficMoments:Array<{time:string;title:string;ready:boolean}>=[];let editorialItems=0;
   if(program){
     const startHour=Math.floor(timeToMinutes(program.start)/60),endHour=Math.max(startHour+1,Math.ceil(timeToMinutes(program.end)/60));
     const{data:ws}=await supabase.from("hub_editorial_workspaces").select("air_hour,items").eq("station_slug",stationSlug).eq("air_date",localDate()).gte("air_hour",startHour).lt("air_hour",endHour);
     for(const w of ws||[])for(const i of Array.isArray((w as any).items)?(w as any).items:[]){
-      playlistItems++;
+      editorialItems++;
       const type=String(i?.type||"").toLowerCase(),notes=String(i?.notes||""),title=String(i?.title||"");
-      if(notes.toLowerCase().includes("verplicht"))requiredTalks++;
+      if(notes.toLowerCase().includes("verplicht")){requiredTalks++;if(!String(i?.presenterText||"").trim())missingRequiredTalks++;}
       if(/sponsor|verkochte actie|wedstrijd/i.test(`${title} ${notes}`))sponsorTalks++;
       if(["promo","imaging","link"].includes(type))promos++;
       if(type==="traffic")trafficMoments.push({time:String(i?.time||`${String((w as any).air_hour).padStart(2,"0")}:00`),title,ready:Boolean(String(i?.presenterText||"").trim())});
@@ -447,27 +402,18 @@ export async function loadPresenterDashboard(stationSlug:string,userId:string):P
   const taskIds=(taskRows||[]).map((x:any)=>String(x.id));let myTaskIds=new Set<string>();
   if(taskIds.length){const{data}=await supabase.from("hub_task_assignees").select("task_id").eq("user_id",userId).in("task_id",taskIds);myTaskIds=new Set((data||[]).map((x:any)=>String(x.task_id)))}
   const tasks=(taskRows||[]).filter((x:any)=>myTaskIds.has(String(x.id))).slice(0,6).map((x:any)=>({id:String(x.id),title:String(x.title),dueAt:x.due_at?String(x.due_at):null,priority:String(x.priority)}));
-  let playlistReady=playlistItems>0;
-  if(program){
-    try{
-      const mapping=readMappings()[stationSlug],cfg=readIntegration("rotation");
-      if(mapping?.rotationId&&cfg?.playlistPath){
-        const now=new Date(),day=localDate(now),start=new Date(`${day}T${program.start}:00`),end=new Date(`${day}T${program.end}:00`);
-        let path=pathFor(cfg.playlistPath,mapping.rotationId);const q=new URLSearchParams({from:start.toISOString(),to:end.toISOString()});path+=`${path.includes("?")?"&":"?"}${q}`;
-        const data=await radioRead("rotation",path,"playlist");playlistItems=Math.max(playlistItems,(data.items||[]).length);playlistReady=(data.items||[]).length>0;
-      }
-    }catch{}
-  }
-  return{program,nextProgram,profile,team,requiredTalks,sponsorTalks,promos,trafficMoments,importantMessages,messages,studioInfo:profile?.studioInfo||program?.notes||"",playlistReady,playlistItems,tasks,warnings};
+  const editorialReady=editorialItems>0&&missingRequiredTalks===0;
+  return{program,nextProgram,profile,team,requiredTalks,sponsorTalks,promos,trafficMoments,importantMessages,messages,studioInfo:profile?.studioInfo||program?.notes||"",editorialReady,editorialItems,tasks,warnings};
 }
 
 export async function loadPersonalInbox(stationSlug:string,userId:string){
-  if(!isSupabaseBrowserConfigured())return{tasks:[],requests:[],meetings:[],replacements:[],warnings:[]};
+  if(!isSupabaseBrowserConfigured())return{tasks:[],requests:[],meetings:[],calendar:[],replacements:[],warnings:[]};
   const supabase=createClient();
-  const[{data:taskAssignees},{data:requests},{data:meetings},{data:replacements}]=await Promise.all([
+  const[{data:taskAssignees},{data:requests},{data:meetings},{data:calendar},{data:replacements}]=await Promise.all([
     supabase.from("hub_task_assignees").select("task_id").eq("user_id",userId),
     supabase.from("hub_admin_requests").select("id,title,status,admin_note,updated_at,station_slug").eq("created_by",userId).order("updated_at",{ascending:false}).limit(12),
     supabase.from("hub_music_meetings").select("id,title,scheduled_at,status,station_slug").gte("scheduled_at",new Date().toISOString()).order("scheduled_at").limit(10),
+    supabase.from("hub_calendar_events").select("id,title,starts_at,ends_at,scope,station_slug,owner_user_id,location").gte("starts_at",new Date().toISOString()).order("starts_at").limit(12),
     supabase.from("hub_absence_coverages").select("id,air_date,status,program_id,absence_id").eq("replacement_user_id",userId).gte("air_date",localDate()).order("air_date")
   ]);
   const ids=(taskAssignees||[]).map((x:any)=>String(x.task_id));let tasks:any[]=[];
@@ -478,63 +424,29 @@ export async function loadPersonalInbox(stationSlug:string,userId:string){
     tasks:tasks.filter((x:any)=>stationSlug==="all"||String(x.station_slug)===stationSlug),
     requests:(requests||[]).filter((x:any)=>stationSlug==="all"||String(x.station_slug)===stationSlug||String(x.station_slug)==="all"),
     meetings:(meetings||[]).filter((x:any)=>stationSlug==="all"||String(x.station_slug)===stationSlug),
+    calendar:(calendar||[]).filter((x:any)=>stationSlug==="all"||String(x.scope)!=="station"||String(x.station_slug)===stationSlug),
     replacements:(replacements||[]).map((x:any)=>({...x,programName:programNames.get(String(x.program_id))||"Programma"})),
     warnings:await loadOperationalWarnings(stationSlug,true)
   };
 }
 
 function matchText(value:any,q:string){return String(value||"").toLowerCase().includes(q)}
-async function searchRotationMusic(stationSlug:string,q:string):Promise<SearchResult[]>{
-  if(stationSlug==="all")return[];
-  const cfg=readIntegration("rotation"),mapping=readMappings()[stationSlug];
-  if(!cfg?.musicFoldersPath||!cfg?.musicFolderItemsPath||!mapping?.rotationId)return[];
-  try{
-    const folderResponse=await radioRead("rotation",pathFor(cfg.musicFoldersPath,mapping.rotationId),"folders");
-    const folders=(folderResponse.folders||[]).slice(0,30);
-    const found:SearchResult[]=[];
-    for(const folder of folders){
-      if(found.length>=20)break;
-      let songs:any[]=[];
-      const cacheKey=`vlacora:rotation-search:${stationSlug}:${folder.id}`;
-      try{
-        const cached=JSON.parse(sessionStorage.getItem(cacheKey)||"null");
-        if(cached&&Date.now()-Number(cached.at)<10*60_000&&Array.isArray(cached.songs))songs=cached.songs;
-      }catch{}
-      if(!songs.length){
-        try{
-          const response=await radioRead("rotation",pathForFolder(cfg.musicFolderItemsPath,mapping.rotationId,String(folder.id)),"songs");
-          songs=response.songs||[];
-          try{sessionStorage.setItem(cacheKey,JSON.stringify({at:Date.now(),songs}))}catch{}
-        }catch{continue}
-      }
-      for(const song of songs){
-        if(found.length>=20)break;
-        if([song.artist,song.title,song.category].some(v=>matchText(v,q)))found.push({
-          id:`rotation-song:${folder.id}:${song.id||`${song.artist}-${song.title}`}`,kind:"Rotation One song",
-          title:`${song.artist||"—"} – ${song.title||"—"}`,
-          subtitle:`${folder.name||"Muziekmap"}${song.category?` • ${song.category}`:""}`,
-          path:`/hub/${stationSlug}/muziekmappen`,stationSlug,score:14
-        });
-      }
-    }
-    return found;
-  }catch{return[]}
-}
 export async function universalSearch(stationSlug:string,query:string):Promise<SearchResult[]>{
   const q=query.trim().toLowerCase();if(q.length<2||!isSupabaseBrowserConfigured())return[];
   const supabase=createClient(),results:SearchResult[]=[];
   const add=(r:SearchResult)=>results.push(r);
   const safe=async<T>(fn:()=>PromiseLike<any>)=>{try{return(await fn()).data||[]}catch{return[]}};
   const [
-    programs,tasks,contacts,content,meetings,tracks,social,notifications,workspaces,hitlists
+    programs,tasks,contacts,content,meetings,tracks,social,calendar,notifications,workspaces,hitlists
   ]=await Promise.all([
     safe(()=>supabase.from("station_programs").select("id,station_slug,name,host,format,notes").limit(100)),
     safe(()=>supabase.from("hub_tasks").select("id,station_slug,title,description,status").limit(100)),
     safe(()=>supabase.from("hub_contacts").select("id,station_slug,name,company,role_title,notes").limit(100)),
     safe(()=>supabase.from("hub_content_inbox").select("id,station_slug,title,description,content_type,status").limit(100)),
     safe(()=>supabase.from("hub_music_meetings").select("id,station_slug,title,notes,status").limit(80)),
-    safe(()=>supabase.from("hub_music_meeting_tracks").select("id,meeting_id,artist,title,category,rotation_folder").limit(180)),
-    safe(()=>supabase.from("hub_social_posts").select("id,station_slug,title,caption,status").limit(100)),
+    safe(()=>supabase.from("hub_music_meeting_tracks").select("id,meeting_id,artist,title,category").limit(180)),
+    safe(()=>supabase.from("hub_social_posts").select("id,station_slug,title,caption,status,campaign,content_pillar,objective").limit(100)),
+    safe(()=>supabase.from("hub_calendar_events").select("id,station_slug,scope,title,description,event_type,starts_at,location").order("starts_at",{ascending:false}).limit(120)),
     safe(()=>supabase.from("hub_notifications").select("id,station_slug,title,body,category").limit(100)),
     safe(()=>supabase.from("hub_editorial_workspaces").select("station_slug,air_date,air_hour,items").order("air_date",{ascending:false}).limit(120)),
     safe(()=>supabase.from("hitlists").select("id,station_slug,name,edition_label,entries").order("publish_date",{ascending:false}).limit(60))
@@ -546,19 +458,18 @@ export async function universalSearch(stationSlug:string,query:string):Promise<S
   for(const x of content)if(accept(String(x.station_slug))&&[x.title,x.description,x.content_type].some(v=>matchText(v,q)))add({id:`content:${x.id}`,kind:"Content inbox",title:String(x.title),subtitle:`${x.content_type} • ${x.status}`,path:`/hub/${x.station_slug}/content-inbox`,stationSlug:String(x.station_slug),score:7});
   for(const x of meetings)if(accept(String(x.station_slug))&&[x.title,x.notes].some(v=>matchText(v,q)))add({id:`meeting:${x.id}`,kind:"Muziekmeeting",title:String(x.title),subtitle:String(x.status),path:`/hub/${x.station_slug}/meetings`,stationSlug:String(x.station_slug),score:8});
   const meetingStation=new Map<string,string>(meetings.map((x:any)=>[String(x.id),String(x.station_slug)]));
-  for(const x of tracks){const s=meetingStation.get(String(x.meeting_id))||stationSlug;if(accept(s)&&[x.artist,x.title,x.category,x.rotation_folder].some(v=>matchText(v,q)))add({id:`track:${x.id}`,kind:"Muziekmeeting song",title:`${x.artist} – ${x.title}`,subtitle:`${x.category||""} ${x.rotation_folder||""}`.trim(),path:`/hub/${s}/meetings`,stationSlug:s,score:11})}
-  for(const x of social)if(accept(String(x.station_slug))&&[x.title,x.caption].some(v=>matchText(v,q)))add({id:`social:${x.id}`,kind:"Social",title:String(x.title),subtitle:String(x.status),path:`/hub/${x.station_slug}/social`,stationSlug:String(x.station_slug),score:6});
+  for(const x of tracks){const st=meetingStation.get(String(x.meeting_id))||stationSlug;if(accept(st)&&[x.artist,x.title,x.category].some(v=>matchText(v,q)))add({id:`track:${x.id}`,kind:"Muziekmeeting song",title:`${x.artist} – ${x.title}`,subtitle:String(x.category||""),path:`/hub/${st}/meetings`,stationSlug:st,score:11})}
+  for(const x of social)if(accept(String(x.station_slug))&&[x.title,x.caption,x.campaign,x.content_pillar,x.objective].some(v=>matchText(v,q)))add({id:`social:${x.id}`,kind:"Social",title:String(x.title),subtitle:`${x.status}${x.campaign?` • ${x.campaign}`:""}`,path:`/hub/${x.station_slug}/social`,stationSlug:String(x.station_slug),score:6});
+  for(const x of calendar){const s=String(x.station_slug||"all");if((String(x.scope)!=="station"||accept(s))&&[x.title,x.description,x.event_type,x.location].some(v=>matchText(v,q)))add({id:`calendar:${x.id}`,kind:"Agenda",title:String(x.title),subtitle:`${new Date(x.starts_at).toLocaleString("nl-BE")} • ${x.location||x.event_type||""}`,path:`/hub/${s==="all"?stationSlug:s}/kalender`,stationSlug:s,score:8});}
   for(const x of notifications)if(accept(String(x.station_slug||""))&&[x.title,x.body,x.category].some(v=>matchText(v,q)))add({id:`notification:${x.id}`,kind:"Communicatie",title:String(x.title),subtitle:String(x.category||""),path:`/hub/${x.station_slug||stationSlug}/meldingen`,stationSlug:String(x.station_slug||stationSlug),score:5});
   for(const w of workspaces){
     const s=String(w.station_slug);if(!accept(s))continue;
-    for(const item of Array.isArray(w.items)?w.items:[])if([item.artist,item.title,item.presenterText,item.notes].some(v=>matchText(v,q)))add({id:`playlist:${s}:${w.air_date}:${w.air_hour}:${item.id}`,kind:item.source==="Rotation One"?"Rotation / playlist":"Redactie-talk",title:`${item.artist?`${item.artist} – `:""}${item.title||"Item"}`,subtitle:`${w.air_date} • ${String(w.air_hour).padStart(2,"0")}:00`,path:`/hub/${s}/redactie`,stationSlug:s,score:item.source==="Rotation One"?12:9});
+    for(const item of Array.isArray(w.items)?w.items:[])if([item.artist,item.title,item.presenterText,item.notes].some(v=>matchText(v,q)))add({id:`editorial:${s}:${w.air_date}:${w.air_hour}:${item.id}`,kind:"Redactie-item",title:`${item.artist?`${item.artist} – `:""}${item.title||"Item"}`,subtitle:`${w.air_date} • ${String(w.air_hour).padStart(2,"0")}:00`,path:`/hub/${s}/redactie`,stationSlug:s,score:9});
   }
   for(const h of hitlists){
     const s=String(h.station_slug);if(!accept(s))continue;
     if(matchText(h.name,q)||matchText(h.edition_label,q))add({id:`hitlist:${h.id}`,kind:"Hitlijst",title:String(h.name),subtitle:String(h.edition_label||""),path:`/hub/${s}/hitlijsten`,stationSlug:s,score:6});
     for(const e of Array.isArray(h.entries)?h.entries:[])if([e.artist,e.title].some(v=>matchText(v,q)))add({id:`hitentry:${h.id}:${e.id||e.position}`,kind:"Hitlijst song",title:`${e.artist} – ${e.title}`,subtitle:`${h.name} • ${h.edition_label||""}`,path:`/hub/${s}/hitlijsten`,stationSlug:s,score:10});
   }
-  const liveRotation=await searchRotationMusic(stationSlug,q);
-  results.push(...liveRotation);
   return results.sort((a,b)=>b.score-a.score||a.title.localeCompare(b.title,"nl")).slice(0,60);
 }

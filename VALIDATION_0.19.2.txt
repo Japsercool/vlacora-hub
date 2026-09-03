@@ -1,8 +1,0 @@
-VLACORA HUB 0.19.2 validation
-[PASS] package.json version 0.19.2
-[PASS] template selector available at top of playlist view
-[PASS] playlist layout moved closer to requested TOPplaylist reference
-[PASS] sidebar actions moved below list for cleaner overview
-[PASS] sold action talk shortcuts retained
-[INFO] no database changes
-[INFO] no API changes

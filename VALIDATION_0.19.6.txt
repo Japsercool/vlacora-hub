@@ -1,9 +1,0 @@
-VLACORA HUB 0.19.6 validation
-[PASS] version 0.19.6
-[PASS] manual traffic source valid
-[PASS] template traffic invalid source removed
-[PASS] provider still visible in notes
-[PASS] editorial-playlist-workspace.tsx parser/name sanity
-[PASS] no EditorialItem source assignment to Vlaams Verkeerscentrum remains
-[INFO] no database changes
-[INFO] no API changes

@@ -1,0 +1,14 @@
+VLACORA HUB 0.22.0 validation notes
+
+PASS: TypeScript/TSX parser check across repository.
+PASS: No Playout One / Rotation One application modules or API clients remain in the standalone source tree.
+PASS: No listener/stream statistics implementation remains; migration 029 only contains cleanup references that drop legacy objects.
+PASS: Central calendar module is wired into the HUB navigation route.
+PASS: Calendar is persisted through Supabase/PostgreSQL, not localStorage.
+PASS: Calendar supports personal, station and organization scopes plus invitees.
+PASS: Social Studio persists workflow metadata in PostgreSQL.
+PASS: Existing social-post edit path preserves the selected post instead of creating a replacement draft.
+PASS: README / architecture / version updated for migration 030.
+
+BUILD ENVIRONMENT NOTE:
+A full `npm run build` could not be completed in the artifact container because npm dependency installation did not finish within the available execution window. The repository was therefore syntax-parsed with the installed TypeScript parser. Run `npm install && npm run build` in the normal project environment before deployment.

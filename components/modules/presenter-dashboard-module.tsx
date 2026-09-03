@@ -29,7 +29,7 @@ export default function PresenterDashboardModule({stationSlug}:{stationSlug:stri
   useEffect(()=>{void load(false)},[load]);
 
   if(stationSlug==="all")return <div className="page-intro"><div><h2>Mijn uitzending</h2><p>Kies één station om jouw huidige of volgende uitzending te tonen.</p></div></div>;
-  if(busy&&!data)return <div className="page-intro"><div><h2>Mijn uitzending</h2><p>Programma, talks en operationele info worden geladen…</p></div></div>;
+  if(busy&&!data)return <div className="page-intro"><div><h2>Mijn uitzending</h2><p>Programma, redactie en teaminfo worden geladen…</p></div></div>;
   if(error)return <div className="config-error standalone"><strong>Mijn uitzending</strong><span>{error}</span><button className="ghost" onClick={()=>void load(true)}>Opnieuw</button></div>;
   if(!data?.program)return <div><div className="page-intro"><div><span className="eyebrow">PRESENTATOR</span><h2>Geen uitzending aan jou gekoppeld</h2><p>Koppel jezelf op de Programma-pagina aan een programma, of zorg dat je naam bij Presentator / team in Programmering staat.</p></div><button className="primary" onClick={()=>router.push(`/hub/${stationSlug}/programmas`)}>Open programma&apos;s</button></div></div>;
 
@@ -37,7 +37,7 @@ export default function PresenterDashboardModule({stationSlug}:{stationSlug:stri
   return <div className="presenter-dashboard">
     <section className="presenter-hero">
       <div><span className="eyebrow">MIJN UITZENDING</span><h2>{p.name}</h2><p>{p.start}–{p.end} • {p.format}{p.host?` • ${p.host}`:""}</p></div>
-      <div className={`presenter-ready ${data.playlistReady?"ready":"warning"}`}><span>{data.playlistReady?"✓":"!"}</span><div><strong>{data.playlistReady?"Playlist klaar":"Playlist controleren"}</strong><small>{data.playlistItems} item(s) gevonden</small></div></div>
+      <div className={`presenter-ready ${data.editorialReady?"ready":"warning"}`}><span>{data.editorialReady?"✓":"!"}</span><div><strong>{data.editorialReady?"Redactie voorbereid":"Redactie controleren"}</strong><small>{data.editorialItems} redactie-item(s)</small></div></div>
     </section>
 
     <div className="presenter-metrics">
@@ -49,7 +49,7 @@ export default function PresenterDashboardModule({stationSlug}:{stationSlug:stri
 
     <div className="presenter-grid">
       <section className="card presenter-card">
-        <div className="section-head"><div><h3>Verkeer & vaste momenten</h3><p>Live verkeersdata wordt pas opgehaald in de talk zelf.</p></div><button className="ghost" onClick={()=>router.push(`/hub/${stationSlug}/redactie`)}>Open playlist</button></div>
+        <div className="section-head"><div><h3>Verkeer & vaste momenten</h3><p>Live verkeersdata wordt pas opgehaald in de talk zelf.</p></div><button className="ghost" onClick={()=>router.push(`/hub/${stationSlug}/redactie`)}>Open redactie</button></div>
         {data.trafficMoments.length===0?<div className="empty-live-state compact"><strong>Geen verkeersslot</strong><span>Er staat in deze uitzending nog geen Verkeer-talk.</span></div>:data.trafficMoments.map((x,i)=><div className="presenter-line" key={`${x.time}-${i}`}><span>{x.time}</span><div><strong>{x.title||"Verkeer"}</strong><small>{x.ready?"Tekst klaar":"Live info nog ophalen"}</small></div><b className={x.ready?"ok":"warn"}>{x.ready?"✓":"!"}</b></div>)}
       </section>
 

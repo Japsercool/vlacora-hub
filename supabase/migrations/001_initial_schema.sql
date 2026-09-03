@@ -136,7 +136,6 @@ create table calendar_events (
 create table music_tracks (
   id uuid primary key default gen_random_uuid(),
   station_id uuid references stations(id),
-  rotation_one_id text,
   artist text not null,
   title text not null,
   release_date date,

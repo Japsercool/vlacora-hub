@@ -1,50 +1,68 @@
-# VLACORA HUB architecture
+# VLACORA HUB architecture — standalone edition
 
-## Demo
-This repository is a frontend prototype with local mock data. It is safe to deploy to Vercel for testing.
+VLACORA HUB 0.22.0 is a standalone editorial and organisation platform. It has no dependency on a playout engine, rotation engine, encoder, stream or listener-statistics provider.
 
-## Intended production architecture
+## Current architecture
 
-Cloud:
-- Next.js / VLACORA web app
-- Supabase PostgreSQL
-- Supabase Auth
-- Supabase Realtime
-- Supabase Storage
+```text
+Browser / VLACORA HUB
+        |
+        +-- Supabase Auth
+        |
+        +-- Supabase PostgreSQL
+             |- hub_stations
+             |- profiles / station_memberships
+             |- hub_calendar_events / attendees
+             |- tasks
+             |- incidents / notifications
+             |- programming / program pages
+             |- editorial workspaces and templates
+             |- music meetings / hitlists
+             |- social studio / review workflow
+             |- messenger / collaboration
+             `- hub_settings
+```
 
-Radio server:
-- `Vlacora.Agent` (.NET 8 Worker Service)
-- Rotation One API
-- Playout One API
-- SHOUTcast API
+Supabase is currently the managed backend. PostgreSQL remains the data model and source of truth.
 
-Flow:
+## Station management
 
-VLACORA Web -> VLACORA API / Supabase -> command queue -> Vlacora.Agent -> Rotation One / Playout One
+Stations are owned by VLACORA itself in `public.hub_stations`. Only a `superadmin` may add, edit, activate/deactivate or delete a station. A station slug stays stable when the visible name changes.
 
-Rotation One and Playout One remain source-of-truth for radio-engine data.
+## Calendar model
 
-## Planned API contracts
+`hub_calendar_events` is intentionally independent of any playout system.
 
-- GET /api/v1/stations
-- GET /api/v1/stations/{stationId}/playlists?date=YYYY-MM-DD
-- GET /api/v1/playlists/{playlistId}
-- POST /api/v1/playlists/{playlistId}/items
-- PATCH /api/v1/playlists/{playlistId}/items/{itemId}
-- POST /api/v1/playlists/{playlistId}/items/{itemId}/move
-- POST /api/v1/playlists/{playlistId}/items/{itemId}/replace
-- POST /api/v1/playlists/{playlistId}/export
+- `personal`: an owner plus optional attendees
+- `station`: one station slug
+- `organization`: all VLACORA users
 
-## Security
-Never commit `.env.local`, service-role keys, database passwords or radio API secrets.
+The calendar UI can additionally surface source records such as Social Studio posts and music meetings. Those records are read from their own tables instead of being duplicated into `hub_calendar_events`.
 
-## Editorial layer (0.3 design)
+This keeps writes low, avoids synchronisation loops and makes a later PostgreSQL move simpler.
 
-New station-scoped entities:
-- song presentation texts
-- program text templates + ordered template items
-- social templates + social drafts
-- music folders + folder tracks
-- internal generated documents
+## Social workflow
 
-Messenger must store messages by `channel_id`; a message is never a global timeline item. Realtime subscriptions in Supabase should therefore subscribe with a `channel_id` filter and Row Level Security should verify membership in `chat_members`.
+Social Studio stores production metadata directly on `hub_social_posts`: platforms, campaign, content pillar, objective, owner, reviewer, deadline, checklist, internal notes and publication URL. Review events stay append-only in `hub_social_review_events`.
+
+The current release does not auto-publish to external social networks. A future connector can be added behind a server-side adapter without changing the core editorial data model.
+
+## Future PostgreSQL migration
+
+The superadmin screen contains a non-secret migration target configuration. A future external PostgreSQL password/connection URL must be configured server-side as a secret, never in the browser or ordinary database settings.
+
+Intended migration flow:
+
+1. Configure the future PostgreSQL target server-side.
+2. Export/copy schema and data.
+3. Run compatibility checks.
+4. Put the HUB briefly in migration/read-only mode.
+5. Perform final delta sync.
+6. Activate the new backend from the superadmin migration workflow.
+7. Keep rollback information until validation is complete.
+
+Version 0.22.0 keeps Supabase active. The data model is deliberately PostgreSQL-oriented and avoids making core team data dependent on a playout engine or an external social provider.
+
+## Cost / usage rule
+
+VLACORA avoids constant polling. Data is loaded when a module opens, refreshed after writes, and Realtime is only used where collaboration benefits from it. Calendar source data is queried only for the visible month. Social assets are uploaded only when a user explicitly chooses a file.

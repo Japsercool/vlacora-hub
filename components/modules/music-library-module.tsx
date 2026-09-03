@@ -8,7 +8,7 @@ export type MusicSong = {
   artist: string;
   title: string;
   category: string;
-  rotationMap: string;
+  musicFolder: string;
   year: string;
   notes: string;
   artwork?: string;
@@ -16,23 +16,30 @@ export type MusicSong = {
 };
 
 const seedSongs: MusicSong[] = [
-  { id:"ms1", artist:"Joel Corry", title:"Whisper", category:"Current", rotationMap:"A-ROTATIE", year:"2026", notes:"Tune of the Week", presentationText:"Joel Corry is deze week onze Tune of the Week. Dit is Whisper." },
-  { id:"ms2", artist:"ANOTR & 54 Ultra", title:"Talk To You", category:"Current", rotationMap:"A-ROTATIE", year:"2026", notes:"Sterke daytime track" },
-  { id:"ms3", artist:"HUGEL", title:"Movin' To The Sun", category:"Current", rotationMap:"A-ROTATIE", year:"2026", notes:"" },
-  { id:"ms4", artist:"Topic & Becky G", title:"Sorry Papi", category:"Current", rotationMap:"B-ROTATIE", year:"2026", notes:"" },
-  { id:"ms5", artist:"Bebe Rexha", title:"New Religion", category:"Current", rotationMap:"B-ROTATIE", year:"2026", notes:"Nieuwe release" },
-  { id:"ms6", artist:"Calvin Harris & Jazzy", title:"Satisfy", category:"Recurrent", rotationMap:"RECURRENTS", year:"2026", notes:"" },
-  { id:"ms7", artist:"Jennifer Lopez & David Guetta", title:"Save Me Tonight", category:"Recurrent", rotationMap:"RECURRENTS", year:"2026", notes:"" },
-  { id:"ms8", artist:"Lost Frequencies", title:"Live It All", category:"Current", rotationMap:"B-ROTATIE", year:"2026", notes:"" },
-  { id:"ms9", artist:"Bruno Mars", title:"I Just Might", category:"Current", rotationMap:"C-ROTATIE", year:"2026", notes:"" }
+  { id:"ms1", artist:"Joel Corry", title:"Whisper", category:"Current", musicFolder:"A-MAP", year:"2026", notes:"Tune of the Week", presentationText:"Joel Corry is deze week onze Tune of the Week. Dit is Whisper." },
+  { id:"ms2", artist:"ANOTR & 54 Ultra", title:"Talk To You", category:"Current", musicFolder:"A-MAP", year:"2026", notes:"Sterke daytime track" },
+  { id:"ms3", artist:"HUGEL", title:"Movin' To The Sun", category:"Current", musicFolder:"A-MAP", year:"2026", notes:"" },
+  { id:"ms4", artist:"Topic & Becky G", title:"Sorry Papi", category:"Current", musicFolder:"B-MAP", year:"2026", notes:"" },
+  { id:"ms5", artist:"Bebe Rexha", title:"New Religion", category:"Current", musicFolder:"B-MAP", year:"2026", notes:"Nieuwe release" },
+  { id:"ms6", artist:"Calvin Harris & Jazzy", title:"Satisfy", category:"Recurrent", musicFolder:"RECURRENTS", year:"2026", notes:"" },
+  { id:"ms7", artist:"Jennifer Lopez & David Guetta", title:"Save Me Tonight", category:"Recurrent", musicFolder:"RECURRENTS", year:"2026", notes:"" },
+  { id:"ms8", artist:"Lost Frequencies", title:"Live It All", category:"Current", musicFolder:"B-MAP", year:"2026", notes:"" },
+  { id:"ms9", artist:"Bruno Mars", title:"I Just Might", category:"Current", musicFolder:"C-MAP", year:"2026", notes:"" }
 ];
 
 const uid = () => Math.random().toString(36).slice(2) + Date.now().toString(36);
 
-function useStored<T>(key:string, initial:T) {
-  const [value,setValue] = useState<T>(initial);
+function normalizeSongs(value:unknown):MusicSong[]{
+  if(!Array.isArray(value))return seedSongs;
+  return value.map((raw:any)=>({
+    ...raw,
+    musicFolder:String(raw?.musicFolder||raw?.rotationMap||"A-MAP")
+  })) as MusicSong[];
+}
+function useStoredSongs(key:string, initial:MusicSong[]) {
+  const [value,setValue] = useState<MusicSong[]>(initial);
   const [ready,setReady] = useState(false);
-  useEffect(()=>{ try { const raw=localStorage.getItem(key); if(raw) setValue(JSON.parse(raw)); } catch {} setReady(true); },[key]);
+  useEffect(()=>{ try { const raw=localStorage.getItem(key); if(raw) setValue(normalizeSongs(JSON.parse(raw))); } catch {} setReady(true); },[key]);
   useEffect(()=>{ if(ready) try { localStorage.setItem(key,JSON.stringify(value)); } catch {} },[key,ready,value]);
   return [value,setValue] as const;
 }
@@ -44,7 +51,7 @@ function readFile(file: File, cb:(value:string)=>void) {
 }
 
 export default function MusicLibraryModule({stationSlug}:{stationSlug:string}) {
-  const [songs,setSongs] = useStored<MusicSong[]>(`vlacora:${stationSlug}:music:catalog`,seedSongs);
+  const [songs,setSongs] = useStoredSongs(`vlacora:${stationSlug}:music:catalog`,seedSongs);
   const [selectedId,setSelectedId] = useState(seedSongs[0].id);
   const [search,setSearch] = useState("");
   const [filter,setFilter] = useState("Alle");
@@ -55,11 +62,11 @@ export default function MusicLibraryModule({stationSlug}:{stationSlug:string}) {
   const selected = songs.find(s=>s.id===selectedId) || songs[0];
   useEffect(()=>{emitActivity({detail:selected?`Muziek • ${selected.artist} – ${selected.title}`:"Muziekbibliotheek",entityType:"song",entityId:selected?.id})},[selected?.id,selected?.artist,selected?.title]);
 
-  const maps = useMemo(()=>Array.from(new Set(["A-ROTATIE","B-ROTATIE","C-ROTATIE","RECURRENTS","GOLD","SPECIALS",...songs.map(s=>s.rotationMap).filter(Boolean)])),[songs]);
+  const maps = useMemo(()=>Array.from(new Set(["A-MAP","B-MAP","C-MAP","RECURRENTS","GOLD","SPECIALS",...songs.map(s=>s.musicFolder).filter(Boolean)])),[songs]);
   const categories = ["Alle",...Array.from(new Set(songs.map(s=>s.category)))];
   const visible = songs.filter(s => {
     const q = search.toLowerCase();
-    return (!q || `${s.artist} ${s.title} ${s.rotationMap}`.toLowerCase().includes(q)) && (filter==="Alle" || s.category===filter);
+    return (!q || `${s.artist} ${s.title} ${s.musicFolder}`.toLowerCase().includes(q)) && (filter==="Alle" || s.category===filter);
   });
 
   function update(patch: Partial<MusicSong>) {
@@ -75,7 +82,7 @@ export default function MusicLibraryModule({stationSlug}:{stationSlug:string}) {
       artist:String(fd.get("artist")||""),
       title:String(fd.get("title")||""),
       category:String(fd.get("category")||"Current"),
-      rotationMap:String(fd.get("rotationMap")||"A-ROTATIE"),
+      musicFolder:String(fd.get("musicFolder")||"A-MAP"),
       year:String(fd.get("year")||"2026"),
       notes:String(fd.get("notes")||""),
       presentationText:""
@@ -86,7 +93,7 @@ export default function MusicLibraryModule({stationSlug}:{stationSlug:string}) {
   function refresh() {
     try {
       const raw = localStorage.getItem(`vlacora:${stationSlug}:music:catalog`);
-      if(raw) setSongs(JSON.parse(raw));
+      if(raw) setSongs(normalizeSongs(JSON.parse(raw)));
     } catch {}
   }
 
@@ -102,7 +109,7 @@ export default function MusicLibraryModule({stationSlug}:{stationSlug:string}) {
         <label className="field">Artiest<input className="input" name="artist" required /></label>
         <label className="field">Titel<input className="input" name="title" required /></label>
         <label className="field">Categorie<select className="select" name="category"><option>Current</option><option>Recurrent</option><option>Gold</option><option>Special</option></select></label>
-        <label className="field">Rotation map<select className="select" name="rotationMap">{maps.map(x=><option key={x}>{x}</option>)}</select></label>
+        <label className="field">Muziekmap<select className="select" name="musicFolder">{maps.map(x=><option key={x}>{x}</option>)}</select></label>
         <label className="field">Jaar<input className="input" name="year" defaultValue="2026"/></label>
         <label className="field wide-field">Notitie<input className="input" name="notes" /></label>
         <button className="primary">Song toevoegen</button>
@@ -120,7 +127,7 @@ export default function MusicLibraryModule({stationSlug}:{stationSlug:string}) {
           {visible.map(song=><button key={song.id} className={`music-browser-row ${selected?.id===song.id?"selected":""}`} onClick={()=>setSelectedId(song.id)}>
             <div className="music-art-thumb">{song.artwork?<img src={song.artwork} alt=""/>:<span>♫</span>}</div>
             <div><strong>{song.artist}</strong><span>{song.title}</span></div>
-            <b>{song.rotationMap}</b>
+            <b>{song.musicFolder}</b>
           </button>)}
         </div>
       </div>
@@ -134,7 +141,7 @@ export default function MusicLibraryModule({stationSlug}:{stationSlug:string}) {
           <label className="field">Artiest<input className="input" value={selected.artist} onChange={e=>update({artist:e.target.value})}/></label>
           <label className="field">Titel<input className="input" value={selected.title} onChange={e=>update({title:e.target.value})}/></label>
           <label className="field">Categorie<select className="select" value={selected.category} onChange={e=>update({category:e.target.value})}><option>Current</option><option>Recurrent</option><option>Gold</option><option>Special</option></select></label>
-          <label className="field">Rotation map<select className="select" value={selected.rotationMap} onChange={e=>update({rotationMap:e.target.value})}>{maps.map(x=><option key={x}>{x}</option>)}</select></label>
+          <label className="field">Muziekmap<select className="select" value={selected.musicFolder} onChange={e=>update({musicFolder:e.target.value})}>{maps.map(x=><option key={x}>{x}</option>)}</select></label>
           <label className="field">Jaar<input className="input" value={selected.year} onChange={e=>update({year:e.target.value})}/></label>
           <label className="field">Artwork upload<input className="input file-input" type="file" accept="image/*" onChange={e=>{const f=e.target.files?.[0];if(f)readFile(f,v=>update({artwork:v}))}}/></label>
         </div>
