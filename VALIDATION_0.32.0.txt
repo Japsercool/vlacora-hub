@@ -1,0 +1,29 @@
+PULSE 0.32.0 VALIDATION
+=======================
+
+FULL SOURCE BASIS
+- Bron: volledige vlacora-hub.zip
+- Niet alleen overlay/update
+
+CHECKS
+- npm run prebuild: PASS
+- TS/TSX syntax transpile: PASS (84 bestanden)
+- database backend integration check: PASS
+- Gateway node --check: PASS
+- Docker bash -n: PASS
+- docker-compose YAML parse: PASS
+
+INTEGRATED
+- DatabaseBackendV2 actief in Beheer
+- Beschikbaarheid zichtbaar in navigatie + rechten
+- standaardweek + uitzonderingen
+- prikmomenten
+- Top 1000/500 events + rollen + shifts + bevestiging
+- hitlijst-eventkoppeling
+- multi-week Excel import
+- hitlijst updates privé/managers/team
+- PULSE server bundle + uitgebreide handleiding
+
+KNOWN VALIDATION LIMIT
+- lokale npm install/next build niet uitgevoerd: dependency-download liep in deze runtime vast.
+- Vercel voert de volledige build uit bij deployment.

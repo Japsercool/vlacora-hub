@@ -1,0 +1,4 @@
+services:
+  gateway:
+    ports:
+      - "${PULSE_GATEWAY_BIND:-127.0.0.1}:${PULSE_GATEWAY_PORT:-8787}:8787"

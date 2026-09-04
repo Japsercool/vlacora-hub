@@ -27,6 +27,7 @@ import MusicMeetingsModule from "@/components/modules/music-meetings-module";
 import TeamRightsModule from "@/components/modules/team-rights-module";
 import AdminIntegrationsModule from "@/components/modules/admin-integrations-module";
 import ProgrammingModule from "@/components/modules/programming-module";
+import AvailabilityModule from "@/components/modules/availability-module";
 import ChartsModule from "@/components/modules/charts-module";
 import IncidentModule,{IncidentSummaryCard} from "@/components/modules/incident-module";
 import IncidentAdminModule from "@/components/modules/incident-admin-module";
@@ -141,6 +142,7 @@ function HubAppInner({ stationSlug, moduleSlug }: Props) {
             </div>
             <TodayCollaboration stationName={station.name} onOpenNotifications={collaboration.openNotifications} onOpenPresence={collaboration.openPresence}/>
             <Card><div className="section-head"><div><h3>Uitzendschema</h3><p>Vandaag • {station.name}</p></div><button className="ghost" onClick={()=>router.push(`/hub/${station.slug}/programmering`)}>Open programmering →</button></div><div className="empty-live-state compact"><strong>Bewerkbare programmering</strong><span>Programma&apos;s worden niet meer uit een vaste demo geladen. Beheer ze in Programmering.</span></div></Card>
+            <Card><div className="section-head"><div><h3>Mijn beschikbaarheid</h3><p>Vaste week, uitzonderingen en specials.</p></div><button className="ghost" onClick={()=>router.push(`/hub/${station.slug}/beschikbaarheid`)}>Open beschikbaarheid →</button></div><div className="empty-live-state compact"><strong>Plan vooruit</strong><span>Geef je normale beschikbaarheid door en bevestig Top 1000/Top 500-shifts apart.</span></div></Card>
           </>}
 
           {hasModuleAccess && moduleSlug === "voor-mij" && <PersonalInboxModule stationSlug={station.slug} />}
@@ -167,6 +169,8 @@ function HubAppInner({ stationSlug, moduleSlug }: Props) {
           {hasModuleAccess && moduleSlug === "kalender" && <CalendarModule stationSlug={station.slug} />}
 
           {hasModuleAccess && moduleSlug === "programmering" && <ProgrammingModule stationSlug={station.slug} stationName={station.name} />}
+
+          {hasModuleAccess && moduleSlug === "beschikbaarheid" && <AvailabilityModule stationSlug={station.slug} />}
 
           {hasModuleAccess && moduleSlug === "programmas" && <ProgramPagesModule stationSlug={station.slug} />}
 

@@ -12,6 +12,7 @@ export const navItems = [
   ["communicatie", "▣", "Communicatie"],
   ["kalender", "□", "Kalender"],
   ["programmering", "◫", "Programmering"],
+  ["beschikbaarheid", "◷", "Beschikbaarheid"],
   ["programmas", "▣", "Programma-pagina's"],
   ["afwezigheden", "↔", "Afwezigheden"],
   ["contacten", "☎", "Contacten"],

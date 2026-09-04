@@ -1,0 +1,13 @@
+.env
+secrets/*
+!secrets/.gitkeep
+PULSE_SERVER_KOPPELING.txt
+INSTALLATION_REPORT.txt
+backups/*
+!backups/.gitkeep
+data/gateway/*
+!data/gateway/.gitkeep
+data/files/*
+!data/files/.gitkeep
+logs/*
+!logs/.gitkeep

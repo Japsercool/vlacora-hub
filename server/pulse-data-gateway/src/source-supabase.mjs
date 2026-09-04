@@ -40,6 +40,15 @@ export async function loadCatalog(jwt) {
   return sourceRpc(jwt, "pulse_export_catalog", {});
 }
 
+export async function loadRuntimeCatalog(jwt) {
+  return sourceRpc(jwt, "pulse_export_runtime_catalog", {});
+}
+
+export async function loadStorageObjects(jwt) {
+  const data = await sourceRpc(jwt, "pulse_export_storage_objects", {});
+  return Array.isArray(data) ? data : [];
+}
+
 export async function loadAuthIdentities(jwt) {
   const data = await sourceRpc(jwt, "pulse_export_auth_identities", {});
   return Array.isArray(data) ? data : [];
@@ -66,11 +75,13 @@ export function sourceStorageBase() {
   return sourceBase();
 }
 
-export async function downloadStorageObject(jwt, bucket, storagePath) {
+export async function downloadStorageObject(jwt, bucket, storagePath, isPublic = false) {
   const encoded = storagePath.split("/").map(encodeURIComponent).join("/");
-  const res = await fetch(`${sourceBase()}/storage/v1/object/authenticated/${encodeURIComponent(bucket)}/${encoded}`, {
-    headers: { apikey: sourceKey(), authorization: `Bearer ${jwt}` },
-  });
-  if (!res.ok) throw new Error(`Storage download mislukt (${res.status}) voor ${storagePath}`);
+  const access = isPublic ? "public" : "authenticated";
+  const headers = isPublic
+    ? { apikey: sourceKey() }
+    : { apikey: sourceKey(), authorization: `Bearer ${jwt}` };
+  const res = await fetch(`${sourceBase()}/storage/v1/object/${access}/${encodeURIComponent(bucket)}/${encoded}`, { headers });
+  if (!res.ok) throw new Error(`Storage download mislukt (${res.status}) voor ${bucket}/${storagePath}`);
   return Buffer.from(await res.arrayBuffer());
 }

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ChangeEvent } from "react";
-import { createClient, isSupabaseBrowserConfigured } from "@/lib/supabase/client";
+import { createClient, isSupabaseBrowserConfigured, configurePulseDataRoute } from "@/lib/supabase/client";
 import styles from "./database-backend-v2.module.css";
 
 type BackendName = "supabase" | "external_postgres";
@@ -93,7 +93,12 @@ const stageLabels: Record<string, string> = {
   copying: "PULSE-data kopiëren",
   constraints: "Relaties en indexen aanmaken",
   verifying: "Data controleren",
-  files: "Bijlagen kopiëren",
+  files: "Bestanden en assets kopiëren",
+  "runtime-security": "Functies, triggers en rechten herstellen",
+  "runtime-functions": "Databasefuncties herstellen",
+  "runtime-triggers": "Triggers herstellen",
+  "runtime-policies": "RLS-beleid herstellen",
+  "rewrite-storage-urls": "Publieke bestands-URL's omschakelen",
   ready: "Klaar voor omschakeling",
   failed: "Migratie gestopt",
 };
@@ -140,6 +145,15 @@ export function DatabaseBackendV2() {
     return data.user?.id || null;
   }
 
+  async function saveBootstrapPointer(active_backend: BackendName, gateway_url = cfg.gateway_url) {
+    if (!client) return;
+    const { error: pointerError } = await client
+      .from("pulse_backend_pointer")
+      .upsert({ scope: "global", active_backend, gateway_url: gateway_url.trim().replace(/\/$/, ""), updated_at: new Date().toISOString() }, { onConflict: "scope" });
+    if (pointerError) throw pointerError;
+    configurePulseDataRoute(active_backend, gateway_url);
+  }
+
   async function saveConfig(patch: Partial<Config>) {
     if (!client) return;
     const row = {
@@ -158,6 +172,7 @@ export function DatabaseBackendV2() {
       .single();
     if (saveError) throw saveError;
     setCfg(data as Config);
+    configurePulseDataRoute((data as Config).active_backend,(data as Config).gateway_url||"");
   }
 
   async function gateway(path: string, body: unknown = {}) {
@@ -190,6 +205,7 @@ export function DatabaseBackendV2() {
       if (active && active !== syncedBackend.current) {
         syncedBackend.current = active;
         if (active === "external_postgres" && cfg.active_backend !== "external_postgres") {
+          await saveBootstrapPointer("external_postgres", cfg.gateway_url);
           await saveConfig({
             previous_backend: cfg.active_backend,
             active_backend: "external_postgres",
@@ -199,6 +215,7 @@ export function DatabaseBackendV2() {
           setMsg("Omschakeling voltooid: PULSE Gateway gebruikt nu de eigen PostgreSQL-backend.");
         }
         if (active === "supabase" && cfg.active_backend === "external_postgres") {
+          await saveBootstrapPointer("supabase", cfg.gateway_url);
           await saveConfig({ active_backend: "supabase", status: "rollback", activated_at: null });
         }
       }
@@ -252,7 +269,7 @@ export function DatabaseBackendV2() {
     await saveConfig({
       gateway_setup_complete: true,
       postgres_managed: Boolean(result.managedDocker ?? cfg.postgres_managed),
-      gateway_version: "0.30.1",
+      gateway_version: "0.32.0",
     });
     setSetupToken("");
   }
@@ -271,7 +288,7 @@ export function DatabaseBackendV2() {
         last_test_at: new Date().toISOString(),
         postgres_managed: true,
         gateway_setup_complete: true,
-        gateway_version: "0.30.1",
+        gateway_version: "0.32.0",
         target_host: String(testResult.host || "postgres"),
         target_port: Number(testResult.port || 5432),
         target_user: String(testResult.user || "pulse_app"),
@@ -289,7 +306,7 @@ export function DatabaseBackendV2() {
       last_test_at: new Date().toISOString(),
       postgres_managed: false,
       gateway_setup_complete: true,
-      gateway_version: "0.30.1",
+      gateway_version: "0.32.0",
     });
     setDbPassword("");
   }
@@ -467,7 +484,7 @@ export function DatabaseBackendV2() {
             <input
               value={extraOrigins}
               onChange={(e: ChangeEvent<HTMLInputElement>) => setExtraOrigins(e.target.value)}
-              placeholder="https://oude-site.vercel.app, https://preview.jouwdomein.be"
+              placeholder="https://oude-site.example, https://preview.jouwdomein.be"
             />
             <small>Handig tijdens een domeinwissel: oud en nieuw kunnen tijdelijk tegelijk werken. Verwijder oude origins na de overstap.</small>
           </label>
@@ -544,12 +561,14 @@ export function DatabaseBackendV2() {
           })} disabled={Boolean(busy) || gatewayState.running}>3. Migreren & controleren</button>
           <button className={styles.primary} onClick={() => void run("activate", async () => {
             const r = await gateway("/admin/activate", {});
+            await saveBootstrapPointer("external_postgres", cfg.gateway_url);
             await saveConfig({ previous_backend: cfg.active_backend, active_backend: "external_postgres", status: "active", activated_at: String(r.activatedAt || new Date().toISOString()) });
             setMsg("Eigen PostgreSQL is geactiveerd.");
           })} disabled={Boolean(busy) || gatewayState.running || migration.status !== "ready" || runtimeBackend === "external_postgres"}>4. Alleen activeren</button>
           <button className={styles.rollback} onClick={() => void run("rollback", async () => {
             await gateway("/admin/rollback", {});
-            await saveConfig({ active_backend: "supabase", status: "rollback", activated_at: null });
+            await saveBootstrapPointer("supabase", cfg.gateway_url);
+          await saveConfig({ active_backend: "supabase", status: "rollback", activated_at: null });
             setMsg("Teruggeschakeld naar Supabase. De PostgreSQL-kopie is behouden.");
           })} disabled={Boolean(busy) || gatewayState.running || runtimeBackend !== "external_postgres"}>Rollback naar Supabase</button>
         </div>

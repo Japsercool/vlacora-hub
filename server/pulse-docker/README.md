@@ -1,52 +1,35 @@
-# PULSE Managed Docker Server 0.30
+# PULSE Server 0.32.0 — Docker
 
-## Doel
-Deze stack maakt automatisch een eigen PostgreSQL + PULSE Data Gateway aan. PostgreSQL-poort 5432 wordt **niet** gepubliceerd. De browser praat uitsluitend met de Gateway.
+Dit is de productie-stack voor de eigen PULSE-dataomgeving.
 
-## Snelste installatie
-Windows:
+## Wat draait er?
 
-```powershell
-PowerShell -ExecutionPolicy Bypass -File .\INSTALL_PULSE_DOCKER.ps1
-```
+- **PostgreSQL 17** — alle persistente PULSE-data na omschakeling.
+- **PostgREST** — interne Data API boven PostgreSQL; niet publiek gepubliceerd.
+- **PULSE Data Gateway** — valideert Supabase Auth JWT's, voert migraties uit, proxyt de Data API en beheert bestanden.
+- **Caddy** — optionele HTTPS reverse proxy voor de Gateway.
 
-Linux:
+PostgreSQL-poort 5432 en PostgREST-poort 3000 worden niet naar buiten gepubliceerd.
+
+## Windows snelstart
+
+1. Installeer Docker Desktop / Docker Engine.
+2. Pak deze map uit op de server.
+3. Start `QUICK_SETUP_WINDOWS.cmd` als administrator.
+4. Vul alleen in wat de wizard vraagt: PULSE-site-URL, Supabase Auth URL + publishable key en (productie) Gateway-domein.
+5. Het script genereert zelf databasewachtwoord, Gateway setup-code, master key, PostgREST signing secret, volumes en configuratie.
+6. Open daarna `PULSE_SERVER_KOPPELING.txt` en vul Gateway URL + eenmalige setup-code in bij **PULSE → Beheer → Database-backend**.
+
+## Linux snelstart
 
 ```bash
-./INSTALL_PULSE_DOCKER.sh
+chmod +x scripts/*.sh
+sudo ./scripts/INSTALL_PULSE_DOCKER.sh
 ```
 
-De installer maakt zelf aan:
-- sterk PostgreSQL-wachtwoord;
-- Gateway setup-code;
-- 256-bit Gateway master key;
-- Docker volumes voor PostgreSQL, PULSE-bestanden en Gateway-state;
-- intern Docker-netwerk;
-- optioneel HTTPS via Caddy.
+## Belangrijk
 
-Na installatie gebruik je bij de **eerste koppeling** in **PULSE > Beheer > Database-backend** alleen:
-1. Gateway URL;
-2. Setup-code uit `PULSE_SERVER_KOPPELING.txt`.
-
-Daarna is de setup-code niet meer nodig. Databasehost, databasegebruiker en databasewachtwoord worden in beheerde Docker-modus nooit in de browser ingevoerd.
-
-## HTTPS
-Een Vercel/HTTPS PULSE-site kan in normale browsers niet veilig naar een HTTP Gateway bellen. Gebruik daarom voor extern gebruik een domeinnaam die naar de PULSE-server wijst en laat de installer het Caddy-profiel starten. Alleen poorten 80/443 hoeven dan naar deze server; PostgreSQL 5432 blijft dicht.
-
-## Website of Gateway later van URL veranderen
-
-De database hoeft daarvoor niet opnieuw gemigreerd te worden. Wijzig de PULSE website-URL in **Beheer > Database-backend > Domeinen & URL's**. De Gateway bewaart de toegestane origins live in zijn state-volume.
-
-Voor een nieuwe publieke Gateway-domeinnaam/HTTPS-host voer je op de server uit:
-
-```powershell
-.\SET_PULSE_URLS.ps1
-```
-
-of op Linux:
-
-```sh
-./SET_PULSE_URLS.sh
-```
-
-De scripts wijzigen alleen URL/configuratie en herladen Gateway/Caddy. PostgreSQL- en bestandsvolumes worden niet verwijderd.
+- Supabase blijft de login-/identiteitsprovider.
+- De eigen server bewaart geen Supabase-wachtwoorden, password hashes of refresh tokens.
+- Bij migratie worden PULSE-tabellen, relaties, indexen, relevante functies, triggers, RLS-beleid en PULSE Storage-assets gecontroleerd overgezet.
+- De oude Supabase-data wordt bij de eerste omschakeling niet verwijderd, zodat rollback mogelijk blijft.

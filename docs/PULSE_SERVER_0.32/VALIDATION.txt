@@ -1,0 +1,20 @@
+PULSE SERVER 0.31.0 - VALIDATION
+Generated: 2026-09-04T18:07:28.780484
+
+Checks uitgevoerd in de buildomgeving:
+- Node syntax: server.mjs, migration-engine.mjs, postgres-tools.mjs, source-supabase.mjs, target-migrations.mjs: OK
+- Bash syntax (-n) voor alle *.sh scripts: OK
+- YAML parse docker-compose.yml + docker-compose.local.yml: OK
+- Bundle required-file audit: OK
+- PDF preflight: 19 pagina's, openable, niet encrypted, niet scanned: OK
+- PDF render inspectie: cover + midden + scriptsreferentie visueel gecontroleerd: OK
+- PostgreSQL wordt in compose NIET met een ports:-mapping gepubliceerd: OK
+- Gateway heeft read_only, cap_drop ALL en no-new-privileges: aanwezig
+- Caddy is de publieke HTTPS-laag in production profile: aanwezig
+
+Niet uitvoerbaar in deze buildomgeving:
+- Een echte Docker daemon was hier niet beschikbaar; docker compose up / container health is daarom niet end-to-end uitgevoerd.
+- PowerShell was hier niet geïnstalleerd; de PowerShell scripts zijn inhoudelijk/statisch gecontroleerd maar niet op een Windows host uitgevoerd.
+
+Productieadvies:
+Run na installatie scripts/VERIFY_PULSE_DOCKER.* en maak voor omschakeling een echte backup. Gebruik AUDIT_PULSE_WEBAPP.* op de volledige PULSE-webbron zodat resterende directe Supabase data/storage calls zichtbaar zijn.

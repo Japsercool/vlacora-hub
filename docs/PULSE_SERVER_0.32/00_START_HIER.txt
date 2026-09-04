@@ -1,0 +1,24 @@
+PULSE SERVER 0.31.0 - START HIER
+================================
+
+Doel: een nieuwe server voorbereiden waarbij PostgreSQL volledig in Docker draait, Supabase Auth de login blijft doen en jij zelf GEEN databasewachtwoord of mappenstructuur hoeft te bedenken.
+
+WINDOWS
+1. Pak deze ZIP uit op de server, bv. D:\PULSE-SERVER\
+2. Zorg dat Docker werkt.
+3. Open pulse-docker\QUICK_SETUP_WINDOWS.cmd als administrator.
+4. Vul alleen in wat gevraagd wordt: PULSE site-URL, Supabase Auth URL + publishable key, en voor productie de Gateway-domeinnaam.
+5. Het script maakt PostgreSQL, random secrets, mappen, containers en PULSE_SERVER_KOPPELING.txt.
+6. Open PULSE > Beheer > Database-backend en vul Gateway URL + setup-code in.
+7. Voer eerst TEST / VOORBEREIDEN / MIGREREN uit. Schakel pas om als alle controles groen zijn.
+
+LINUX
+1. chmod +x pulse-docker/scripts/*.sh
+2. cd pulse-docker
+3. ./scripts/INSTALL_PULSE_DOCKER.sh
+
+BELANGRIJK
+- PostgreSQL poort 5432 wordt NIET publiek geopend.
+- Supabase Auth blijft actief; auth.users/wachtwoorden worden niet als echte login-database gekopieerd.
+- Houd Supabase-data als rollback zolang de nieuwe backend nog niet lang genoeg stabiel is.
+- Lees HANDLEIDING/HANDLEIDING_PULSE_SERVER.pdf of .md voor de volledige uitleg.

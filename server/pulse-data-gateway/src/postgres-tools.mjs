@@ -177,3 +177,123 @@ export async function writeTargetBackendMeta(client, values) {
     }
   }
 }
+
+
+export async function preparePostgrestRuntime(client) {
+  await client.query("create schema if not exists auth");
+  await client.query(`do $$ begin create role anon nologin; exception when duplicate_object then null; end $$;`);
+  await client.query(`do $$ begin create role authenticated nologin; exception when duplicate_object then null; end $$;`);
+  const who = await client.query("select current_user as usr");
+  const owner = who.rows[0]?.usr;
+  if (owner) {
+    await client.query(`grant anon to ${quoteIdent(owner)}`);
+    await client.query(`grant authenticated to ${quoteIdent(owner)}`);
+  }
+  await client.query(`create or replace function auth.uid() returns uuid
+    language sql stable
+    as $$
+      select nullif(coalesce(
+        current_setting('request.jwt.claim.sub', true),
+        nullif(current_setting('request.jwt.claims', true),'')::jsonb->>'sub'
+      ), '')::uuid
+    $$`);
+  await client.query(`create or replace function auth.jwt() returns jsonb
+    language sql stable
+    as $$ select coalesce(nullif(current_setting('request.jwt.claims', true),''),'{}')::jsonb $$`);
+  await client.query("grant usage on schema public,auth to authenticated,anon");
+  await client.query("grant execute on function auth.uid() to authenticated,anon");
+  await client.query("grant execute on function auth.jwt() to authenticated,anon");
+  await client.query("grant select,insert,update,delete on all tables in schema public to authenticated");
+  await client.query("grant usage,select,update on all sequences in schema public to authenticated");
+  await client.query("alter default privileges in schema public grant select,insert,update,delete on tables to authenticated");
+  await client.query("alter default privileges in schema public grant usage,select,update on sequences to authenticated");
+}
+
+export async function applyRuntimeCatalog(client, runtime, progress) {
+  await preparePostgrestRuntime(client);
+  const functions = Array.isArray(runtime?.functions) ? runtime.functions : [];
+  for (let i=0;i<functions.length;i++) {
+    const fn=functions[i];
+    progress?.({stage:"runtime-functions",table:fn.name,index:i+1,total:functions.length});
+    if (!fn?.definition) continue;
+    await client.query(String(fn.definition));
+  }
+  await client.query("grant execute on all functions in schema public to authenticated");
+
+  const triggers = Array.isArray(runtime?.triggers) ? runtime.triggers : [];
+  for (let i=0;i<triggers.length;i++) {
+    const tr=triggers[i];
+    if (!tr?.table || !tr?.name || !tr?.definition) continue;
+    progress?.({stage:"runtime-triggers",table:tr.table,index:i+1,total:triggers.length});
+    await client.query(`drop trigger if exists ${quoteIdent(tr.name)} on public.${quoteIdent(tr.table)}`);
+    await client.query(String(tr.definition));
+  }
+
+  const rls = Array.isArray(runtime?.rls) ? runtime.rls : [];
+  for (const row of rls) {
+    if (!row?.table) continue;
+    if (row.enabled) await client.query(`alter table public.${quoteIdent(row.table)} enable row level security`);
+    else await client.query(`alter table public.${quoteIdent(row.table)} disable row level security`);
+    if (row.forced) await client.query(`alter table public.${quoteIdent(row.table)} force row level security`);
+    else await client.query(`alter table public.${quoteIdent(row.table)} no force row level security`);
+  }
+
+  const policies = Array.isArray(runtime?.policies) ? runtime.policies : [];
+  for (let i=0;i<policies.length;i++) {
+    const pol=policies[i];
+    if (!pol?.table || !pol?.name) continue;
+    progress?.({stage:"runtime-policies",table:pol.table,index:i+1,total:policies.length});
+    await client.query(`drop policy if exists ${quoteIdent(pol.name)} on public.${quoteIdent(pol.table)}`);
+    const roles=(Array.isArray(pol.roles)?pol.roles:["authenticated"]).map(quoteIdent).join(", ");
+    const permissive=String(pol.permissive||"PERMISSIVE").toUpperCase()==="RESTRICTIVE"?"RESTRICTIVE":"PERMISSIVE";
+    const cmd=String(pol.cmd||"ALL").toUpperCase();
+    let sql=`create policy ${quoteIdent(pol.name)} on public.${quoteIdent(pol.table)} as ${permissive} for ${cmd} to ${roles}`;
+    if (pol.qual) sql += ` using (${pol.qual})`;
+    if (pol.with_check) sql += ` with check (${pol.with_check})`;
+    await client.query(sql);
+  }
+
+  // PostgREST caches schema metadata. Force an immediate refresh after functions,
+  // triggers and policies have been reconstructed on the target database.
+  try { await client.query("notify pgrst, 'reload schema'"); } catch {}
+}
+
+
+export async function rewriteSupabaseStorageUrls(client, sourceBase, gatewayBase, progress) {
+  const source = String(sourceBase || "").replace(/\/$/, "");
+  const gateway = String(gatewayBase || "").replace(/\/$/, "");
+  if (!source || !gateway) return { columns: 0, rows: 0 };
+
+  const from = `${source}/storage/v1/object/public/`;
+  const to = `${gateway}/data/files/public/`;
+  const q = await client.query(`
+    select table_name,column_name,data_type
+    from information_schema.columns
+    where table_schema='public'
+      and data_type in ('text','character varying','jsonb')
+    order by table_name,ordinal_position
+  `);
+  let columns = 0;
+  let rows = 0;
+  for (let i=0;i<q.rows.length;i++) {
+    const col=q.rows[i];
+    progress?.({stage:'rewrite-storage-urls',table:col.table_name,index:i+1,total:q.rows.length});
+    const table=`public.${quoteIdent(col.table_name)}`;
+    const field=quoteIdent(col.column_name);
+    let result;
+    if (col.data_type === 'jsonb') {
+      result = await client.query(
+        `update ${table} set ${field}=replace(${field}::text,$1,$2)::jsonb where ${field}::text like '%' || $1 || '%'`,
+        [from,to],
+      );
+    } else {
+      result = await client.query(
+        `update ${table} set ${field}=replace(${field},$1,$2) where ${field} like '%' || $1 || '%'`,
+        [from,to],
+      );
+    }
+    columns += result.rowCount ? 1 : 0;
+    rows += Number(result.rowCount || 0);
+  }
+  return { columns, rows, from, to };
+}

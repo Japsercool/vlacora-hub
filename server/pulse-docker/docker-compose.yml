@@ -1,6 +1,8 @@
+name: pulse
+
 services:
   postgres:
-    image: postgres:17-alpine
+    image: ${PULSE_POSTGRES_IMAGE:-postgres:17-alpine}
     restart: unless-stopped
     environment:
       POSTGRES_DB: ${PULSE_POSTGRES_DB:-pulse}
@@ -18,18 +20,37 @@ services:
       timeout: 5s
       retries: 15
       start_period: 10s
+    security_opt:
+      - no-new-privileges:true
+
+  postgrest:
+    image: ${PULSE_POSTGREST_IMAGE:-postgrest/postgrest:v12.2.12}
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./data/postgrest/postgrest.conf:/etc/postgrest.conf:ro
+    command: ["/etc/postgrest.conf"]
+    networks:
+      - pulse_internal
+    security_opt:
+      - no-new-privileges:true
 
   gateway:
     build:
       context: ../pulse-data-gateway
       dockerfile: Dockerfile
     restart: unless-stopped
+    init: true
     depends_on:
       postgres:
         condition: service_healthy
+      postgrest:
+        condition: service_started
     environment:
       PORT: 8787
-      PULSE_PUBLIC_URL: ${PULSE_PUBLIC_URL:-}
+      PULSE_PUBLIC_URL: ${PULSE_PUBLIC_URL}
       PULSE_ALLOWED_ORIGIN: ${PULSE_ALLOWED_ORIGIN}
       PULSE_GATEWAY_PUBLIC_URL: ${PULSE_GATEWAY_PUBLIC_URL:-}
       SUPABASE_AUTH_URL: ${SUPABASE_AUTH_URL}
@@ -43,6 +64,8 @@ services:
       PULSE_POSTGRES_USER: ${PULSE_POSTGRES_USER:-pulse_app}
       PULSE_POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
       PULSE_POSTGRES_SSL: "0"
+      PULSE_POSTGREST_URL: http://postgrest:3000
+      PULSE_POSTGREST_JWT_SECRET_FILE: /run/secrets/postgrest_jwt_secret
       PULSE_FILE_ROOT: /pulse/files
       PULSE_FILE_MIGRATION_STRICT: "1"
       PULSE_SOURCE_STORAGE_BUCKET: ${PULSE_SOURCE_STORAGE_BUCKET:-vlacora-hub-files}
@@ -50,25 +73,37 @@ services:
       - postgres_password
       - gateway_setup_token
       - gateway_master_key
+      - postgrest_jwt_secret
     volumes:
-      - pulse_files:/pulse/files
-      - pulse_gateway_state:/app/data
+      - ./data/files:/pulse/files
+      - ./data/gateway:/app/data
       - ./backups:/pulse/backups
-    ports:
-      - "${PULSE_GATEWAY_PORT:-8787}:8787"
     networks:
       - pulse_internal
       - pulse_edge
+    read_only: true
+    tmpfs:
+      - /tmp:size=128m,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8787/health/live').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
 
   caddy:
-    image: caddy:2.10-alpine
+    image: ${PULSE_CADDY_IMAGE:-caddy:2.10-alpine}
     restart: unless-stopped
     profiles: ["https"]
     depends_on:
-      - gateway
+      gateway:
+        condition: service_healthy
     environment:
       PULSE_GATEWAY_DOMAIN: ${PULSE_GATEWAY_DOMAIN}
-      PULSE_GATEWAY_EMAIL: ${PULSE_GATEWAY_EMAIL:-}
     ports:
       - "80:80"
       - "443:443"
@@ -78,6 +113,12 @@ services:
       - pulse_caddy_config:/config
     networks:
       - pulse_edge
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+    security_opt:
+      - no-new-privileges:true
 
 networks:
   pulse_internal:
@@ -86,10 +127,11 @@ networks:
 
 volumes:
   pulse_postgres:
-  pulse_files:
-  pulse_gateway_state:
+    name: pulse_postgres
   pulse_caddy_data:
+    name: pulse_caddy_data
   pulse_caddy_config:
+    name: pulse_caddy_config
 
 secrets:
   postgres_password:
@@ -98,3 +140,5 @@ secrets:
     file: ./secrets/gateway_setup_token.txt
   gateway_master_key:
     file: ./secrets/gateway_master_key.txt
+  postgrest_jwt_secret:
+    file: ./secrets/postgrest_jwt_secret.txt

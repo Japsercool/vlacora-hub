@@ -1,0 +1,8 @@
+PULSE website
+  +--> Supabase Auth (login, sessies, passwords, UUID)
+  +--> HTTPS PULSE Gateway
+          +--> PostgreSQL 17 (Docker internal only)
+          +--> data/files
+          +--> data/gateway
+
+Public ports: 80/443 only in production. PostgreSQL 5432 is NOT published.

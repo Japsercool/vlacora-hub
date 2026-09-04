@@ -4,14 +4,16 @@ import path from "node:path";
 import crypto from "node:crypto";
 import express from "express";
 import cors from "cors";
-import { createRemoteJWKSet, jwtVerify } from "jose";
+import { createRemoteJWKSet, jwtVerify, SignJWT } from "jose";
 import { encryptJson, decryptJson } from "./crypto.mjs";
-import { testDb, withClient, writeTargetBackendMeta } from "./postgres-tools.mjs";
+import { testDb, withClient, writeTargetBackendMeta, preparePostgrestRuntime } from "./postgres-tools.mjs";
 import { assertSourceSuperadmin, validateSupabaseSession } from "./source-supabase.mjs";
 import { migrateSnapshot, readProgress } from "./migration-engine.mjs";
 import { applyLocalMigrations } from "./target-migrations.mjs";
 
 const app = express();
+app.disable("x-powered-by");
+const VERSION = "0.32.0";
 const PORT = Number(process.env.PORT || 8787);
 function secretValue(envName, fileEnvName) {
   const direct = (process.env[envName] || "").trim();
@@ -106,23 +108,50 @@ function setup(req, { requireCode = false } = {}) {
   }
 }
 
-async function session(req) {
+async function authenticatedSession(req) {
   const raw = (req.get("authorization") || "").replace(/^Bearer\s+/i, "");
   if (!raw) throw Object.assign(new Error("Geen Supabase sessie"), { status: 401 });
-
   let payload = null;
   try {
     ({ payload } = await jwtVerify(raw, JWKS, { issuer: ISSUER, audience: "authenticated" }));
-  } catch (jwksError) {
-    // Legacy HS256-projecten publiceren geen bruikbare symmetrische sleutel via JWKS.
-    // In dat geval valideert de Gateway de sessie rechtstreeks bij Supabase Auth.
+  } catch {
     const user = await validateSupabaseSession(raw);
     payload = { sub: user?.id, email: user?.email, aud: "authenticated", legacyValidation: true };
   }
-
   if (!payload?.sub) throw Object.assign(new Error("Supabase sessie bevat geen geldige gebruiker"), { status: 401 });
-  await assertSourceSuperadmin(raw);
   return { jwt: raw, payload };
+}
+
+async function localDataJwt(payload) {
+  const secret = secretValue("PULSE_POSTGREST_JWT_SECRET", "PULSE_POSTGREST_JWT_SECRET_FILE");
+  if (!secret) throw new Error("PULSE PostgREST JWT secret ontbreekt op de Gateway");
+  return new SignJWT({ role: "authenticated", email: payload?.email || null })
+    .setProtectedHeader({ alg: "HS256", typ: "JWT" })
+    .setSubject(String(payload.sub))
+    .setIssuedAt()
+    .setExpirationTime("5m")
+    .sign(Buffer.from(secret, "utf8"));
+}
+
+async function session(req) {
+  const verified = await authenticatedSession(req);
+  // Voor de eerste migratie controleren we de rol nog tegen de Supabase-bron.
+  // Zodra de eigen backend actief is, komt autorisatie volledig uit de eigen
+  // PostgreSQL en is Supabase alleen nog de identiteit-/JWT-provider.
+  if (readBackendState().activeBackend === "external_postgres") {
+    const c = stored();
+    const allowed = await withClient(c, async (client) => {
+      const q = await client.query(
+        "select 1 from public.profiles where id=$1::uuid and active and lower(role)='superadmin' limit 1",
+        [String(verified.payload.sub)],
+      );
+      return q.rowCount > 0;
+    });
+    if (!allowed) throw Object.assign(new Error("Alleen een PULSE-superadmin mag deze beheeractie uitvoeren"), { status: 403 });
+  } else {
+    await assertSourceSuperadmin(verified.jwt);
+  }
+  return verified;
 }
 
 function dbConfigFrom(body) {
@@ -186,10 +215,10 @@ function writeBackendState(state) {
 
 async function bootstrapActiveTarget() {
   const state = readBackendState();
-  if (state.activeBackend !== "external_postgres" || !fs.existsSync(configFile)) return;
+  if (state.activeBackend !== "external_postgres") return;
   try {
     const c = stored();
-    await withClient(c, async (client) => { await applyLocalMigrations(client); });
+    await withClient(c, async (client) => { await preparePostgrestRuntime(client); await applyLocalMigrations(client); });
     console.log("PULSE target migrations checked");
   } catch (error) {
     console.error("PULSE target migration bootstrap failed", error);
@@ -227,8 +256,23 @@ async function startMigration({ jwt, replaceExisting, activateAfter = false }) {
   })();
 }
 
+app.get("/health/live", (_req, res) => {
+  res.json({ ok: true, service: "PULSE Data Gateway", version: VERSION });
+});
+
+app.get("/health/ready", async (_req, res) => {
+  try {
+    const c = managedPostgresConfig() || (fs.existsSync(configFile) ? stored() : null);
+    if (!c) return res.status(503).json({ ok: false, ready: false, reason: "postgres_not_configured", version: VERSION });
+    const db = await testDb(c);
+    res.json({ ok: true, ready: true, version: VERSION, database: db.db, postgresVersion: db.version, paired: Boolean(readPairingState().paired) });
+  } catch (error) {
+    res.status(503).json({ ok: false, ready: false, version: VERSION, reason: error.message });
+  }
+});
+
 app.get("/health", (_req, res) => {
-  res.json({ ok: true, service: "PULSE Data Gateway", version: "0.30.1", managedDocker: process.env.PULSE_POSTGRES_AUTOCONFIG === "1", paired: Boolean(readPairingState().paired), backend: readBackendState(), migration: readProgress(), domains: readDomainState() });
+  res.json({ ok: true, service: "PULSE Data Gateway", version: VERSION, managedDocker: process.env.PULSE_POSTGRES_AUTOCONFIG === "1", paired: Boolean(readPairingState().paired), backend: readBackendState(), migration: readProgress(), domains: readDomainState() });
 });
 
 app.get("/runtime", (_req, res) => {
@@ -338,6 +382,58 @@ app.post("/admin/postgres/configure", async (req, res, next) => {
   } catch (error) { next(error); }
 });
 
+app.post("/admin/preflight", async (req, res, next) => {
+  try {
+    setup(req);
+    await session(req);
+    const c = stored();
+    const db = await testDb(c);
+    const fileRoot = (process.env.PULSE_FILE_ROOT || "").trim();
+    let fileStorage = { configured: Boolean(fileRoot), writable: false, root: fileRoot || null, freeBytes: null };
+    if (fileRoot) {
+      fs.mkdirSync(fileRoot, { recursive: true });
+      const probe = path.join(fileRoot, `.pulse-write-test-${process.pid}-${Date.now()}`);
+      fs.writeFileSync(probe, "ok");
+      fs.unlinkSync(probe);
+      fileStorage.writable = true;
+      try { fileStorage.freeBytes = Number(fs.statfsSync(fileRoot).bavail) * Number(fs.statfsSync(fileRoot).bsize); } catch {}
+    }
+    res.json({
+      ok: true,
+      version: VERSION,
+      managedDocker: process.env.PULSE_POSTGRES_AUTOCONFIG === "1",
+      postgres: { database: db.db, user: db.usr, version: db.version, host: c.host, port: c.port },
+      fileStorage,
+      paired: Boolean(readPairingState().paired),
+      backend: readBackendState(),
+      domains: readDomainState(),
+      migration: readProgress(),
+    });
+  } catch (error) { next(error); }
+});
+
+app.post("/admin/upgrade", async (req, res, next) => {
+  try {
+    setup(req);
+    await session(req);
+    if (migrationJob) throw Object.assign(new Error("Upgrade kan niet terwijl een migratie loopt"), { status: 409 });
+    const c = stored();
+    const applied = await withClient(c, async (client) => { await preparePostgrestRuntime(client); return applyLocalMigrations(client); });
+    res.json({ ok: true, version: VERSION, applied, message: applied.length ? `${applied.length} doelmigratie(s) toegepast.` : "Doeldatabase was al volledig bijgewerkt." });
+  } catch (error) { next(error); }
+});
+
+app.post("/admin/diagnostics", async (req, res, next) => {
+  try {
+    setup(req);
+    await session(req);
+    let postgres = null;
+    try { const c = stored(); const db = await testDb(c); postgres = { ok: true, database: db.db, user: db.usr, version: db.version, host: c.host, port: c.port }; }
+    catch (error) { postgres = { ok: false, error: error.message }; }
+    res.json({ ok: true, version: VERSION, postgres, backend: readBackendState(), migration: readProgress(), domains: readDomainState(), paired: readPairingState(), origins: effectiveOrigins() });
+  } catch (error) { next(error); }
+});
+
 app.post("/admin/migrate", async (req, res, next) => {
   try {
     setup(req);
@@ -396,7 +492,7 @@ app.post("/admin/rollback", async (req, res, next) => {
     await session(req);
     if (migrationJob) throw Object.assign(new Error("Rollback kan niet terwijl een migratie loopt"), { status: 409 });
     const current = readBackendState();
-    if (fs.existsSync(configFile)) {
+    try {
       const c = stored();
       await withClient(c, (client) => writeTargetBackendMeta(client, {
         active_backend: "supabase",
@@ -404,9 +500,94 @@ app.post("/admin/rollback", async (req, res, next) => {
         activated_at: null,
         details: { rolledBackAt: new Date().toISOString() },
       }));
+    } catch (targetError) {
+      console.warn("PULSE rollback metadata kon niet naar het doel worden geschreven:", targetError.message);
     }
     writeBackendState({ activeBackend: "supabase", previousBackend: current.activeBackend || "external_postgres", activatedAt: null, fingerprint: current.fingerprint || "" });
     res.json({ ok: true, status: "rollback", message: "De Gateway staat terug op Supabase. De eigen PostgreSQL-data is niet verwijderd." });
+  } catch (error) { next(error); }
+});
+
+
+
+function dataFileRoot() {
+  const root = String(process.env.PULSE_FILE_ROOT || "").trim();
+  if (!root) throw new Error("PULSE_FILE_ROOT ontbreekt op de Gateway");
+  return path.resolve(root);
+}
+function publicFileBuckets() {
+  return new Set(String(process.env.PULSE_PUBLIC_FILE_BUCKETS || "vlacora-profile-photos,vlacora-program-assets,vlacora-social-assets").split(",").map(x=>x.trim()).filter(Boolean));
+}
+function safeDataFile(bucket, objectPath) {
+  const root=dataFileRoot();
+  const cleanBucket=String(bucket||"").replace(/[^a-zA-Z0-9._-]/g,"");
+  const decoded=String(objectPath||"").split("/").map(x=>decodeURIComponent(x)).filter(Boolean);
+  if (!cleanBucket || decoded.some(x=>x===".." || x.includes("\\"))) throw Object.assign(new Error("Ongeldig bestandspad"),{status:400});
+  const target=path.resolve(root,cleanBucket,...decoded);
+  if (!target.startsWith(path.resolve(root)+path.sep)) throw Object.assign(new Error("Ongeldig bestandspad"),{status:400});
+  return {target,cleanBucket,storagePath:decoded.join("/")};
+}
+async function postgrestUserFetch(payload, suffix, init={}) {
+  const base=String(process.env.PULSE_POSTGREST_URL||"http://postgrest:3000").replace(/\/$/,"");
+  const jwt=await localDataJwt(payload);
+  return fetch(base+suffix,{...init,headers:{...(init.headers||{}),authorization:`Bearer ${jwt}`,accept:"application/json"}});
+}
+async function assertPrivateFileReadable(payload,bucket,storagePath) {
+  if (publicFileBuckets().has(bucket)) return;
+  if (bucket !== "vlacora-hub-files") throw Object.assign(new Error("Privé bucket niet toegestaan"),{status:403});
+  const q=`/hub_attachments?storage_path=eq.${encodeURIComponent(storagePath)}&select=id&limit=1`;
+  const r=await postgrestUserFetch(payload,q);
+  if (!r.ok) throw Object.assign(new Error("Bestandsrechten konden niet worden gecontroleerd"),{status:r.status});
+  const rows=await r.json();
+  if (!Array.isArray(rows)||!rows.length) throw Object.assign(new Error("Geen toegang tot dit bestand"),{status:403});
+}
+
+app.put(/^\/data\/files\/([^/]+)\/(.+)$/, express.raw({type:"*/*",limit:"100mb"}), async(req,res,next)=>{
+  try{
+    if(readBackendState().activeBackend!=="external_postgres")return res.status(409).json({error:"Eigen PostgreSQL is niet actief"});
+    await authenticatedSession(req);
+    const {target,cleanBucket,storagePath}=safeDataFile(req.params[0],req.params[1]);
+    if(fs.existsSync(target)&&req.get("x-pulse-upsert")!=="1")return res.status(409).json({error:"Bestand bestaat al"});
+    fs.mkdirSync(path.dirname(target),{recursive:true});fs.writeFileSync(target,Buffer.isBuffer(req.body)?req.body:Buffer.from(req.body||""));
+    res.json({path:storagePath,fullPath:`${cleanBucket}/${storagePath}`});
+  }catch(e){next(e)}
+});
+app.get(/^\/data\/files\/public\/([^/]+)\/(.+)$/,async(req,res,next)=>{
+  try{const {target,cleanBucket}=safeDataFile(req.params[0],req.params[1]);if(!publicFileBuckets().has(cleanBucket))return res.status(403).json({error:"Bucket is niet publiek"});if(!fs.existsSync(target))return res.status(404).end();res.sendFile(target)}catch(e){next(e)}
+});
+app.get(/^\/data\/files\/authenticated\/([^/]+)\/(.+)$/,async(req,res,next)=>{
+  try{const verified=await authenticatedSession(req);const {target,cleanBucket,storagePath}=safeDataFile(req.params[0],req.params[1]);await assertPrivateFileReadable(verified.payload,cleanBucket,storagePath);if(!fs.existsSync(target))return res.status(404).end();res.sendFile(target)}catch(e){next(e)}
+});
+app.delete(/^\/data\/files\/([^/]+)$/,async(req,res,next)=>{
+  try{const verified=await authenticatedSession(req);const bucket=req.params[0];const paths=Array.isArray(req.body?.paths)?req.body.paths:[];const removed=[];for(const objectPath of paths){const f=safeDataFile(bucket,objectPath);await assertPrivateFileReadable(verified.payload,f.cleanBucket,f.storagePath);if(fs.existsSync(f.target))fs.rmSync(f.target,{force:true});removed.push({name:f.storagePath})}res.json({data:removed})}catch(e){next(e)}
+});
+
+app.all(/^\/data\/rest\/v1(?:\/.*)?$/, async (req, res, next) => {
+  try {
+    const backend = readBackendState();
+    if (backend.activeBackend !== "external_postgres") {
+      return res.status(409).json({ error: "Eigen PostgreSQL is nog niet de actieve PULSE-data-backend" });
+    }
+    const verified = await authenticatedSession(req);
+    const localJwt = await localDataJwt(verified.payload);
+    const base = String(process.env.PULSE_POSTGREST_URL || "http://postgrest:3000").replace(/\/$/, "");
+    const suffix = req.originalUrl.replace(/^\/data\/rest\/v1/, "");
+    const headers = {
+      authorization: `Bearer ${localJwt}`,
+      accept: req.get("accept") || "application/json",
+      "content-type": req.get("content-type") || "application/json",
+    };
+    for (const h of ["prefer","range","range-unit","content-profile","accept-profile","if-match","if-none-match"]) {
+      const v=req.get(h); if (v) headers[h]=v;
+    }
+    const init = { method: req.method, headers };
+    if (!["GET","HEAD"].includes(req.method)) init.body = JSON.stringify(req.body ?? {});
+    const upstream = await fetch(base + suffix, init);
+    const body = Buffer.from(await upstream.arrayBuffer());
+    for (const h of ["content-type","content-range","range-unit","preference-applied","location","etag"]) {
+      const v=upstream.headers.get(h); if (v) res.setHeader(h,v);
+    }
+    res.status(upstream.status).send(body);
   } catch (error) { next(error); }
 });
 
@@ -416,4 +597,4 @@ app.use((error, _req, res, _next) => {
 });
 
 void bootstrapActiveTarget();
-app.listen(PORT, "0.0.0.0", () => console.log(`PULSE Data Gateway 0.30.1 listening on ${PORT}`));
+app.listen(PORT, "0.0.0.0", () => console.log(`PULSE Data Gateway ${VERSION} listening on ${PORT}`));

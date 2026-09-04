@@ -1,0 +1,7 @@
+PULSE SERVER KOPPELING - PRIVÉ BEWAREN
+Versie: 0.31.0
+Gateway URL: https://api.pulse.example.be
+Setup-code: <automatisch gegenereerd>
+PULSE site: https://pulse.example.be
+Database: pulse (automatisch beheerde PostgreSQL 17 in Docker)
+Poort 5432 publiek: NEE

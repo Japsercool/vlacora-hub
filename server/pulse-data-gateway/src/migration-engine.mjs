@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
-import { loadCatalog, loadAuthIdentities, tableCount, tablePage, downloadStorageObject } from "./source-supabase.mjs";
+import { loadCatalog, loadRuntimeCatalog, loadStorageObjects, loadAuthIdentities, tableCount, tablePage, downloadStorageObject, sourceStorageBase } from "./source-supabase.mjs";
 import { applyLocalMigrations } from "./target-migrations.mjs";
 import {
   withClient,
@@ -11,6 +11,9 @@ import {
   clearTargetTables,
   insertJsonRows,
   applyConstraintsAndIndexes,
+  preparePostgrestRuntime,
+  applyRuntimeCatalog,
+  rewriteSupabaseStorageUrls,
   writeTargetBackendMeta,
 } from "./postgres-tools.mjs";
 
@@ -31,32 +34,45 @@ function checksumCatalog(catalog) {
   return crypto.createHash("sha256").update(JSON.stringify(catalog)).digest("hex");
 }
 
-async function copyAttachments(jwt, attachmentRows, fileRoot, state) {
-  if (!fileRoot || !Array.isArray(attachmentRows) || !attachmentRows.length) return { copied: 0, failed: 0 };
-  const bucket = process.env.PULSE_SOURCE_STORAGE_BUCKET || "vlacora-hub-files";
-  let copied = 0, failed = 0;
-  for (let i = 0; i < attachmentRows.length; i++) {
-    const row = attachmentRows[i];
-    if (!row?.storage_path) continue;
+async function copyStorageObjects(jwt, storageObjects, fileRoot, state) {
+  const objects = Array.isArray(storageObjects) ? storageObjects.filter((x) => x?.bucket && x?.name) : [];
+  if (!objects.length) {
+    state.files = { copied: 0, failed: 0, total: 0 };
+    persist(state);
+    return { copied: 0, failed: 0, total: 0 };
+  }
+  if (!fileRoot) throw new Error("Supabase Storage bevat PULSE-bestanden, maar PULSE_FILE_ROOT is niet ingesteld op de Gateway");
+
+  let copied = 0;
+  let failed = 0;
+  for (let i = 0; i < objects.length; i++) {
+    const item = objects[i];
+    const bucket = String(item.bucket);
+    const storagePath = String(item.name);
     state.stage = "files";
-    state.file = row.storage_path;
-    state.files = { copied, failed, total: attachmentRows.length };
+    state.file = `${bucket}/${storagePath}`;
+    state.files = { copied, failed, total: objects.length, current: i + 1 };
     persist(state);
     try {
-      const bytes = await downloadStorageObject(jwt, bucket, row.storage_path);
-      const target = path.join(fileRoot, ...String(row.storage_path).split("/").filter(Boolean));
+      const bytes = await downloadStorageObject(jwt, bucket, storagePath, item.public === true);
+      const parts = storagePath.split("/").filter((part) => part && part !== "." && part !== "..");
+      const target = path.resolve(fileRoot, bucket, ...parts);
+      const allowedRoot = path.resolve(fileRoot, bucket) + path.sep;
+      if (!(target + path.sep).startsWith(allowedRoot) && !target.startsWith(allowedRoot)) {
+        throw new Error("Ongeldig opslagpad");
+      }
       fs.mkdirSync(path.dirname(target), { recursive: true });
       fs.writeFileSync(target, bytes);
       copied++;
     } catch (error) {
       failed++;
       state.warnings ||= [];
-      state.warnings.push(`Bestand ${row.storage_path}: ${error.message}`);
+      state.warnings.push(`Storage ${bucket}/${storagePath}: ${error.message}`);
     }
   }
-  state.files = { copied, failed, total: attachmentRows.length };
+  state.files = { copied, failed, total: objects.length };
   persist(state);
-  return { copied, failed };
+  return { copied, failed, total: objects.length };
 }
 
 export async function migrateSnapshot({ jwt, targetConfig, replaceExisting = false, fileRoot = "" }) {
@@ -73,7 +89,10 @@ export async function migrateSnapshot({ jwt, targetConfig, replaceExisting = fal
   try {
     const catalog = await loadCatalog(jwt);
     const authIdentities = await loadAuthIdentities(jwt);
+    const runtimeCatalog = await loadRuntimeCatalog(jwt);
+    const storageObjects = await loadStorageObjects(jwt);
     state.authIdentityCount = authIdentities.length;
+    state.storageObjectCount = storageObjects.length;
     const tables = (catalog?.tables || []).map((t) => t.name);
     state.catalogChecksum = checksumCatalog(catalog);
     state.tableTotal = tables.length;
@@ -91,6 +110,7 @@ export async function migrateSnapshot({ jwt, targetConfig, replaceExisting = fal
 
     await withClient(targetConfig, async (client) => {
         await prepareTargetSchema(client, catalog, (p) => { state.stage = p.stage; state.current = p; persist(state); });
+        await preparePostgrestRuntime(client);
         await applyLocalMigrations(client, (p) => { state.stage = p.stage; state.current = p; persist(state); });
         const existing = await targetTableCounts(client, tables);
         const nonEmpty = Object.entries(existing).filter(([, n]) => Number(n) > 0);
@@ -109,7 +129,6 @@ export async function migrateSnapshot({ jwt, targetConfig, replaceExisting = fal
         persist(state);
         await prepareAuthIdentityMirror(client, authIdentities);
 
-        let attachmentRows = [];
         for (let i = 0; i < tables.length; i++) {
           const table = tables[i];
           const total = sourceCounts[table] || 0;
@@ -122,7 +141,6 @@ export async function migrateSnapshot({ jwt, targetConfig, replaceExisting = fal
             const rows = Array.isArray(page?.rows) ? page.rows : [];
             if (!rows.length) break;
             await insertJsonRows(client, table, rows);
-            if (table === "hub_attachments") attachmentRows = attachmentRows.concat(rows);
             offset += rows.length;
             state.tables[table].copied = offset;
             persist(state);
@@ -145,19 +163,34 @@ export async function migrateSnapshot({ jwt, targetConfig, replaceExisting = fal
         persist(state);
         if (mismatch) throw new Error("Controle mislukt: minstens één tabel heeft op het doel een ander aantal rijen dan in Supabase.");
 
+        state.stage = "runtime-security";
+        persist(state);
+        await applyRuntimeCatalog(client, runtimeCatalog, (p) => { state.stage = p.stage; state.current = p; persist(state); });
+
         await writeTargetBackendMeta(client, {
           active_backend: "staged",
           source: "supabase",
           details: { catalogChecksum: state.catalogChecksum, verifiedAt: new Date().toISOString() },
         });
 
-        if (attachmentRows.length) {
-          if (!fileRoot) throw new Error("Er zijn PULSE-bijlagen, maar PULSE_FILE_ROOT is niet ingesteld op de Gateway");
-          const fileResult = await copyAttachments(jwt, attachmentRows, fileRoot, state);
-          const strictFiles = process.env.PULSE_FILE_MIGRATION_STRICT !== "0";
-          if (strictFiles && fileResult.failed > 0) {
-            throw new Error(`${fileResult.failed} PULSE-bestand(en) konden niet worden gekopieerd. Omschakeling is geblokkeerd zodat geen bijlagen verloren gaan.`);
-          }
+        const fileResult = await copyStorageObjects(jwt, storageObjects, fileRoot, state);
+        const strictFiles = process.env.PULSE_FILE_MIGRATION_STRICT !== "0";
+        if (strictFiles && fileResult.failed > 0) {
+          throw new Error(`${fileResult.failed} PULSE Storage-bestand(en) konden niet worden gekopieerd. Omschakeling is geblokkeerd zodat geen bijlagen/assets verloren gaan.`);
+        }
+
+        const gatewayBase = String(process.env.PULSE_GATEWAY_PUBLIC_URL || "").replace(/\/$/, "");
+        if (gatewayBase) {
+          state.stage = "rewrite-storage-urls";
+          persist(state);
+          state.storageUrlRewrite = await rewriteSupabaseStorageUrls(
+            client,
+            sourceStorageBase(),
+            gatewayBase,
+            (p) => { state.stage = p.stage; state.current = p; persist(state); },
+          );
+        } else if (storageObjects.some((x) => x?.public === true)) {
+          state.warnings.push("Publieke Storage-assets zijn gekopieerd, maar PULSE_GATEWAY_PUBLIC_URL ontbreekt; bestaande publieke Supabase-URL's konden niet automatisch worden herschreven.");
         }
     });
 

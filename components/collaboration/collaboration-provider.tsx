@@ -76,7 +76,7 @@ const CollaborationContext=createContext<CollaborationContextValue|null>(null);
 const MODULES:Record<string,string>={
   dashboard:"TODAY","voor-mij":"Voor mij","mijn-uitzending":"Mijn uitzending",stations:"Stations",meldingen:"Meldingen",taken:"Taken",meldpunt:"Meldpunt",aanvragen:"Aanvragen","content-inbox":"Content-inbox",
   messenger:"Messenger",communicatie:"Communicatie",kalender:"Kalender",
-  programmering:"Programmering",programmas:"Programma-pagina's",afwezigheden:"Afwezigheden",contacten:"Contacten",sjablonen:"Workflowbouwer",muziek:"Muziek",meetings:"Muziekmeeting",redactie:"Redactie",verkeer:"Verkeer",
+  programmering:"Programmering",beschikbaarheid:"Beschikbaarheid",programmas:"Programma-pagina's",afwezigheden:"Afwezigheden",contacten:"Contacten",sjablonen:"Workflowbouwer",muziek:"Muziek",meetings:"Muziekmeeting",redactie:"Redactie",verkeer:"Verkeer",
   hitlijsten:"Hitlijsten","hitlijst-beheer":"Hitlijstbeheer",presentatie:"Presentatie",social:"Social Studio","social-beheer":"Social beheer","social-templatebouwer":"Templatebouwer","meldpunt-beheer":"Meldpuntbeheer",team:"Team",beheer:"Beheer"
 };
 const LOCAL_NOTIFICATIONS="vlacora:collaboration:notifications:v13";
