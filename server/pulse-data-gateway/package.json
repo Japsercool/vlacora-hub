@@ -1,0 +1,1 @@
+{"name":"pulse-data-gateway","version":"0.28.0","private":true,"type":"module","scripts":{"start":"node src/server.mjs"},"dependencies":{"cors":"2.8.5","dotenv":"16.6.1","express":"5.1.0","jose":"6.1.0","pg":"8.16.3"}}

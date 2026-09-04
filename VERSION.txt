@@ -1,18 +1,15 @@
-PULSE 0.25.0
+PULSE 0.28.0 UPDATE
+Datum: 2026-09-04
 
-Releasefocus
-- Volledige productrebrand van VLACORA HUB naar PULSE.
-- Nieuwe PULSE-logo-assets geïntegreerd in sidebar, login en browsermetadata.
-- Social Templatebouwer verder uitgewerkt als mini-Canva met echte canvasinteractie, drag/drop afbeeldingen, lagen en lettertype-dropdown.
-- Nieuwe, visueel verschillende social startertemplates in Social Studio.
-- Sjablonen verduidelijkt en omgebouwd naar Workflowbouwer voor terugkerend teamwerk.
-- Officiële communicatie krijgt centrale en zenderspecifieke beheerbare categorieën.
+Nieuw in deze update:
+- Moduletoegang per gebruiker als visuele matrix (Rol / kijken / bewerken / beheren / blokkeren).
+- Officiële communicatie: Lezers & Polls met ontvangers, gelezen, bevestigd, antwoorden en gesprek per ontvanger.
+- Database-backend v2 voor migratie naar een eigen PostgreSQL-server terwijl Supabase Auth behouden blijft.
+- PostgreSQL-doelconfiguratie bewaart geen databasewachtwoord in Supabase of browseropslag.
+- Self-hosted PULSE Data Gateway starter voor veilige verbinding met lokale/eigen PostgreSQL.
+- Migratiestatus en rollbackmetadata.
+- Nieuwe databasefundering is op het gekoppelde Supabase-project toegepast.
 
-Behoud
-- Supabase Auth blijft de vaste login- en identity-laag.
-- Bestaande PostgreSQL-tabellen, Storage buckets, RPC-namen en technische vlacora_* identifiers blijven bewust ongewijzigd voor backward compatibility.
-- Alle functies uit 0.24.5 blijven aanwezig: meldpuntbeheer, hitlijsten, agenda-uitnodigingen, accountkoppelingen, afwezigheden, redactieversies, muziek/formatvoorstellen, bijlagen en fijnmazige menurechten.
-
-Database
-- Nieuwe migratie: 040_communication_categories.sql.
-- Deze voegt hub_communication_categories toe met RLS voor centrale en zenderspecifieke communicatiecategorieën.
+Basis:
+- Ontworpen als overlay voor PULSE 0.25.0+ / de huidige PULSE-bronlijn.
+- Rotation One en Playout One maken geen deel uit van deze update.
