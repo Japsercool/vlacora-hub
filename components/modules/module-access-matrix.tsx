@@ -64,7 +64,7 @@ export function ModuleAccessMatrix({ stationSlug = "all" }: { stationSlug?: stri
   const [savingKey, setSavingKey] = useState("");
   const [error, setError] = useState("");
 
-  const client = useMemo(() => (isSupabaseBrowserConfigured ? createClient() : null), []);
+  const client = useMemo(() => (isSupabaseBrowserConfigured() ? createClient() : null), []);
 
   const load = useCallback(async () => {
     if (!client) return;

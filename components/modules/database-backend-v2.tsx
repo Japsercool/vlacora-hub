@@ -10,7 +10,7 @@ type Config = {
 const initial:Config={scope:"global",active_backend:"supabase",target_kind:"postgres",target_name:"",gateway_url:"",database_name:"",ssl_required:true,status:"not_configured",gateway_fingerprint:"",last_test_at:null,activated_at:null,previous_backend:"supabase"};
 
 export function DatabaseBackendV2(){
- const client=useMemo(()=>isSupabaseBrowserConfigured?createClient():null,[]);
+ const client=useMemo(()=>isSupabaseBrowserConfigured()?createClient():null,[]);
  const [cfg,setCfg]=useState<Config>(initial);const [host,setHost]=useState("");const [port,setPort]=useState("5432");const [dbUser,setDbUser]=useState("");const [dbPassword,setDbPassword]=useState("");const [setupToken,setSetupToken]=useState("");const [busy,setBusy]=useState("");const [msg,setMsg]=useState("");const [error,setError]=useState("");
  useEffect(()=>{if(!client)return;void client.from("hub_data_backend_configs").select("*").eq("scope","global").maybeSingle().then(({data,error})=>{if(error)setError(error.message);if(data)setCfg(data as Config);});},[client]);
  async function actor(){const {data}=await client!.auth.getUser();return data.user?.id||null}

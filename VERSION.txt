@@ -1,15 +1,1 @@
-PULSE 0.28.0 UPDATE
-Datum: 2026-09-04
-
-Nieuw in deze update:
-- Moduletoegang per gebruiker als visuele matrix (Rol / kijken / bewerken / beheren / blokkeren).
-- Officiële communicatie: Lezers & Polls met ontvangers, gelezen, bevestigd, antwoorden en gesprek per ontvanger.
-- Database-backend v2 voor migratie naar een eigen PostgreSQL-server terwijl Supabase Auth behouden blijft.
-- PostgreSQL-doelconfiguratie bewaart geen databasewachtwoord in Supabase of browseropslag.
-- Self-hosted PULSE Data Gateway starter voor veilige verbinding met lokale/eigen PostgreSQL.
-- Migratiestatus en rollbackmetadata.
-- Nieuwe databasefundering is op het gekoppelde Supabase-project toegepast.
-
-Basis:
-- Ontworpen als overlay voor PULSE 0.25.0+ / de huidige PULSE-bronlijn.
-- Rotation One en Playout One maken geen deel uit van deze update.
+PULSE 0.28.1 UPDATE

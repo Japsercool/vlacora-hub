@@ -9,7 +9,7 @@ type Vote = { poll_id:string; option_id:string; user_id:string };
 type Reply = { id:string; announcement_id:string; recipient_user_id:string; sender_user_id:string; body:string; created_at:string; sender?: { display_name?:string|null } | null };
 
 export function AnnouncementReadersPanel({ announcementId }: { announcementId: string }) {
-  const client = useMemo(() => (isSupabaseBrowserConfigured ? createClient() : null), []);
+  const client = useMemo(() => (isSupabaseBrowserConfigured() ? createClient() : null), []);
   const [recipients,setRecipients]=useState<Recipient[]>([]);
   const [votes,setVotes]=useState<Vote[]>([]);
   const [replies,setReplies]=useState<Reply[]>([]);

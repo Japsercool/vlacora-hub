@@ -1,0 +1,28 @@
+PULSE 0.28.0 UPDATE — VALIDATION
+Datum: 2026-09-04
+
+DATABASE
+- Actieve Supabase database bevat de nieuwe migraties voor module-overrides.
+- Actieve Supabase database bevat tabellen voor announcement readers/polls/replies.
+- Actieve Supabase database bevat backend config + migration run tabellen.
+- RLS is op alle nieuwe tabellen ingeschakeld.
+- Geen databasewachtwoordkolom aanwezig in hub_data_backend_configs.
+
+SECURITY
+- PostgreSQL-wachtwoord wordt alleen naar de eigen Gateway gestuurd.
+- Gateway slaat DB-config AES-256-GCM versleuteld lokaal op.
+- Supabase Auth JWT wordt door Gateway tegen JWKS gecontroleerd.
+- PostgreSQL hoeft niet rechtstreeks publiek bereikbaar te zijn.
+
+UI
+- ModuleAccessMatrix: Rol / view / edit / manage / hidden.
+- AnnouncementReadersPanel: ontvangers / gelezen / bevestigd / geantwoord + gesprek per ontvanger.
+- DatabaseBackendV2: test / configure / migrate / activate / rollback.
+
+BEPERKING VAN DEZE ARTIFACT
+- Dit is een UPDATE/overlay op PULSE 0.25.0+.
+- De volledige bestaande PULSE-bronboom is niet als sandboxbestand beschikbaar in deze chat.
+- Daarom is geen fictieve FULL_SOURCE-ZIP gemaakt die bestaande modules zou kunnen verliezen.
+- `/admin/migrate` in de meegeleverde Gateway voert in deze overlay preflight uit; de volledige 64-tabel exportadapter moet tegen de actuele volledige bron worden geïntegreerd.
+
+0.28.1 HOTFIX: TS2774 fixed in announcement-readers-panel.tsx, database-backend-v2.tsx and module-access-matrix.tsx by invoking isSupabaseBrowserConfigured().
