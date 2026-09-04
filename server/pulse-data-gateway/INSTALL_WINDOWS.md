@@ -1,13 +1,28 @@
-# PULSE Data Gateway op Windows Server
+# PULSE Data Gateway 0.30
 
-1. Installeer Node.js LTS.
-2. Kopieer deze map naar bijvoorbeeld `C:\PULSE\DataGateway`.
-3. Open PowerShell in die map en voer `npm install` uit.
-4. Kopieer `.env.example` naar `.env`.
-5. Genereer een setup-token en een 32-byte AES-key. Voor de key kan PowerShell bijvoorbeeld 32 cryptografisch willekeurige bytes naar hex omzetten.
-6. Vul je huidige Supabase Auth URL/issuer in.
-7. Zet `PULSE_ALLOWED_ORIGIN` op de HTTPS-URL van PULSE.
-8. Start met `npm start`.
-9. Publiceer uitsluitend de Gateway via HTTPS/reverse proxy/tunnel; stel PostgreSQL zelf niet rechtstreeks aan het internet bloot.
+Voor nieuwe installaties wordt de losse Node.js-installatie niet meer aanbevolen. Gebruik bij voorkeur:
 
-De databasegegevens die je in PULSE invult worden met AES-256-GCM versleuteld in `data/postgres.enc`. De master key staat alleen in `.env` op je eigen server.
+```text
+../pulse-docker/INSTALL_PULSE_DOCKER.ps1
+```
+
+Die installer maakt PostgreSQL, Docker secrets, volumes en de Gateway samen aan.
+
+De losse Gateway blijft beschikbaar voor gevorderde installaties met een bestaande PostgreSQL-server.
+
+## Beheerde Docker-modus
+
+De Gateway krijgt vanuit Docker onder andere:
+
+```env
+PULSE_POSTGRES_AUTOCONFIG=1
+PULSE_POSTGRES_HOST=postgres
+PULSE_POSTGRES_PORT=5432
+PULSE_POSTGRES_DB=pulse
+PULSE_POSTGRES_USER=pulse_app
+PULSE_POSTGRES_PASSWORD_FILE=/run/secrets/postgres_password
+PULSE_GATEWAY_SETUP_TOKEN_FILE=/run/secrets/gateway_setup_token
+PULSE_GATEWAY_MASTER_KEY_FILE=/run/secrets/gateway_master_key
+```
+
+In deze modus worden databasecredentials nooit vanuit de browser aangeleverd.

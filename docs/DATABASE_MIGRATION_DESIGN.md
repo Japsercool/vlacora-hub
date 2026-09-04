@@ -1,32 +1,61 @@
-# Databaseomschakeling — PULSE 0.28
+# PULSE 0.29 — eigen PostgreSQL met Supabase Auth
 
-## Vast principe
+## Doel
 
-- Supabase Auth blijft de loginlaag.
-- `auth.users` en wachtwoorden worden niet naar de eigen database gekopieerd.
-- `profiles.id` blijft exact dezelfde UUID als de `sub` in het Supabase JWT.
-- Applicatiedata gaat naar PostgreSQL op de eigen server.
-- PostgreSQL wordt niet rechtstreeks vanuit de browser benaderd.
-- De Data Gateway controleert het Supabase JWT via de publieke JWKS.
+```text
+PULSE browser
+   |
+   +-- Supabase Auth -------------------- blijft
+   |     login / sessies / wachtwoorden / user UUID
+   |
+   `-- PULSE Data Gateway --------------- eigen server
+          |
+          +-- PostgreSQL ---------------- alle PULSE-appdata
+          `-- File root ----------------- bijlagen/assets
+```
 
-## Gewenste éénknopsflow
+De doel-PostgreSQL mag een gewone PostgreSQL-installatie zijn. Self-hosted Supabase is optioneel, niet verplicht.
 
-`Test -> Configure -> Preflight -> Schema -> Data copy -> Files copy -> Verify -> Activate`
+## Eénknopsmigratie
 
-Activeren mag alleen wanneer:
+De beheerinterface bevat zowel losse diagnostische stappen als één grote omschakelknop. De éénknopsflow doet eerst alle veiligheidscontroles en activeert pas na een geslaagde eindcontrole.
 
-- alle verwachte tabellen aanwezig zijn;
-- row counts overeenkomen;
-- referentiële checks geslaagd zijn;
-- belangrijke steekproeven per module geslaagd zijn;
-- de Gateway healthcheck groen is.
+### Schema
 
-Na activatie wordt de oude Supabase-applicatiedata eerst alleen read-only als rollbackbron behouden. Verwijderen gebeurt pas later handmatig.
+De Gateway vraagt via de beveiligde Supabase RPC `pulse_export_catalog()` de actuele tabellen, kolomtypen, defaults, constraints en indexen op. Daardoor hoeft een nieuwe lege PostgreSQL niet vooraf handmatig ingericht te worden.
 
-## Geen betaalde vaste outbound IP nodig
+### Data
 
-PULSE/Vercel hoeft niet rechtstreeks op poort 5432 van de eigen server te verbinden. De Gateway staat naast PostgreSQL en wordt via HTTPS bereikt. Zo hoeft PostgreSQL zelf niet publiek bereikbaar te zijn en is geen betaalde Vercel fixed-egress-oplossing vereist.
+`pulse_export_table()` levert maximaal 1000 rijen per pagina. De Gateway importeert met `jsonb_populate_recordset`, zodat UUID, arrays, JSONB, timestamps en numerieke types behouden blijven.
 
-## Status van dit UPDATE-pakket
+### Controle
 
-De UI, configuratietabellen en veilige Gateway-configuratie zijn aanwezig. De daadwerkelijke volledige snapshot-exportadapter moet in de actuele volledige PULSE-bron worden gekoppeld, omdat die alle bestaande modules/tabelcontracten moet kennen. Die bron-ZIP is in deze chatruntime niet fysiek beschikbaar; daarom doet de Gateway in dit overlaypakket bij `/admin/migrate` bewust alleen preflight in plaats van te doen alsof alle 64 huidige tabellen al veilig worden gekopieerd.
+Voor elke tabel wordt bron/copy/doel bijgehouden. Een verschil in aantallen blokkeert de status `ready` en dus ook activering.
+
+### Bestanden
+
+`hub_attachments.storage_path` wordt gebruikt om private Supabase Storage-objecten naar `PULSE_FILE_ROOT` op de eigen server te kopiëren. Mislukte bestanden worden als waarschuwing bijgehouden zonder stil te verdwijnen.
+
+## Rollback
+
+Rollback schakelt de Gateway terug naar `supabase`. De gekopieerde PostgreSQL-data wordt niet verwijderd. Ook de oorspronkelijke Supabase-data wordt tijdens migratie nooit automatisch verwijderd.
+
+## Updates na de eerste omschakeling
+
+Doelmigraties staan in:
+
+```text
+server/pulse-data-gateway/migrations/*.sql
+```
+
+De Gateway registreert per bestand versie + SHA-256-checksum in:
+
+```text
+pulse_meta.schema_migrations
+```
+
+Ontbrekende migraties worden automatisch toegepast wanneer een reeds actieve externe backend start. Een reeds toegepaste migratie waarvan de inhoud achteraf werd gewijzigd, wordt bewust geweigerd om schema-drift te voorkomen.
+
+## Belangrijke integratieregel
+
+Nieuwe PULSE-modules moeten data via de centrale PULSE-datalaag benaderen. Supabase Auth mag rechtstreeks gebruikt blijven worden voor login/session, maar nieuwe appdata hoort niet opnieuw hard aan één Supabase-project gekoppeld te worden.

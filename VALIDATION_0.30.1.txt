@@ -1,0 +1,14 @@
+PULSE 0.30.1 UPDATE validation
+
+- TypeScript overlay strict check: OK
+- Node syntax check Data Gateway: OK
+- Docker Compose YAML parse: OK
+- Linux installer shell syntax: OK
+- Dynamic Gateway CORS / domain state: included
+- Configurable public site URL: included
+- Configurable Gateway URL: included
+- SET_PULSE_URLS.ps1/.sh: included
+- Supabase migration 057_configurable_public_urls.sql: included and applied to active PULSE database
+- No PostgreSQL port publication added
+- Existing 0.30 migration/rollback architecture retained
+- Existing hitlist history, bulk import, updates, module access, readers/polls retained

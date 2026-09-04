@@ -1,0 +1,100 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${PULSE_POSTGRES_DB:-pulse}
+      POSTGRES_USER: ${PULSE_POSTGRES_USER:-pulse_app}
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+    secrets:
+      - postgres_password
+    volumes:
+      - pulse_postgres:/var/lib/postgresql/data
+    networks:
+      - pulse_internal
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${PULSE_POSTGRES_USER:-pulse_app} -d ${PULSE_POSTGRES_DB:-pulse}"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 10s
+
+  gateway:
+    build:
+      context: ../pulse-data-gateway
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PORT: 8787
+      PULSE_PUBLIC_URL: ${PULSE_PUBLIC_URL:-}
+      PULSE_ALLOWED_ORIGIN: ${PULSE_ALLOWED_ORIGIN}
+      PULSE_GATEWAY_PUBLIC_URL: ${PULSE_GATEWAY_PUBLIC_URL:-}
+      SUPABASE_AUTH_URL: ${SUPABASE_AUTH_URL}
+      SUPABASE_PUBLISHABLE_KEY: ${SUPABASE_PUBLISHABLE_KEY}
+      PULSE_GATEWAY_SETUP_TOKEN_FILE: /run/secrets/gateway_setup_token
+      PULSE_GATEWAY_MASTER_KEY_FILE: /run/secrets/gateway_master_key
+      PULSE_POSTGRES_AUTOCONFIG: "1"
+      PULSE_POSTGRES_HOST: postgres
+      PULSE_POSTGRES_PORT: 5432
+      PULSE_POSTGRES_DB: ${PULSE_POSTGRES_DB:-pulse}
+      PULSE_POSTGRES_USER: ${PULSE_POSTGRES_USER:-pulse_app}
+      PULSE_POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+      PULSE_POSTGRES_SSL: "0"
+      PULSE_FILE_ROOT: /pulse/files
+      PULSE_FILE_MIGRATION_STRICT: "1"
+      PULSE_SOURCE_STORAGE_BUCKET: ${PULSE_SOURCE_STORAGE_BUCKET:-vlacora-hub-files}
+    secrets:
+      - postgres_password
+      - gateway_setup_token
+      - gateway_master_key
+    volumes:
+      - pulse_files:/pulse/files
+      - pulse_gateway_state:/app/data
+      - ./backups:/pulse/backups
+    ports:
+      - "${PULSE_GATEWAY_PORT:-8787}:8787"
+    networks:
+      - pulse_internal
+      - pulse_edge
+
+  caddy:
+    image: caddy:2.10-alpine
+    restart: unless-stopped
+    profiles: ["https"]
+    depends_on:
+      - gateway
+    environment:
+      PULSE_GATEWAY_DOMAIN: ${PULSE_GATEWAY_DOMAIN}
+      PULSE_GATEWAY_EMAIL: ${PULSE_GATEWAY_EMAIL:-}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - pulse_caddy_data:/data
+      - pulse_caddy_config:/config
+    networks:
+      - pulse_edge
+
+networks:
+  pulse_internal:
+    internal: true
+  pulse_edge:
+
+volumes:
+  pulse_postgres:
+  pulse_files:
+  pulse_gateway_state:
+  pulse_caddy_data:
+  pulse_caddy_config:
+
+secrets:
+  postgres_password:
+    file: ./secrets/postgres_password.txt
+  gateway_setup_token:
+    file: ./secrets/gateway_setup_token.txt
+  gateway_master_key:
+    file: ./secrets/gateway_master_key.txt
