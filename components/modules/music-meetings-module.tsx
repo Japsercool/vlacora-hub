@@ -73,7 +73,7 @@ export default function MusicMeetingsModule({stationSlug}:{stationSlug:string}){
     let alive=true;
     void loadMusicMeetingReviews(track.id).then(rows=>{
       if(!alive)return;setReviews(rows);
-      void createClient().auth.getUser().then(({data})=>{
+      void createClient().auth.getUser().then(({data}:{data:{user?:{id?:string|null}|null}})=>{
         const mine=rows.find(r=>r.userId===data.user?.id);
         if(mine){setScore(mine.score==null?"":String(mine.score));setDecision(mine.decision);setNote(mine.note)}
         else{setScore("");setDecision(track.decision||"");setNote(track.note||"")}

@@ -67,7 +67,7 @@ export function createClient(){
   client.storage.from=(bucket:string)=>{
     const original=originalFrom(bucket);
     const route=()=>readStoredRoute();
-    const authHeader=async()=>{const {data}=await client.auth.getSession();const token=data.session?.access_token||"";return token?{authorization:`Bearer ${token}`}:{}};
+    const authHeader=async():Promise<Record<string,string>>=>{const {data}=await client.auth.getSession();const token=data.session?.access_token||"";return token?{authorization:`Bearer ${token}`}:{}};
     return {
       ...original,
       upload:async(path:string,file:any,options:any={})=>{

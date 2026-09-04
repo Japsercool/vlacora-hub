@@ -1,0 +1,15 @@
+PULSE 0.32.1 - TypeScript build fix
+
+Gecorrigeerd na Vercel prebuild-fouten in 0.32.0:
+- account-widget: expliciete auth.getUser() result type
+- messenger-module: mapped channel array expliciet als Channel[]
+- music-meetings-module: expliciete auth.getUser() result type
+- lib/supabase/client: authHeader retourneert Record<string,string>, geen undefined headerwaarden
+- lib/supabase/operations: Promise callback expliciet getypeerd
+
+Lokale controles in packaging-omgeving:
+- scripts/prebuild-check.mjs uitgevoerd: OK (zonder lokale node_modules dus geen volledige tsc-run)
+- alle .ts/.tsx bestanden via TypeScript transpileModule syntactisch gecontroleerd
+- ZIP-integriteit gecontroleerd met unzip -t
+
+De door Vercel gerapporteerde TS7031/TS7006/TS2322 fouten zijn gericht gecorrigeerd.

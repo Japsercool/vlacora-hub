@@ -179,7 +179,7 @@ export async function rebuildAbsenceCoverage(absenceId:string){
   const stationSlug=String(absence.station_slug),userId=String(absence.user_id);
   const[programs,team,{data:profile}]=await Promise.all([
     loadPrograms(stationSlug),
-    supabase.from("hub_program_team").select("program_id,user_id").eq("user_id",userId).then(x=>x.data||[]),
+    supabase.from("hub_program_team").select("program_id,user_id").eq("user_id",userId).then((x:any)=>x.data||[]),
     supabase.from("profiles").select("display_name,email").eq("id",userId).maybeSingle()
   ]);
   const programIds=new Set((team||[]).map((x:any)=>String(x.program_id)));

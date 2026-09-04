@@ -65,7 +65,7 @@ export default function MessengerModule({stationSlug}:{stationSlug:string}){
     const membersBy=new Map<string,string[]>();
     for(const m of memberRows){const id=String(m.channel_id),arr=membersBy.get(id)||[];arr.push(String(m.user_id));membersBy.set(id,arr)}
     const activeIds=new Set(people.map(p=>p.id));
-    const mapped=(rows||[]).map((r:any)=>({
+    const mapped:Channel[]=(rows||[]).map((r:any)=>({
       id:String(r.id),stationSlug:String(r.station_slug||"all"),name:String(r.name||""),type:String(r.channel_type) as Channel["type"],
       createdBy:r.created_by?String(r.created_by):null,memberIds:membersBy.get(String(r.id))||[],createdAt:String(r.created_at),updatedAt:String(r.updated_at)
     })).filter((c:Channel)=>{
