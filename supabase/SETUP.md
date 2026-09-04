@@ -1,8 +1,8 @@
-# VLACORA HUB 0.21.0 — Supabase setup
+# PULSE 0.25.0 — Supabase setup
 
-VLACORA HUB uses Supabase as its current backend. The persistent data store is PostgreSQL.
+PULSE uses Supabase as its current backend. The persistent data store is PostgreSQL.
 
-1. Create one Supabase project for VLACORA HUB.
+1. Use one Supabase project for PULSE.
 2. In **SQL Editor**, run the SQL files in `supabase/migrations/` in numeric order.
 3. For an existing 0.20.x database, at minimum apply every migration you have not yet run and finish with `029_standalone_stations.sql`.
 4. Create team accounts in **Authentication → Users**.

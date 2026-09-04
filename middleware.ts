@@ -6,7 +6,7 @@ export async function middleware(request:NextRequest){
   const url=process.env.NEXT_PUBLIC_SUPABASE_URL||VLACORA_SUPABASE_URL;
   const key=process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY||VLACORA_SUPABASE_PUBLISHABLE_KEY;
   const path=request.nextUrl.pathname;
-  // VLACORA HUB never exposes /hub without Supabase Auth. If configuration is missing,
+  // PULSE never exposes /hub without Supabase Auth. If configuration is missing,
   // keep the application behind the login/setup page instead of opening a prototype mode.
   if(!url||!key){
     if(path.startsWith("/hub")){const target=request.nextUrl.clone();target.pathname="/login";target.search="";target.searchParams.set("error","auth-not-configured");return NextResponse.redirect(target)}

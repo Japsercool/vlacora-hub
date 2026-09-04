@@ -1,37 +1,18 @@
-VLACORA HUB 0.24.3
-Hitlijstwerkblad v2 + Agenda-uitnodigingen + Sidebar priority + Social canvas images.
+PULSE 0.25.0
 
-Nieuw / verbeterd in 0.24.3
-- Hitlijstwerkblad opnieuw opgebouwd: geen aparte brede “Songgeheugen”-kolom meer. Artiest + titel vormen één bewerkbare songcel met een compacte zoek/dropdown-knop.
-- Centrale songpicker zoekt in hitlijstgeheugen, VLACORA Muziek en eerdere hitlijsten.
-- Rijen blijven direct bewerkbaar, versleepbaar en via pijltjes verplaatsbaar.
-- Vorige positie, trend, weken en peak worden opnieuw berekend vanuit eerdere edities in dezelfde reeks.
-- Vorige editie wordt automatisch gevonden op basis van reeks + publicatiedatum, tenzij expliciet een editie gekozen is.
-- Knop “Nieuwe editie uit deze lijst” maakt een volgende editie vanuit de huidige ranking zodat weekwerk sneller gaat.
-- Excel import/plakken blijft beschikbaar voor bulkwerk.
-- Agenda: bij station- en organisatie-items kunnen echte actieve Supabase-accounts worden uitgenodigd via een zoekbare multi-picker met avatar, naam, functie/e-mail en chips.
-- Nieuwe genodigden krijgen na opslaan een VLACORA-melding. Persoonlijke afspraken blijven strikt privé en kunnen geen genodigden bevatten.
-- Zijbalk: het normale WERKPLEK-menu staat altijd eerst. BEHEER staat pas eronder in dezelfde scrollzone en kan het gewone menu niet meer wegdrukken. Profiel/logout blijft onderaan vast beschikbaar.
-- Social Templatebouwer: afbeeldingen kunnen nu rechtstreeks via de bovenste toolbar worden geüpload en als vrije laag op het canvas geplaatst.
-- Social Templatebouwer: PNG/JPG/WebP kan vanuit de computer rechtstreeks op het canvas worden gesleept; VLACORA uploadt het asset en plaatst de afbeelding op de drop-positie.
-- Achtergrond uploaden is nu expliciet gescheiden van “afbeelding als laag toevoegen”.
-- Bestaande drag/resize/rotate/lagen/lock/visibility/undo-redo/templatevariabelen blijven behouden.
+Releasefocus
+- Volledige productrebrand van VLACORA HUB naar PULSE.
+- Nieuwe PULSE-logo-assets geïntegreerd in sidebar, login en browsermetadata.
+- Social Templatebouwer verder uitgewerkt als mini-Canva met echte canvasinteractie, drag/drop afbeeldingen, lagen en lettertype-dropdown.
+- Nieuwe, visueel verschillende social startertemplates in Social Studio.
+- Sjablonen verduidelijkt en omgebouwd naar Workflowbouwer voor terugkerend teamwerk.
+- Officiële communicatie krijgt centrale en zenderspecifieke beheerbare categorieën.
 
-Behouden uit 0.24.x
-- Fijnmazige menurechten per account/rol.
-- Apart Social Studio / Social beheer / Templatebouwer.
-- Centrale hitlijst-songmemory in PostgreSQL.
-- Supabase Auth als vaste login/identity-laag.
-- Persoonlijke agenda door RLS alleen leesbaar voor eigenaar.
-- Account-linked programma’s, afwezigheden/vervangingen, redactieversies, muziek-/formatvoorstellen en generieke bijlagen.
-- Geen actieve Playout One, Rotation One, SHOUTcast/listener-statistieken of encoderintegratie.
+Behoud
+- Supabase Auth blijft de vaste login- en identity-laag.
+- Bestaande PostgreSQL-tabellen, Storage buckets, RPC-namen en technische vlacora_* identifiers blijven bewust ongewijzigd voor backward compatibility.
+- Alle functies uit 0.24.5 blijven aanwezig: meldpuntbeheer, hitlijsten, agenda-uitnodigingen, accountkoppelingen, afwezigheden, redactieversies, muziek/formatvoorstellen, bijlagen en fijnmazige menurechten.
 
 Database
-- 0.24.3 vereist geen nieuwe database-migratie bovenop 0.24.2.
-- Laatste vereiste schema-migratie blijft: supabase/migrations/037_hitlist_song_memory.sql.
-
-Build hardening
-- App Router route handlers gebruiken globalThis.Request.
-- Prebuild verwijdert stale external-stubs.d.ts.
-- Prebuild controleert route-signatures, bekende Autoprefixer-valkuilen, Templatebouwer pointer types, hitlijstwerkblad-regressies, agenda account-uitnodigingen, sidebar-scrollstructuur en directe social-afbeeldingen.
-- Als node_modules aanwezig is, draait prebuild eerst een volledige tsc --noEmit voordat Next.js start.
+- Nieuwe migratie: 040_communication_categories.sql.
+- Deze voegt hub_communication_categories toe met RLS voor centrale en zenderspecifieke communicatiecategorieën.

@@ -180,7 +180,7 @@ export default function MessengerModule({stationSlug}:{stationSlug:string}){
 
   return <div className="messenger messenger-v182">
     <div className="channels">
-      <div className="module-title-row"><div><h3>Messenger</h3><small>Alleen echte, actieve VLACORA-gebruikers</small></div><button className="primary tiny-btn" onClick={()=>setShowCreate(v=>!v)}>＋</button></div>
+      <div className="module-title-row"><div><h3>Messenger</h3><small>Alleen echte, actieve PULSE-gebruikers</small></div><button className="primary tiny-btn" onClick={()=>setShowCreate(v=>!v)}>＋</button></div>
       <input className="input" value={search} onChange={e=>setSearch(e.target.value)} placeholder="Zoek gesprek…"/>
       {showCreate&&<div className="channel-create-v4">
         <div className="two-form-cols"><label className="field">Type<select className="select" value={newType} onChange={e=>setNewType(e.target.value as Channel["type"])}><option value="direct">Privé</option><option value="group">Groep</option><option value="station">Stationkanaal</option></select></label><label className="field">Station<select className="select" value={newStation} onChange={e=>setNewStation(e.target.value)}>{stations.map(s=><option value={s.slug} key={s.slug}>{s.name}</option>)}</select></label></div>

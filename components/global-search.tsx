@@ -34,7 +34,7 @@ export default function GlobalSearch({stationSlug}:{stationSlug:string}){
   return <div className="global-search">
     <form className="global-search-box" onSubmit={search}>
       <span>⌕</span>
-      <input ref={inputRef} value={query} onFocus={()=>setOpen(true)} onChange={e=>setQuery(e.target.value)} placeholder="Zoek in VLACORA…"/>
+      <input ref={inputRef} value={query} onFocus={()=>setOpen(true)} onChange={e=>setQuery(e.target.value)} placeholder="Zoek in PULSE…"/>
       <kbd>Ctrl K</kbd>
       <button type="submit" disabled={busy}>{busy?"…":"Zoek"}</button>
     </form>
@@ -42,7 +42,7 @@ export default function GlobalSearch({stationSlug}:{stationSlug:string}){
       <div className="global-search-head"><strong>Universeel zoeken</strong><span>Zoekt pas wanneer je op Zoek/Enter drukt • geen achtergrondqueries</span><button onClick={()=>setOpen(false)}>×</button></div>
       {!searched&&<div className="global-search-empty">Zoek bijvoorbeeld op <b>ANOTR</b>, een programma, taak, talk, contact, hitlijst of social post.</div>}
       {searched&&!busy&&results.length===0&&<div className="global-search-empty">Geen resultaten voor “{query}”.</div>}
-      {busy&&<div className="global-search-empty">VLACORA doorzoekt de gekoppelde werkdata…</div>}
+      {busy&&<div className="global-search-empty">PULSE doorzoekt de gekoppelde werkdata…</div>}
       {results.length>0&&<div className="global-search-results">{results.map(item=><button key={item.id} onClick={()=>go(item)}><span className="search-kind">{item.kind}</span><div><strong>{item.title}</strong><small>{item.subtitle}</small></div><span>›</span></button>)}</div>}
     </div>}
   </div>;

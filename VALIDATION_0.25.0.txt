@@ -1,0 +1,49 @@
+PULSE 0.25.0 — RELEASE VALIDATION
+Datum: 2026-09-04
+
+GECONTROLEERD
+- Productnaam/package: pulse-workspace 0.25.0
+- PULSE-logo-assets aanwezig:
+  * public/brand/pulse-icon.png
+  * public/brand/pulse-icon-256.png
+  * public/brand/pulse-lockup.png
+- Browsermetadata en login/sidebar-branding gebruiken PULSE.
+- Social Templatebouwer: mini-Canva canvas, lagen, generieke HTMLElement pointer-handler,
+  drag/drop afbeeldingen, upload als laag, placeholders, font-dropdown en PNG-rendering aanwezig.
+- Social Studio blijft gescheiden van de visuele Templatebouwer.
+- Workflowbouwer aanwezig met generieke workflowtriggers en PULSE workflow-export.
+- Officiële communicatie gebruikt beheerbare communicatiecategorieën.
+- Migratie 040_communication_categories.sql aanwezig.
+- Alle functies uit 0.24.5 blijven in deze bronboom aanwezig, inclusief meldpuntbeheer,
+  hitlijstwerkblad/songgeheugen, agenda-accountuitnodigingen, afwezigheden/vervanging,
+  redactieversies, bijlagen en fijnmazige menurechten.
+
+CODECONTROLES
+- 73 TS/TSX bestanden met TypeScript parser gelezen: 0 syntaxfouten.
+- Lokale @/ imports gecontroleerd: 0 ontbrekende imports.
+- npm run prebuild: PASS.
+- 2 app route.ts handlers gecontroleerd; geen NextRequest-route regressie.
+- social-template-builder pointerStart is generiek op HTMLElement.
+- Oude losse Songgeheugen-kolom en native agenda-multiselect worden door prebuild bewaakt.
+- Geen external-stubs.d.ts aanwezig na prebuild.
+- Geen *.tsbuildinfo, node_modules, .next, .git of .vercel hoort in de release-ZIP.
+- Actieve TS/TSX-code bevat geen Playout One, Rotation One, SHOUTcast of listener-statistiekenintegratie.
+
+DATABASE
+- Nieuwe tabel/migratie: public.hub_communication_categories.
+- Op het huidige gekoppelde Supabase-project is migratie pulse_communication_categories al toegepast.
+- Zes centrale standaardcategorieën zijn aangemaakt: Algemeen, Programmering, Redactie,
+  Muziek, Social en Techniek.
+- RLS is ingeschakeld en centrale/zenderspecifieke beheerrechten zijn gescheiden.
+
+BELANGRIJKE COMPATIBILITEIT
+- Technische identifiers zoals vlacora_* en VLACORA_SUPABASE_* blijven bewust ongewijzigd.
+  Dit voorkomt dat bestaande Supabase-data, RPC's, Storage of deployments breken na de rebrand.
+- De bestaande zendernaam "Vlacora One" blijft een zendernaam en wordt niet door de productrebrand gewijzigd.
+
+VOLLEDIGE NEXT.JS BUILD
+- Een echte dependency-backed `next build` kon in deze werkomgeving niet worden afgerond,
+  omdat `npm install` hier op de npm-registry netwerkdownload/time-out vastloopt.
+- Op Vercel, waar dependencies wél worden geïnstalleerd, draait de prebuild eerst automatisch
+  `tsc --noEmit`; TypeScriptfouten worden dus vóór de Next.js build gemeld.
+- Er wordt daarom NIET beweerd dat een volledige lokale Next.js productiebouw in deze container is geslaagd.

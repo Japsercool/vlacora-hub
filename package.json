@@ -1,6 +1,6 @@
 {
-  "name": "vlacora-hub",
-  "version": "0.24.3",
+  "name": "pulse-workspace",
+  "version": "0.25.0",
   "private": true,
   "scripts": {
     "dev": "next dev",

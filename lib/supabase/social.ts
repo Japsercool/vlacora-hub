@@ -95,7 +95,7 @@ export type SocialAsset={
 
 const defaultBrand=(stationSlug:string):BrandKit=>({
   station_slug:stationSlug,
-  brand_name:stationSlug==="all"?"VLACORA":stationSlug,
+  brand_name:stationSlug==="all"?"PULSE":stationSlug,
   logo_url:"",
   primary_color:"#27269f",
   secondary_color:"#4d38ff",
@@ -104,7 +104,7 @@ const defaultBrand=(stationSlug:string):BrandKit=>({
   text_color:"#ffffff",
   font_family:"Inter",
   default_cta:"Luister nu live",
-  default_hashtags:"#radio #vlacora"
+  default_hashtags:"#radio"
 });
 
 async function userId(){

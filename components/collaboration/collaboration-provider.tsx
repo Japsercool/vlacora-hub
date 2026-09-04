@@ -76,8 +76,8 @@ const CollaborationContext=createContext<CollaborationContextValue|null>(null);
 const MODULES:Record<string,string>={
   dashboard:"TODAY","voor-mij":"Voor mij","mijn-uitzending":"Mijn uitzending",stations:"Stations",meldingen:"Meldingen",taken:"Taken",meldpunt:"Meldpunt",aanvragen:"Aanvragen","content-inbox":"Content-inbox",
   messenger:"Messenger",communicatie:"Communicatie",kalender:"Kalender",
-  programmering:"Programmering",programmas:"Programma-pagina's",afwezigheden:"Afwezigheden",contacten:"Contacten",sjablonen:"Sjablonen",muziek:"Muziek",meetings:"Muziekmeeting",redactie:"Redactie",verkeer:"Verkeer",
-  hitlijsten:"Hitlijsten","hitlijst-beheer":"Hitlijstbeheer",presentatie:"Presentatie",social:"Social Studio","social-beheer":"Social beheer","social-templatebouwer":"Templatebouwer",team:"Team",beheer:"Beheer"
+  programmering:"Programmering",programmas:"Programma-pagina's",afwezigheden:"Afwezigheden",contacten:"Contacten",sjablonen:"Workflowbouwer",muziek:"Muziek",meetings:"Muziekmeeting",redactie:"Redactie",verkeer:"Verkeer",
+  hitlijsten:"Hitlijsten","hitlijst-beheer":"Hitlijstbeheer",presentatie:"Presentatie",social:"Social Studio","social-beheer":"Social beheer","social-templatebouwer":"Templatebouwer","meldpunt-beheer":"Meldpuntbeheer",team:"Team",beheer:"Beheer"
 };
 const LOCAL_NOTIFICATIONS="vlacora:collaboration:notifications:v13";
 const LOCAL_RECEIPTS="vlacora:collaboration:receipts:v13";
@@ -195,7 +195,7 @@ export function CollaborationProvider({
       const {data:userData}=await supabase.auth.getUser();
       if(cancelled||!userData.user)return;
       const user=userData.user;
-      let displayName=String(user.user_metadata?.display_name||user.email?.split("@")[0]||"VLACORA gebruiker");
+      let displayName=String(user.user_metadata?.display_name||user.email?.split("@")[0]||"PULSE gebruiker");
       let role="redactie";
       try{
         const {data:profile}=await supabase.from("profiles").select("display_name,role").eq("id",user.id).maybeSingle();

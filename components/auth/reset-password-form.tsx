@@ -24,8 +24,8 @@ export default function ResetPasswordForm(){
   }
 
   return <form className="login-card" onSubmit={submit}>
-    <div className="login-brand"><div className="brand-mark">V</div><div><strong>VLACORA</strong><span>HUB</span></div></div>
-    <div><span className="eyebrow">ACCOUNT HERSTELLEN</span><h1>Kies een nieuw wachtwoord</h1><p>Deze resetlink geeft alleen toegang tot het wijzigen van je eigen VLACORA-account.</p></div>
+    <div className="login-brand pulse-login-brand"><img src="/brand/pulse-icon.png" alt="PULSE"/><div><strong>PULSE</strong><span>YOUR STATION. ONE TEAM. ALL IN SYNC.</span></div></div>
+    <div><span className="eyebrow">ACCOUNT HERSTELLEN</span><h1>Kies een nieuw wachtwoord</h1><p>Deze resetlink geeft alleen toegang tot het wijzigen van je eigen PULSE-account.</p></div>
     {error&&<div className="login-error">{error}</div>}
     <label className="field">Nieuw wachtwoord<input type="password" required minLength={10} className="input" value={password} onChange={e=>setPassword(e.target.value)} autoComplete="new-password"/></label>
     <label className="field">Herhaal wachtwoord<input type="password" required minLength={10} className="input" value={repeat} onChange={e=>setRepeat(e.target.value)} autoComplete="new-password"/></label>

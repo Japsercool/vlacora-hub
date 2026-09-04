@@ -54,7 +54,7 @@ export default function TrafficModule({stationSlug}:{stationSlug:string}){
 
   return <div className="traffic-page">
     <div className="page-intro traffic-intro">
-      <div><span className="eyebrow">VLAAMS VERKEERSCENTRUM • DATEX II V3</span><h2>Live verkeer</h2><p>Actuele files, incidenten en wegenwerken. VLACORA gebruikt eerst het officiële menselijke verkeersoverzicht en DATEX alleen als fallback. Ophalen gebeurt uitsluitend op aanvraag.</p></div>
+      <div><span className="eyebrow">VLAAMS VERKEERSCENTRUM • DATEX II V3</span><h2>Live verkeer</h2><p>Actuele files, incidenten en wegenwerken. PULSE gebruikt eerst het officiële menselijke verkeersoverzicht en DATEX alleen als fallback. Ophalen gebeurt uitsluitend op aanvraag.</p></div>
       <div className="button-row"><button className="ghost" disabled={saving} onClick={()=>void save()}>{saving?"Opslaan…":"Instellingen opslaan"}</button><button className="primary" disabled={busy} onClick={()=>void refresh(false)}>↻ {busy?"Laden…":"Vernieuw live"}</button></div>
     </div>
     {notice&&<div className="inline-notice standalone">{notice}</div>}
@@ -77,7 +77,7 @@ export default function TrafficModule({stationSlug}:{stationSlug:string}){
       <section className="card traffic-radio-card">
         <div className="section-head"><div><span className="eyebrow">RADIO READY</span><h3>Verkeerstekst</h3><p>Automatisch samengesteld uit de actuele relevante meldingen.</p></div><span className={`traffic-live-badge ${snapshot?.ok?"online":""}`}>● LIVE</span></div>
         <textarea className="traffic-radio-text" value={radioText} onChange={e=>setRadioText(e.target.value)} placeholder="Klik bovenaan op ‘Vernieuw live’ om nu verkeersinfo op te halen…"/>
-        <div className="traffic-radio-footer"><div><strong>Feed update</strong><span>{fmtTime(snapshot?.publicationTime||"")}</span></div><div><strong>VLACORA opgehaald</strong><span>{fmtTime(snapshot?.fetchedAt||"")}</span></div><button className="primary soft" onClick={()=>void copyText()}>Kopieer tekst</button></div>
+        <div className="traffic-radio-footer"><div><strong>Feed update</strong><span>{fmtTime(snapshot?.publicationTime||"")}</span></div><div><strong>PULSE opgehaald</strong><span>{fmtTime(snapshot?.fetchedAt||"")}</span></div><button className="primary soft" onClick={()=>void copyText()}>Kopieer tekst</button></div>
       </section>
     </div>
 

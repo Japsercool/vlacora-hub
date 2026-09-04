@@ -2,8 +2,13 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "VLACORA HUB",
-  description: "Multi-station radio collaboration and live operations hub"
+  title: { default: "PULSE", template: "%s • PULSE" },
+  applicationName: "PULSE",
+  description: "Your station. One team. All in sync.",
+  icons: {
+    icon: "/brand/pulse-icon-256.png",
+    apple: "/brand/pulse-icon-256.png"
+  }
 };
 
 export default function RootLayout({

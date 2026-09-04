@@ -23,7 +23,7 @@ const staleStubPaths = walk(root).filter((file) => path.basename(file) === "exte
 for (const file of staleStubPaths) {
   try {
     fs.unlinkSync(file);
-    console.log(`VLACORA prebuild cleanup: removed stale ${path.relative(root, file)}.`);
+    console.log(`PULSE prebuild cleanup: removed stale ${path.relative(root, file)}.`);
   } catch (error) {
     problems.push(`Kon stale ${path.relative(root, file)} niet verwijderen: ${error instanceof Error ? error.message : String(error)}`);
   }
@@ -111,7 +111,7 @@ for (const file of remainingStubs) {
 }
 
 if (problems.length) {
-  console.error("VLACORA prebuild-check FAILED:\n- " + problems.join("\n- "));
+  console.error("PULSE prebuild-check FAILED:\n- " + problems.join("\n- "));
   process.exit(1);
 }
 
@@ -121,19 +121,19 @@ if (problems.length) {
 const tscName = process.platform === "win32" ? "tsc.cmd" : "tsc";
 const localTsc = path.join(root, "node_modules", ".bin", tscName);
 if (fs.existsSync(localTsc)) {
-  console.log("VLACORA prebuild: volledige TypeScript-controle starten…");
+  console.log("PULSE prebuild: volledige TypeScript-controle starten…");
   const result = spawnSync(localTsc, ["--noEmit", "--pretty", "false"], { cwd: root, stdio: "inherit", shell: false });
   if (result.error) {
-    console.error(`VLACORA TypeScript-controle kon niet starten: ${result.error.message}`);
+    console.error(`PULSE TypeScript-controle kon niet starten: ${result.error.message}`);
     process.exit(1);
   }
   if ((result.status ?? 1) !== 0) {
-    console.error("VLACORA prebuild-check FAILED: volledige TypeScript-controle bevat fouten.");
+    console.error("PULSE prebuild-check FAILED: volledige TypeScript-controle bevat fouten.");
     process.exit(result.status ?? 1);
   }
-  console.log("VLACORA prebuild: volledige TypeScript-controle OK.");
+  console.log("PULSE prebuild: volledige TypeScript-controle OK.");
 } else {
-  console.log("VLACORA prebuild: node_modules/.bin/tsc niet aanwezig; volledige typecheck wordt uitgevoerd zodra dependencies geïnstalleerd zijn (bv. op Vercel).");
+  console.log("PULSE prebuild: node_modules/.bin/tsc niet aanwezig; volledige typecheck wordt uitgevoerd zodra dependencies geïnstalleerd zijn (bv. op Vercel).");
 }
 
-console.log(`VLACORA prebuild-check OK: ${routes.length} route.ts-bestanden gecontroleerd; stale type-stubs opgeschoond.`);
+console.log(`PULSE prebuild-check OK: ${routes.length} route.ts-bestanden gecontroleerd; stale type-stubs opgeschoond.`);

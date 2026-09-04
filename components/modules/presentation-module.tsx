@@ -42,7 +42,7 @@ export default function PresentationModule({ stationSlug }: { stationSlug:string
 
   function updateSong(patch:Partial<SongText>){ if(!song)return; setSongs(songs.map(s=>s.id===song.id?{...s,...patch}:s)); }
   function addSong(){ const artist=prompt("Artiest:"); if(!artist)return; const title=prompt("Titel:"); if(!title)return; const n={id:uid(),artist,title,text:"",notes:"",tags:[]}; setSongs([...songs,n]);setSelectedSong(n.id); }
-  function aiVariant(){ if(!song)return; updateSong({text:`${song.artist} met ${song.title}. Nieuw op VLACORA Radio en geselecteerd door onze muziekredactie. Dit is ${song.title}.`}); }
+  function aiVariant(){ if(!song)return; updateSong({text:`${song.artist} met ${song.title}. Nieuw in PULSE en geselecteerd door onze muziekredactie. Dit is ${song.title}.`}); }
   function addProgram(){ const program=prompt("Programmanaam:"); if(!program)return; const n:ProgramTemplate={id:uid(),program,presenter:"Nog te bepalen",intro:`Welkom bij ${program} op {station}.`,items:[]};setTemplates([...templates,n]);setSelectedTemplate(n.id); }
   function addItem(){ if(!template)return; const name=prompt("Naam item:","Nieuw item"); if(!name)return; const item={id:uid(),name,type:"Redactie-item",instruction:"Beschrijf hier wat de presentator moet doen.",sample:"Voorbeeldtekst..."};setTemplates(templates.map(t=>t.id===template.id?{...t,items:[...t.items,item]}:t)); }
   function moveItem(index:number,dir:-1|1){ if(!template)return; const items=[...template.items];const to=index+dir;if(to<0||to>=items.length)return;[items[index],items[to]]=[items[to],items[index]];setTemplates(templates.map(t=>t.id===template.id?{...t,items}:t)); }

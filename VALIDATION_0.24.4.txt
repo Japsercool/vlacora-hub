@@ -1,0 +1,38 @@
+VLACORA HUB 0.24.4 — VALIDATION
+
+Basis
+- Gebouwd vanaf exact VLACORA_HUB_0.24.3_HITLIST_INVITES_SOCIAL_POLISH_GITHUB_READY.zip.
+- Geen oudere werkmap als releasebasis gebruikt.
+
+Codecontrole
+- TypeScript/TSX parser: 70 implementation files, 0 parsefouten.
+- Lokale @/ imports: 0 ontbrekend.
+- npm run prebuild: PASS.
+- App Router route.ts: 2 gecontroleerd; geen NextRequest-signature regressie.
+- external-stubs.d.ts: niet in release.
+- CSS start/end Autoprefixer guard: PASS.
+- Nieuwe incident-admin-module geeft geen nieuwe semantische fouten in de gebruikte strict stub-typecheck.
+
+Meldpuntbeheer
+- Nieuw adminNav-item meldpunt-beheer aanwezig.
+- Nieuw permission key meldpunt_beheer aanwezig in labels, groepen, module mapping en rolpresets.
+- Team & rechten neemt de nieuwe permission automatisch op in de matrix/menu-preview.
+- Gewoon Meldpunt gebruikt accountgerichte editcheck via vlacora_can_edit_incident.
+- Primaire verantwoordelijke zichtbaar in dossier.
+- Extra behandelaars worden centraal opgeslagen en krijgen dossier-editrecht.
+- Categorie-instellingen per station: actief, default severity, default assignee.
+- Standaard verantwoordelijke wordt bij nieuwe melding gebruikt en krijgt notificatie.
+
+Supabase live
+- hub_incident_collaborators: aanwezig.
+- hub_incident_category_settings: aanwezig.
+- vlacora_can_edit_incident: aanwezig.
+- hub_stations_seed_incident_categories trigger: aanwezig.
+- 44 standaard categorie-rijen aanwezig na migratiecontrole.
+- RLS updatebeleid voor hub_incidents vervangen door dossiergerichte authorization.
+- 038 en 039 live toegepast.
+
+Opmerking build
+- npm install kon in deze artefactomgeving niet tijdig voltooien door registry/netwerktimeout.
+- Daarom is hier geen volledige dependency-backed next build geclaimd.
+- In normale/Vercel buildomgeving voert scripts/prebuild-check.mjs, zodra node_modules aanwezig is, eerst tsc --noEmit uit.

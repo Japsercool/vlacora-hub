@@ -25,7 +25,7 @@ export default function ContactsModule({stationSlug}:{stationSlug:string}){
 
   const rows=useMemo(()=>{
     const q=query.toLowerCase().trim();
-    const internal=team.map(p=>({key:`internal-${p.id}`,internal:true,category:(p.jobTitle||p.role).toLowerCase().includes("techn")?"techniek":(p.jobTitle||p.role).toLowerCase().includes("sales")?"sales":"presentator",name:p.name,company:"VLACORA team",roleTitle:p.jobTitle||p.role,email:p.email,phone:p.phone,emergency:false,notes:p.role,source:p}));
+    const internal=team.map(p=>({key:`internal-${p.id}`,internal:true,category:(p.jobTitle||p.role).toLowerCase().includes("techn")?"techniek":(p.jobTitle||p.role).toLowerCase().includes("sales")?"sales":"presentator",name:p.name,company:"PULSE team",roleTitle:p.jobTitle||p.role,email:p.email,phone:p.phone,emergency:false,notes:p.role,source:p}));
     const ext=external.map(x=>({key:x.id,internal:false,...x,source:x}));
     return[...internal,...ext].filter((x:any)=>(category==="all"||x.category===category)&&(!q||`${x.name} ${x.company} ${x.roleTitle} ${x.email} ${x.phone} ${x.notes}`.toLowerCase().includes(q))).sort((a:any,b:any)=>Number(b.emergency)-Number(a.emergency)||a.name.localeCompare(b.name,"nl"));
   },[team,external,query,category]);

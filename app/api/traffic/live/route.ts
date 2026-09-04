@@ -213,7 +213,7 @@ async function loadOfficialOverview(){
   const pages=await Promise.all([0,1,2,3].map(async page=>{
     const url=page===0?OVERVIEW_URL:`${OVERVIEW_URL}?page=${page}`;
     const response=await fetch(url,{
-      headers:{Accept:"text/html,application/xhtml+xml","User-Agent":"VLACORA-HUB/0.23.1"},
+      headers:{Accept:"text/html,application/xhtml+xml","User-Agent":"PULSE/0.25.0"},
       next:{revalidate:60}
     });
     if(!response.ok)throw new Error(`Verkeerscentrum overzicht HTTP ${response.status}`);
@@ -250,7 +250,7 @@ export async function GET(req: globalThis.Request){
 
   try{
     const response=await fetch(DATEX_URL,{
-      headers:{Accept:"application/xml,text/xml;q=0.9,*/*;q=0.8","User-Agent":"VLACORA-HUB/0.23.1"},
+      headers:{Accept:"application/xml,text/xml;q=0.9,*/*;q=0.8","User-Agent":"PULSE/0.25.0"},
       next:{revalidate:60}
     });
     if(!response.ok)throw new Error(`DATEX HTTP ${response.status}`);

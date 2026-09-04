@@ -15,7 +15,7 @@ export const navItems = [
   ["programmas", "▣", "Programma-pagina's"],
   ["afwezigheden", "↔", "Afwezigheden"],
   ["contacten", "☎", "Contacten"],
-  ["sjablonen", "▧", "Sjablonen"],
+  ["sjablonen", "⌘", "Workflowbouwer"],
   ["muziek", "♫", "Muziek"],
   ["muziek-voorstellen", "＋", "Muziek & formatvoorstellen"],
   ["meetings", "◎", "Muziekmeetings"],
@@ -25,10 +25,11 @@ export const navItems = [
   ["presentatie", "✎", "Presentatie"],
   ["social", "✦", "Social Studio"],
   ["team", "♙", "Team"],
+  ["meldpunt-beheer", "!", "Meldpuntbeheer"],
   ["beheer", "⚙", "Beheer"],
   ["hitlijst-beheer", "↕", "Hitlijstbeheer"],
   ["social-beheer", "✦", "Social beheer"],
-  ["social-templatebouwer", "▦", "Templatebouwer"]
+  ["social-templatebouwer", "▦", "Social templatebouwer"]
 ] as const;
 
-export const adminNavSlugs = ["beheer","stations","team","sjablonen","hitlijst-beheer","social-beheer","social-templatebouwer"] as const;
+export const adminNavSlugs = ["beheer","stations","team","meldpunt-beheer","sjablonen","hitlijst-beheer","social-beheer","social-templatebouwer"] as const;

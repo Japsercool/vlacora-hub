@@ -61,7 +61,7 @@ export default function CalendarModule({stationSlug}:{stationSlug:string}){
   const invitedPeople=useMemo(()=>attendees.map(id=>people.find(p=>p.id===id)).filter(Boolean) as CalendarPerson[],[attendees,people]);
   const upcoming=useMemo(()=>{
     const now=Date.now();
-    return [...visibleEvents.map(e=>({id:e.id,title:e.title,startsAt:e.startsAt,subtitle:`${e.scope==="personal"?(e.ownerName||"Persoonlijk"):e.scope==="station"?e.stationSlug:"VLACORA"} • ${e.eventType}`,path:"",source:false})),...(showSources?sources.map(s=>({...s,source:true})):[])].filter(x=>new Date(x.startsAt).getTime()>=now-86400000).sort((a,b)=>a.startsAt.localeCompare(b.startsAt)).slice(0,12);
+    return [...visibleEvents.map(e=>({id:e.id,title:e.title,startsAt:e.startsAt,subtitle:`${e.scope==="personal"?(e.ownerName||"Persoonlijk"):e.scope==="station"?e.stationSlug:"PULSE"} • ${e.eventType}`,path:"",source:false})),...(showSources?sources.map(s=>({...s,source:true})):[])].filter(x=>new Date(x.startsAt).getTime()>=now-86400000).sort((a,b)=>a.startsAt.localeCompare(b.startsAt)).slice(0,12);
   },[visibleEvents,sources,showSources]);
 
   function newEvent(targetScope:CalendarScope){
@@ -86,12 +86,12 @@ export default function CalendarModule({stationSlug}:{stationSlug:string}){
   }
 
   return <div className="calendar-v22-page">
-    <div className="page-intro"><div><span className="eyebrow">CENTRALE AGENDA</span><h2>Agenda</h2><p>Persoonlijke afspraken, zenderplanning en VLACORA-brede momenten in één overzicht.</p></div><div className="button-row"><button className="ghost" disabled={busy} onClick={()=>void load()}>↻ Vernieuw</button><button className="primary" onClick={()=>newEvent(scope==="organization"?"organization":scope==="station"?"station":"personal")}>+ Afspraak</button></div></div>
+    <div className="page-intro"><div><span className="eyebrow">CENTRALE AGENDA</span><h2>Agenda</h2><p>Persoonlijke afspraken, zenderplanning en PULSE-brede momenten in één overzicht.</p></div><div className="button-row"><button className="ghost" disabled={busy} onClick={()=>void load()}>↻ Vernieuw</button><button className="primary" onClick={()=>newEvent(scope==="organization"?"organization":scope==="station"?"station":"personal")}>+ Afspraak</button></div></div>
     {notice&&<div className="inline-notice">{notice}</div>}
     <div className="calendar-scope-tabs">
       <button className={scope==="mine"?"active":""} onClick={()=>setScope("mine")}>◎ Mijn agenda</button>
       <button className={scope==="station"?"active":""} onClick={()=>setScope("station")}>◉ {stationSlug==="all"?"Alle zenders":"Zenderagenda"}</button>
-      <button className={scope==="organization"?"active":""} onClick={()=>setScope("organization")}>▣ VLACORA breed</button>
+      <button className={scope==="organization"?"active":""} onClick={()=>setScope("organization")}>▣ PULSE breed</button>
     </div>
 
     <div className="calendar-v22-layout">
@@ -112,13 +112,13 @@ export default function CalendarModule({stationSlug}:{stationSlug:string}){
 
       <aside className="calendar-v22-side">
         <section className="card"><div className="section-head"><div><h3>Komend</h3><p>De eerstvolgende afspraken in deze weergave.</p></div></div>{upcoming.length===0?<div className="empty-live-state compact"><strong>Niets gepland</strong></div>:upcoming.map((x:any)=><button className="calendar-upcoming-row" key={x.id} onClick={()=>x.source?router.push(x.path):editEvent(events.find(e=>e.id===x.id)!)}><span className="calendar-date-badge"><b>{new Date(x.startsAt).getDate()}</b><small>{new Date(x.startsAt).toLocaleDateString("nl-BE",{month:"short"})}</small></span><div><strong>{x.title}</strong><small>{new Date(x.startsAt).toLocaleString("nl-BE",{weekday:"short",hour:"2-digit",minute:"2-digit"})} • {x.subtitle}</small></div><b>›</b></button>)}</section>
-        <section className="card calendar-legend"><h3>Wat komt samen?</h3><p><span>◎</span> Persoonlijke afspraken</p><p><span>◉</span> Zenderafspraken</p><p><span>▣</span> VLACORA-brede momenten</p><p><span>✦</span> Geplande social posts</p><p><span>♫</span> Muziekmeetings</p><small>Social en meetings worden gelezen uit hun eigen tabellen; er wordt niets dubbel opgeslagen.</small></section>
+        <section className="card calendar-legend"><h3>Wat komt samen?</h3><p><span>◎</span> Persoonlijke afspraken</p><p><span>◉</span> Zenderafspraken</p><p><span>▣</span> PULSE-brede momenten</p><p><span>✦</span> Geplande social posts</p><p><span>♫</span> Muziekmeetings</p><small>Social en meetings worden gelezen uit hun eigen tabellen; er wordt niets dubbel opgeslagen.</small></section>
       </aside>
     </div>
 
     {editor&&<div className="modal-backdrop" onMouseDown={()=>setEditor(null)}><div className="modal-card calendar-event-modal" onMouseDown={e=>e.stopPropagation()}><div className="modal-head"><div><span className="eyebrow">AGENDA-ITEM</span><h2>{editor.id?.startsWith("new-")?"Nieuwe afspraak":"Afspraak bewerken"}</h2></div><button className="mini-btn" onClick={()=>setEditor(null)}>×</button></div><div className="modal-form">
       <label className="field">Titel<input className="input" value={editor.title||""} onChange={e=>setEditor({...editor,title:e.target.value})}/></label>
-      <div className="calendar-editor-grid"><label className="field">Niveau<select className="select" value={editor.scope||"personal"} onChange={e=>setEditor({...editor,scope:e.target.value as CalendarScope})}><option value="personal">Persoonlijk</option><option value="station">Zender</option><option value="organization">VLACORA breed</option></select></label><label className="field">Type<select className="select" value={editor.eventType||"meeting"} onChange={e=>setEditor({...editor,eventType:e.target.value})}>{TYPES.map(([v,l])=><option value={v} key={v}>{l}</option>)}</select></label></div>
+      <div className="calendar-editor-grid"><label className="field">Niveau<select className="select" value={editor.scope||"personal"} onChange={e=>setEditor({...editor,scope:e.target.value as CalendarScope})}><option value="personal">Persoonlijk</option><option value="station">Zender</option><option value="organization">PULSE breed</option></select></label><label className="field">Type<select className="select" value={editor.eventType||"meeting"} onChange={e=>setEditor({...editor,eventType:e.target.value})}>{TYPES.map(([v,l])=><option value={v} key={v}>{l}</option>)}</select></label></div>
       {editor.scope==="personal"&&<div className="privacy-note"><strong>🔒 Alleen voor jou</strong><span>Persoonlijke afspraken zijn door niemand anders leesbaar, ook niet door admins of beheerders.</span></div>}
       <div className="calendar-editor-grid"><label className="field">Start<input className="input" type="datetime-local" value={toLocalInput(editor.startsAt||null)} onChange={e=>setEditor({...editor,startsAt:fromLocalInput(e.target.value)})}/></label><label className="field">Einde<input className="input" type="datetime-local" value={toLocalInput(editor.endsAt||null)} onChange={e=>setEditor({...editor,endsAt:e.target.value?fromLocalInput(e.target.value):null})}/></label></div>
       <label className="required-notification-toggle"><input type="checkbox" checked={Boolean(editor.allDay)} onChange={e=>setEditor({...editor,allDay:e.target.checked})}/><div><strong>Hele dag</strong><span>Toon zonder specifiek uur.</span></div></label>
@@ -128,7 +128,7 @@ export default function CalendarModule({stationSlug}:{stationSlug:string}){
         {invitedPeople.length>0&&<div className="calendar-invite-chips">{invitedPeople.map(person=><button type="button" key={person.id} className="calendar-invite-chip" onClick={()=>toggleAttendee(person.id)}>{person.avatarUrl?<img src={person.avatarUrl} alt=""/>:<b>{person.name.split(/\s+/).slice(0,2).map(x=>x[0]).join("").toUpperCase()}</b>}<span>{person.name}</span><i>×</i></button>)}</div>}
         <button type="button" className="calendar-invite-trigger" onClick={()=>setInviteOpen(v=>!v)}><span>＋ {attendees.length?"Nog iemand uitnodigen":"Teamleden kiezen"}</span><b>{attendees.length} geselecteerd ▾</b></button>
         {inviteOpen&&<div className="calendar-invite-popover"><input autoFocus className="input" value={inviteSearch} onChange={e=>setInviteSearch(e.target.value)} placeholder="Zoek op naam, e-mail of functie…"/><div className="calendar-invite-list">{invitePeople.length===0?<div className="calendar-invite-empty">Geen teamleden gevonden.</div>:invitePeople.map(person=>{const checked=attendees.includes(person.id);return <button type="button" key={person.id} className={checked?"selected":""} onClick={()=>toggleAttendee(person.id)}>{person.avatarUrl?<img src={person.avatarUrl} alt=""/>:<b>{person.name.split(/\s+/).slice(0,2).map(x=>x[0]).join("").toUpperCase()}</b>}<span><strong>{person.name}</strong><small>{person.jobTitle||person.email}</small></span><i>{checked?"✓":"＋"}</i></button>})}</div><div className="calendar-invite-popover-foot"><span>{attendees.length} persoon/personen uitgenodigd</span><button type="button" className="ghost" onClick={()=>setInviteOpen(false)}>Klaar</button></div></div>}
-      </div><small>Uitgenodigde accounts krijgen na opslaan een VLACORA-melding. Persoonlijke afspraken kunnen niemand uitnodigen.</small></div>}
+      </div><small>Uitgenodigde accounts krijgen na opslaan een PULSE-melding. Persoonlijke afspraken kunnen niemand uitnodigen.</small></div>}
       <div className="button-row"><button className="primary" disabled={busy} onClick={()=>void persist()}>Opslaan</button>{selected&&<button className="ghost danger-text" disabled={busy} onClick={()=>void remove()}>Verwijderen</button>}</div>
     </div></div></div>}
   </div>;

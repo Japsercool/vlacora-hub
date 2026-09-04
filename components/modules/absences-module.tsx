@@ -72,7 +72,7 @@ export default function AbsencesModule({stationSlug}:{stationSlug:string}){
   if(!configured)return <div className="page-intro"><div><h2>Afwezigheden</h2><p>Supabase is nodig om afwezigheden centraal met het team te delen.</p></div></div>;
 
   return <div className="absence-page">
-    <div className="page-intro"><div><span className="eyebrow">PLANNING & TEAM</span><h2>Afwezigheden & vervanging</h2><p>VLACORA berekent welke programma&apos;s geraakt worden, toont open taken en laat per uitzending een vervanger kiezen.</p></div><span className="metric-badge">{upcoming.length} actief / gepland</span></div>
+    <div className="page-intro"><div><span className="eyebrow">PLANNING & TEAM</span><h2>Afwezigheden & vervanging</h2><p>PULSE berekent welke programma&apos;s geraakt worden, toont open taken en laat per uitzending een vervanger kiezen.</p></div><span className="metric-badge">{upcoming.length} actief / gepland</span></div>
     {notice&&<div className="inline-notice standalone">{notice}</div>}
     <div className="absence-layout">
       <section className="card absence-form">

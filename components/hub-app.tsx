@@ -29,6 +29,7 @@ import AdminIntegrationsModule from "@/components/modules/admin-integrations-mod
 import ProgrammingModule from "@/components/modules/programming-module";
 import ChartsModule from "@/components/modules/charts-module";
 import IncidentModule,{IncidentSummaryCard} from "@/components/modules/incident-module";
+import IncidentAdminModule from "@/components/modules/incident-admin-module";
 import TemplatesModule from "@/components/modules/templates-module";
 import TasksModule,{TaskSummaryCard} from "@/components/modules/tasks-module";
 import { HUB_STATIONS_EVENT, allHubStation, hydrateHubStations, readHubStations, type HubStation } from "@/lib/hub-stations";
@@ -70,7 +71,7 @@ function HubAppInner({ stationSlug, moduleSlug }: Props) {
     let alive=true;
     if(!isSupabaseBrowserConfigured())return;
     const supabase=createClient();
-    void supabase.auth.getUser().then(async({data})=>{
+    void supabase.auth.getUser().then(async({data}:{data:any})=>{
       if(!data.user||!alive)return;
       const{data:profile}=await supabase.from("profiles").select("role,permissions").eq("id",data.user.id).maybeSingle();
       if(!alive)return;
@@ -88,7 +89,7 @@ function HubAppInner({ stationSlug, moduleSlug }: Props) {
   return (
     <div className="hub-shell">
       <aside className="sidebar">
-        <div className="brand"><div className="brand-mark">V</div><div><div className="brand-name">VLACORA</div><div className="brand-sub">HUB</div></div></div>
+        <div className="brand"><img className="pulse-brand-icon" src="/brand/pulse-icon.png" alt="PULSE"/><div className="pulse-brand-copy"><div className="brand-name">PULSE</div><div className="brand-sub">WORKSPACE</div></div></div>
         <div className="station-mini"><span className="station-dot" style={{ background: station.accent }} /><div><strong>{station.name}</strong><small>Multi-station workspace</small></div></div>
         {!permissions&&<div className="sidebar-rights-loading">Menu laden…</div>}
         <div className="sidebar-menu-scroll">
@@ -108,7 +109,7 @@ function HubAppInner({ stationSlug, moduleSlug }: Props) {
 
       <main className="main">
         <header className="topbar">
-          <div><div className="eyebrow">VLACORA / {station.name}</div><h1>{moduleName}</h1></div>
+          <div><div className="eyebrow">PULSE / {station.name}</div><h1>{moduleName}</h1></div>
           <GlobalSearch stationSlug={station.slug}/>
           <div className="top-actions">
             <select className="select" value={station.slug} onChange={(e) => router.push(`/hub/${e.target.value}/${moduleSlug}`)}>
@@ -121,11 +122,11 @@ function HubAppInner({ stationSlug, moduleSlug }: Props) {
         </header>
 
         <div className="content">
-          {!permissions&&<div className="card empty-live-state"><strong>Rechten laden…</strong><span>VLACORA bepaalt eerst welke onderdelen voor jouw account zichtbaar zijn.</span></div>}
+          {!permissions&&<div className="card empty-live-state"><strong>Rechten laden…</strong><span>PULSE bepaalt eerst welke onderdelen voor jouw account zichtbaar zijn.</span></div>}
           {permissions&&!hasModuleAccess && <div className="card empty-live-state"><strong>Geen toegang tot dit onderdeel</strong><span>Een superadmin kan dit per gebruiker aanpassen bij Team & rechten.</span></div>}
           {hasModuleAccess && moduleSlug === "dashboard" && <>
             <section className="hero">
-              <div><div className="hero-kicker">TODAY • LIVE WERKPLEK</div><h2>{collaboration.currentUser?.name?`Welkom, ${collaboration.currentUser.name}.`:"Vandaag in VLACORA"}</h2><p>Dit vraagt vandaag aandacht binnen {station.name}.</p></div>
+              <div><div className="hero-kicker">TODAY • LIVE WERKPLEK</div><h2>{collaboration.currentUser?.name?`Welkom, ${collaboration.currentUser.name}.`:"Vandaag in PULSE"}</h2><p>Dit vraagt vandaag aandacht binnen {station.name}.</p></div>
               <div className="hero-now"><span className="tiny">TEAM HUB</span><strong>Redactie • planning • communicatie</strong><span>Alles wat je team vandaag nodig heeft in één werkplek.</span></div>
             </section>
             <div className="metric-grid">
@@ -136,7 +137,7 @@ function HubAppInner({ stationSlug, moduleSlug }: Props) {
             </div>
             <div className="two-col">
               <IncidentSummaryCard stationSlug={station.slug} />
-              <Card><div className="section-head"><div><h3>Teamwerk</h3><p>Focus op redactie, taken, communicatie en planning.</p></div><Badge tone="green">STANDALONE</Badge></div><div className="attention-list"><div className="attention blue"><span>✓</span><div><strong>Zelfstandige HUB</strong><small>De HUB bewaart teamdata centraal in VLACORA/Supabase PostgreSQL.</small></div></div></div><button className="primary wide" onClick={()=>router.push(`/hub/${station.slug}/redactie`)}>Open redactie →</button></Card>
+              <Card><div className="section-head"><div><h3>Teamwerk</h3><p>Focus op redactie, taken, communicatie en planning.</p></div><Badge tone="green">STANDALONE</Badge></div><div className="attention-list"><div className="attention blue"><span>✓</span><div><strong>Zelfstandige HUB</strong><small>PULSE bewaart teamdata centraal in Supabase/PostgreSQL.</small></div></div></div><button className="primary wide" onClick={()=>router.push(`/hub/${station.slug}/redactie`)}>Open redactie →</button></Card>
             </div>
             <TodayCollaboration stationName={station.name} onOpenNotifications={collaboration.openNotifications} onOpenPresence={collaboration.openPresence}/>
             <Card><div className="section-head"><div><h3>Uitzendschema</h3><p>Vandaag • {station.name}</p></div><button className="ghost" onClick={()=>router.push(`/hub/${station.slug}/programmering`)}>Open programmering →</button></div><div className="empty-live-state compact"><strong>Bewerkbare programmering</strong><span>Programma&apos;s worden niet meer uit een vaste demo geladen. Beheer ze in Programmering.</span></div></Card>
@@ -148,11 +149,11 @@ function HubAppInner({ stationSlug, moduleSlug }: Props) {
 
           {hasModuleAccess && moduleSlug === "meldingen" && <><NotificationsPage stationSlug={station.slug} /><OperationalWarningsPanel stationSlug={station.slug}/></>}
 
-          {hasModuleAccess && moduleSlug === "stations" && <><div className="page-intro"><div><h2>Stations</h2><p>VLACORA beheert deze zenders zelfstandig, zonder externe radio-engine.</p></div></div><div className="station-grid">{hubStations.filter(s=>s.slug!=="all").map(s=><Card key={s.slug} className="station-card"><div className="station-card-head"><div className="station-logo" style={{background:s.accent}}>{s.short}</div><div><h3>{s.name}</h3><span className="muted">VLACORA station</span></div></div><div className="station-stat"><span>Werkmodus</span><strong>Standalone HUB</strong></div><Link className="primary wide" href={`/hub/${s.slug}/dashboard`}>Open station</Link></Card>)}</div></>}
+          {hasModuleAccess && moduleSlug === "stations" && <><div className="page-intro"><div><h2>Stations</h2><p>PULSE beheert deze zenders zelfstandig, zonder externe radio-engine.</p></div></div><div className="station-grid">{hubStations.filter(s=>s.slug!=="all").map(s=><Card key={s.slug} className="station-card"><div className="station-card-head"><div className="station-logo" style={{background:s.accent}}>{s.short}</div><div><h3>{s.name}</h3><span className="muted">PULSE station</span></div></div><div className="station-stat"><span>Werkmodus</span><strong>Standalone HUB</strong></div><Link className="primary wide" href={`/hub/${s.slug}/dashboard`}>Open station</Link></Card>)}</div></>}
 
           {hasModuleAccess && moduleSlug === "taken" && <TasksModule stationSlug={station.slug} />}
 
-          {hasModuleAccess && moduleSlug === "meldpunt" && <IncidentModule stationSlug={station.slug} publishNotification={collaboration.publishNotification} />}
+          {hasModuleAccess && moduleSlug === "meldpunt" && <IncidentModule stationSlug={station.slug} publishNotification={collaboration.publishNotification} permissions={permissions!} />}
 
           {hasModuleAccess && moduleSlug === "aanvragen" && <AdminRequestsModule stationSlug={station.slug} />}
 
@@ -192,6 +193,8 @@ function HubAppInner({ stationSlug, moduleSlug }: Props) {
           {hasModuleAccess && (moduleSlug === "social" || moduleSlug === "social-beheer") && <SocialStudioModule stationSlug={station.slug} permissions={permissions} initialTab={moduleSlug==="social-beheer"?"brand":"studio"} />}
 
           {hasModuleAccess && moduleSlug === "social-templatebouwer" && <SocialTemplateBuilderModule stationSlug={station.slug} permissions={permissions} />}
+
+          {hasModuleAccess && moduleSlug === "meldpunt-beheer" && <IncidentAdminModule stationSlug={station.slug} publishNotification={collaboration.publishNotification} permissions={permissions!} />}
 
           {hasModuleAccess && moduleSlug === "team" && <TeamRightsModule stationSlug={station.slug} />}
 

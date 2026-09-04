@@ -38,7 +38,7 @@ pids/
 *.tsbuildinfo
 
 # Environment variables / SECRETS
-# Never commit real VLACORA or Supabase secrets.
+# Never commit real PULSE or Supabase secrets.
 .env
 .env.local
 .env.development.local

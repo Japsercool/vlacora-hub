@@ -104,7 +104,7 @@ export default function MusicLibraryModule({stationSlug}:{stationSlug:string}) {
     </div>
 
     {showAdd && <div className="card inline-editor-card">
-      <div className="module-title-row"><div><h3>Nieuwe song toevoegen</h3><small>Wordt meteen beschikbaar in de VLACORA-muziekbibliotheek.</small></div><button className="mini-btn" onClick={()=>setShowAdd(false)}>×</button></div>
+      <div className="module-title-row"><div><h3>Nieuwe song toevoegen</h3><small>Wordt meteen beschikbaar in de PULSE-muziekbibliotheek.</small></div><button className="mini-btn" onClick={()=>setShowAdd(false)}>×</button></div>
       <form className="music-add-grid" onSubmit={addSong}>
         <label className="field">Artiest<input className="input" name="artist" required /></label>
         <label className="field">Titel<input className="input" name="title" required /></label>
@@ -147,7 +147,7 @@ export default function MusicLibraryModule({stationSlug}:{stationSlug:string}) {
         </div>
         <label className="field">Redactienotitie<textarea className="input textarea" value={selected.notes} onChange={e=>update({notes:e.target.value})}/></label>
         <label className="field">Presentatietekst voor deze song<textarea className="input presenter-editor mini-presenter-editor" value={selected.presentationText||""} onChange={e=>update({presentationText:e.target.value})} placeholder="Wat kan de presentator zeggen?"/></label>
-        <div className="button-row"><button className="ghost" onClick={()=>update({presentationText:`Nieuwe muziek op VLACORA: ${selected.artist} met ${selected.title}.`})}>✨ Tekstvoorstel</button><button className="ghost danger-text" onClick={()=>setSongs(songs.filter(s=>s.id!==selected.id))}>Verwijder song</button></div>
+        <div className="button-row"><button className="ghost" onClick={()=>update({presentationText:`Nieuwe muziek in PULSE: ${selected.artist} met ${selected.title}.`})}>✨ Tekstvoorstel</button><button className="ghost danger-text" onClick={()=>setSongs(songs.filter(s=>s.id!==selected.id))}>Verwijder song</button></div>
       </div>}
     </div>
   </div>

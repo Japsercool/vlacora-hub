@@ -209,7 +209,7 @@ export default function TasksModule({stationSlug}:{stationSlug:string}){
     </div>
 
     <div className="task-presence-strip">
-      <div><strong>Nu actief</strong><span>Je ziet meteen wie in VLACORA zit en waar die mee bezig is.</span></div>
+      <div><strong>Nu actief</strong><span>Je ziet meteen wie in PULSE zit en waar die mee bezig is.</span></div>
       <div className="task-presence-people">
         {activePeople.slice(0,8).map(p=><button key={p.key} onClick={collab.openPresence} className={p.moduleSlug==="taken"?"working-on-tasks":""}><span className="task-presence-avatar">{p.initials}<i/></span><span><b>{p.name}{p.isMe?" • jij":""}</b><small>{p.detail}</small></span></button>)}
         {!activePeople.length&&<span className="muted-copy-hint">Nog niemand online zichtbaar.</span>}
@@ -269,7 +269,7 @@ export default function TasksModule({stationSlug}:{stationSlug:string}){
         </section>
 
         <section className="task-editor-section recurrence-editor">
-          <div className="section-head"><div><h3>Terugkerende taak</h3><p>Wanneer je deze taak afrondt, maakt VLACORA automatisch de volgende aan.</p></div></div>
+          <div className="section-head"><div><h3>Terugkerende taak</h3><p>Wanneer je deze taak afrondt, maakt PULSE automatisch de volgende aan.</p></div></div>
           <div className="task-editor-grid">
             <label className="field">Herhalen<select className="select" value={draft.recurrenceKind} onChange={e=>{const recurrenceKind=e.target.value as TaskRecurrence;patch({recurrenceKind,recurrenceConfig:{...draft.recurrenceConfig,weekdays:recurrenceKind==="weekly"&&!(draft.recurrenceConfig.weekdays||[]).length?[new Date(draft.dueAt||Date.now()).getDay()]:draft.recurrenceConfig.weekdays}})}}><option value="none">Niet herhalen</option><option value="daily">Dagelijks</option><option value="weekly">Wekelijks</option><option value="monthly">Maandelijks</option></select></label>
             {draft.recurrenceKind!=="none"&&<label className="field">Elke<input className="input" type="number" min="1" max="52" value={draft.recurrenceInterval} onChange={e=>patch({recurrenceInterval:Math.max(1,Number(e.target.value)||1)})}/><small>{draft.recurrenceKind==="daily"?"dag(en)":draft.recurrenceKind==="weekly"?"week/weken":"maand(en)"}</small></label>}

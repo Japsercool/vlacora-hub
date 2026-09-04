@@ -1,0 +1,28 @@
+VLACORA HUB 0.24.5 — VALIDATION
+
+Releasebasis
+- Exact opgebouwd uit VLACORA_HUB_0.24.4_MELDPUNT_BEHEER_GITHUB_READY.zip.
+- Geen oudere werkmap gebruikt.
+- Geen nieuwe database-migratie t.o.v. 0.24.4.
+
+Codecontrole
+- TypeScript/TSX syntactisch geparseerd met TypeScript compiler API: 72 implementation files, 0 syntaxfouten.
+- Lokale @/ en relatieve imports gecontroleerd: 0 ontbrekende imports.
+- npm run prebuild: PASS.
+- App Router route.ts: 2 gecontroleerd; globalThis.Request-guard actief.
+- external-stubs.d.ts: niet in release.
+- CSS start/end Autoprefixer guard: PASS.
+- Geen actieve Playout One/Rotation One/SHOUTcast/listener-integratiecode aangetroffen buiten historische documentatie/migraties.
+
+Behouden functionaliteit
+- Meldpuntbeheer met primaire verantwoordelijke, extra behandelaars, categoriebeheer en dossiergerichte rechten.
+- Hitlijstwerkblad met geïntegreerde songeditor, centrale song memory en Excel-import.
+- Agenda-uitnodigingen via echte Supabase-accounts.
+- Social Studio + Social beheer + drag-and-drop Templatebouwer.
+- Fijnmazige menu-/modulerechten per gebruiker/rol.
+- Programma-accountkoppeling, DJ-foto's, afwezigheden/vervanging, redactieversies, muziek-/formatvoorstellen en generieke bijlagen.
+- Supabase Auth blijft de vaste login/identity-laag.
+
+Buildomgeving
+- Een volledige dependency-backed next build kon in de artefactomgeving niet worden uitgevoerd omdat registry.npmjs.org niet resolveert (EAI_AGAIN).
+- scripts/prebuild-check.mjs voert in Vercel/normale omgeving automatisch tsc --noEmit uit zodra node_modules aanwezig is, vóór next build.

@@ -326,7 +326,7 @@ export async function updateContentItem(id:string,patch:{status?:ContentItem["st
   const{error}=await createClient().from("hub_content_inbox").update(payload).eq("id",id);if(error)throw error;
 }
 
-function mapWarning(r:any):OperationalWarning{return{warningKey:String(r.warning_key),stationSlug:String(r.station_slug),code:String(r.code),severity:String(r.severity) as OperationalWarning["severity"],title:String(r.title),body:String(r.body||""),status:String(r.status) as OperationalWarning["status"],actionPath:String(r.action_path||""),source:String(r.source||"VLACORA"),firstSeenAt:String(r.first_seen_at),lastSeenAt:String(r.last_seen_at),resolvedAt:r.resolved_at?String(r.resolved_at):null}}
+function mapWarning(r:any):OperationalWarning{return{warningKey:String(r.warning_key),stationSlug:String(r.station_slug),code:String(r.code),severity:String(r.severity) as OperationalWarning["severity"],title:String(r.title),body:String(r.body||""),status:String(r.status) as OperationalWarning["status"],actionPath:String(r.action_path||""),source:String((r.source==="VLACORA"?"PULSE":r.source)||"PULSE"),firstSeenAt:String(r.first_seen_at),lastSeenAt:String(r.last_seen_at),resolvedAt:r.resolved_at?String(r.resolved_at):null}}
 export async function loadOperationalWarnings(stationSlug:string,openOnly=true):Promise<OperationalWarning[]>{
   if(!isSupabaseBrowserConfigured())return[];
   let q=createClient().from("hub_operational_warnings").select("*").order("severity",{ascending:true}).order("last_seen_at",{ascending:false});
@@ -341,7 +341,7 @@ export async function upsertOperationalWarning(input:{stationSlug:string;code:st
   const now=new Date().toISOString();
   const supabase=createClient();
   const{data:existing}=await supabase.from("hub_operational_warnings").select("warning_key,status,first_seen_at").eq("warning_key",warningKey).maybeSingle();
-  const payload={warning_key:warningKey,station_slug:input.stationSlug,code:input.code,severity:input.severity,title:input.title,body:input.body,status:"open",action_path:input.actionPath,source:input.source||"VLACORA",first_seen_at:existing?.first_seen_at||now,last_seen_at:now,resolved_at:null,updated_by:actor};
+  const payload={warning_key:warningKey,station_slug:input.stationSlug,code:input.code,severity:input.severity,title:input.title,body:input.body,status:"open",action_path:input.actionPath,source:input.source||"PULSE",first_seen_at:existing?.first_seen_at||now,last_seen_at:now,resolved_at:null,updated_by:actor};
   const{error}=await supabase.from("hub_operational_warnings").upsert(payload,{onConflict:"warning_key"});if(error)throw error;
 }
 export async function resolveOperationalWarning(stationSlug:string,code:string,identity="main"){

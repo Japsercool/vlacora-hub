@@ -57,7 +57,7 @@ export default function TeamRightsModule({stationSlug}:{stationSlug:string}){
     const membershipsByUser=new Map<string,string[]>();
     (memberships||[]).filter((x:any)=>x.active).forEach((x:any)=>{const a=membershipsByUser.get(String(x.user_id))||[];a.push(String(x.station_slug));membershipsByUser.set(String(x.user_id),a)});
     const rows=(profiles||[]).map((p:ProfileRow)=>({
-      id:p.id,name:p.display_name||p.email?.split("@")[0]||"VLACORA gebruiker",email:p.email||"",initials:initials(p.display_name||p.email||"V"),avatarUrl:p.avatar_url||"",role:prettyRole(p.role),stations:membershipsByUser.get(p.id)||[],active:p.active!==false,
+      id:p.id,name:p.display_name||p.email?.split("@")[0]||"PULSE gebruiker",email:p.email||"",initials:initials(p.display_name||p.email||"V"),avatarUrl:p.avatar_url||"",role:prettyRole(p.role),stations:membershipsByUser.get(p.id)||[],active:p.active!==false,
       phone:p.phone||"",jobTitle:p.job_title||prettyRole(p.role),permissions:permissionsFor(p.role,p.permissions),lastSeen:lastSeen(p.last_seen_at,p.id===me),isCurrent:p.id===me
     })) as TeamUser[];
     const my=rows.find(x=>x.id===me);setCurrentRole(dbRole(my?.role||""));setUsers(rows);setSelectedId(current=>current&&rows.some(x=>x.id===current)?current:(rows[0]?.id||""));setLoading(false);
@@ -87,7 +87,7 @@ export default function TeamRightsModule({stationSlug}:{stationSlug:string}){
     e.preventDefault();if(!canAdmin)return flash("Alleen een superadmin kan gebruikers uitnodigen.");
     const f=new FormData(e.currentTarget);const role=String(f.get("role")||"Kijker");const station=String(f.get("station")||"");
     const{data,error}=await createClient().functions.invoke("vlacora-admin-users",{body:{action:"invite",email:String(f.get("email")||""),displayName:String(f.get("name")||""),role:dbRole(role),jobTitle:String(f.get("jobTitle")||role),stationSlugs:station?[station]:[],redirectTo:`${location.origin}/auth/callback?next=/reset-password`}});
-    if(error||data?.error)return flash(data?.error||error?.message||"Uitnodigen mislukt");setShowAdd(false);flash("Uitnodiging verstuurd en VLACORA-profiel aangemaakt");setTimeout(()=>void load(),800);
+    if(error||data?.error)return flash(data?.error||error?.message||"Uitnodigen mislukt");setShowAdd(false);flash("Uitnodiging verstuurd en PULSE-profiel aangemaakt");setTimeout(()=>void load(),800);
   }
   async function sendRecovery(){if(!draft||!canAdmin)return;const{data,error}=await createClient().functions.invoke("vlacora-admin-users",{body:{action:"send_recovery",email:draft.email,redirectTo:`${location.origin}/auth/callback?next=/reset-password`}});if(error||data?.error)return flash(data?.error||error?.message||"Resetmail mislukt");flash("Wachtwoordlink verstuurd")}
   async function changeAvatar(file:File|undefined){if(!draft||!file)return;try{const url=await uploadProfileAvatar(draft.id,file);patch({avatarUrl:url});setUsers(rows=>rows.map(x=>x.id===draft.id?{...x,avatarUrl:url}:x));flash("DJ-/presentatorfoto opgeslagen") }catch(e){flash(e instanceof Error?e.message:"Foto uploaden mislukt")}}

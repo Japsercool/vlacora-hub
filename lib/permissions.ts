@@ -7,7 +7,7 @@ export type PermissionKey =
   | "redactie" | "redactie_versies" | "verkeer"
   | "hitlijsten" | "hitlijsten_import" | "presentatie"
   | "social_content" | "social_calendar" | "social_templates" | "social_template_builder" | "social_assets" | "social_approval"
-  | "team" | "beheer";
+  | "team" | "meldpunt_beheer" | "beheer";
 
 export type PermissionMap = Record<PermissionKey, PermissionLevel>;
 
@@ -15,13 +15,13 @@ export const permissionLabels: Record<PermissionKey,string> = {
   dashboard:"Dashboard", voor_mij:"Voor mij", mijn_uitzending:"Mijn uitzending", meldingen:"Meldingen", stations:"Zenders bekijken", taken:"Taken", meldpunt:"Meldpunt",
   messenger:"Messenger", communicatie:"Officiële communicatie", kalender:"Gedeelde agenda",
   programmering:"Programmering", programmas:"Programmapagina's", afwezigheden:"Afwezigheden & vervanging",
-  contacten:"Contacten", sjablonen:"Algemene sjablonen", muziek:"Muziekinformatie",
+  contacten:"Contacten", sjablonen:"Workflowbouwer", muziek:"Muziekinformatie",
   muziek_voorstellen:"Muziek- & formatvoorstellen", meetings:"Muziekmeetings",
   redactie:"Redactie / talks", redactie_versies:"Redactie-versiegeschiedenis", verkeer:"Verkeer",
   hitlijsten:"Hitlijsten", hitlijsten_import:"Hitlijsten importeren", presentatie:"Presentatie",
   social_content:"Social • Content maken", social_calendar:"Social • Contentkalender",
-  social_templates:"Social • Brand kit & beheer", social_template_builder:"Social • Templatebouwer", social_assets:"Social • Assets & copyblokken",
-  social_approval:"Social • Goedkeuren & publiceren", team:"Team & gebruikers", beheer:"Superbeheer"
+  social_templates:"Social • Brand kit & beheer", social_template_builder:"Social • Mini Canva / Templatebouwer", social_assets:"Social • Assets & copyblokken",
+  social_approval:"Social • Goedkeuren & publiceren", team:"Team & gebruikers", meldpunt_beheer:"Meldpuntbeheer", beheer:"Superbeheer"
 };
 
 export const permissionGroups: Array<{label:string;keys:PermissionKey[]}> = [
@@ -30,7 +30,7 @@ export const permissionGroups: Array<{label:string;keys:PermissionKey[]}> = [
   {label:"Muziek",keys:["muziek","muziek_voorstellen","meetings","hitlijsten","hitlijsten_import"]},
   {label:"Redactie",keys:["redactie","redactie_versies","verkeer","presentatie"]},
   {label:"Social media",keys:["social_content","social_calendar","social_templates","social_template_builder","social_assets","social_approval"]},
-  {label:"Beheer",keys:["team","beheer"]}
+  {label:"Beheer",keys:["team","meldpunt_beheer","beheer"]}
 ];
 
 const allKeys = Object.keys(permissionLabels) as PermissionKey[];
@@ -45,7 +45,7 @@ export const rolePresets: Record<string,PermissionMap> = {
     muziek:"publish",muziek_voorstellen:"publish",meetings:"publish",redactie:"publish",redactie_versies:"publish",verkeer:"publish",
     hitlijsten:"publish",hitlijsten_import:"publish",presentatie:"edit",
     social_content:"publish",social_calendar:"publish",social_templates:"admin",social_template_builder:"admin",social_assets:"publish",social_approval:"publish",
-    team:"admin",beheer:"edit"
+    team:"admin",meldpunt_beheer:"admin",beheer:"edit"
   }),
   "Muziekredactie": withLevels({
     dashboard:"view",voor_mij:"view",mijn_uitzending:"view",meldingen:"view",stations:"view",taken:"edit",meldpunt:"edit",messenger:"edit",communicatie:"edit",kalender:"view",
@@ -73,7 +73,7 @@ export const rolePresets: Record<string,PermissionMap> = {
   }),
   "Techniek": withLevels({
     dashboard:"view",voor_mij:"view",mijn_uitzending:"none",meldingen:"view",stations:"view",taken:"edit",meldpunt:"admin",messenger:"edit",communicatie:"view",kalender:"edit",
-    programmering:"view",programmas:"view",contacten:"view",sjablonen:"admin",verkeer:"view",beheer:"admin"
+    programmering:"view",programmas:"view",contacten:"view",sjablonen:"admin",verkeer:"view",meldpunt_beheer:"admin",beheer:"admin"
   }),
   "Kijker": withLevels({
     dashboard:"view",voor_mij:"view",mijn_uitzending:"none",meldingen:"view",stations:"view",communicatie:"view",kalender:"view",programmering:"view",programmas:"view",contacten:"view",
@@ -100,7 +100,7 @@ export const modulePermission: Partial<Record<string,PermissionKey|null>> = {
   messenger:"messenger", communicatie:"communicatie", kalender:"kalender", programmering:"programmering",
   programmas:"programmas", afwezigheden:"afwezigheden", contacten:"contacten", sjablonen:"sjablonen",
   muziek:"muziek", "muziek-voorstellen":"muziek_voorstellen", meetings:"meetings", redactie:"redactie", verkeer:"verkeer", hitlijsten:"hitlijsten",
-  presentatie:"presentatie", social:"social_content", "social-beheer":"social_templates", "social-templatebouwer":"social_template_builder", "hitlijst-beheer":"hitlijsten", team:"team", beheer:"beheer"
+  presentatie:"presentatie", social:"social_content", "social-beheer":"social_templates", "social-templatebouwer":"social_template_builder", "hitlijst-beheer":"hitlijsten", "meldpunt-beheer":"meldpunt_beheer", team:"team", beheer:"beheer"
 };
 
 export function canViewModule(permissions: PermissionMap | null | undefined, moduleSlug: string) {

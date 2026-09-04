@@ -5,7 +5,7 @@ import AttachmentPanel from "@/components/attachment-panel";
 import SocialTemplateRenderer from "@/components/social-template-renderer";
 import { useCollaboration } from "@/components/collaboration/collaboration-provider";
 import { can,type PermissionMap } from "@/lib/permissions";
-import { BUILDER_STARTERS,isBuilderConfig,renderBuilderCanvas,starterTemplate,variablesUsed,type BuilderConfig } from "@/lib/social-template-builder";
+import { BUILDER_FONTS,BUILDER_STARTERS,isBuilderConfig,renderBuilderCanvas,starterTemplate,variablesUsed,type BuilderConfig } from "@/lib/social-template-builder";
 import { loadSharedHitlists,loadSharedProgramming } from "@/lib/supabase/hub-data";
 import {
   addSocialReviewEvent,deleteSocialAsset,deleteSocialCopyBlock,deleteSocialPost,
@@ -39,12 +39,12 @@ const variables=["{station}","{artist}","{title}","{program}","{presenter}","{ch
 
 
 const defaultContext=(stationSlug:string):Context=>({
-  station:stationSlug==="all"?"VLACORA":stationSlug,artist:"Joel Corry",title:"Whisper",program:"",presenter:"",
+  station:stationSlug==="all"?"PULSE":stationSlug,artist:"Joel Corry",title:"Whisper",program:"",presenter:"",
   chartPosition:"1",previousPosition:"2",nextShow:"",date:new Date().toLocaleDateString("nl-BE"),
   time:new Date().toLocaleTimeString("nl-BE",{hour:"2-digit",minute:"2-digit"}),cta:"Luister nu live",artworkImage:""
 });
 const defaultBrand=(stationSlug:string):BrandKit=>({
-  station_slug:stationSlug,brand_name:stationSlug==="all"?"VLACORA":stationSlug,logo_url:"",
+  station_slug:stationSlug,brand_name:stationSlug==="all"?"PULSE":stationSlug,logo_url:"",
   primary_color:"#27269f",secondary_color:"#4d38ff",accent_color:"#ef4a5d",background_color:"#101124",
   text_color:"#ffffff",font_family:"Inter",default_cta:"Luister nu live",default_hashtags:"#radio #vlacora"
 });
@@ -162,7 +162,9 @@ export default function SocialStudioModule({stationSlug,permissions,initialTab="
         loadBrandKit(stationSlug),loadSocialTemplates(stationSlug),loadSocialPosts(stationSlug),loadSocialAssets(stationSlug),loadSocialCopyBlocks(stationSlug),loadSocialPeople()
       ]);
       setBrand(kit);setCtx(x=>({...x,station:kit.brand_name||stationSlug,cta:kit.default_cta||x.cta}));
-      const nextTemplates=cloudTemplates.length?cloudTemplates:BUILDER_STARTERS.map(p=>starterTemplate(stationSlug,p));
+      const starterLibrary=BUILDER_STARTERS.map(p=>starterTemplate(stationSlug,p));
+      const cloudNames=new Set(cloudTemplates.map(t=>t.name.trim().toLowerCase()));
+      const nextTemplates=[...starterLibrary.filter(t=>!cloudNames.has(t.name.trim().toLowerCase())),...cloudTemplates];
       setTemplates(nextTemplates);
       const first=nextTemplates[0];if(first){setSelectedTemplateId(first.id);setTemplateDraft(first);setFormat((first.aspect_ratio as FormatKey)||"4:5")}
       setPosts(cloudPosts);setAssets(cloudAssets);setCopyBlocks(cloudCopyBlocks);setPeople(cloudPeople);
@@ -394,11 +396,11 @@ export default function SocialStudioModule({stationSlug,permissions,initialTab="
   }
   async function removeAsset(asset:SocialAsset){if(!confirm(`Asset “${asset.name}” verwijderen?`))return;try{await deleteSocialAsset(asset);setAssets(rows=>rows.filter(x=>x.id!==asset.id));flash("Asset verwijderd")}catch(e){flash(e instanceof Error?e.message:"Verwijderen mislukt")}}
 
-  if(stationSlug==="all")return <div><div className="page-intro"><div><h2>Social Studio</h2><p>Kies één station zodat VLACORA de juiste brand kit, assets en templates gebruikt.</p></div></div><div className="card empty-live-state"><strong>Social Studio is station-specifiek</strong><span>Kies bovenaan een station.</span></div></div>;
+  if(stationSlug==="all")return <div><div className="page-intro"><div><h2>Social Studio</h2><p>Kies één station zodat PULSE de juiste brand kit, assets en templates gebruikt.</p></div></div><div className="card empty-live-state"><strong>Social Studio is station-specifiek</strong><span>Kies bovenaan een station.</span></div></div>;
 
   return <div className="social-studio-v16">
     <div className="page-intro social-studio-intro">
-      <div><span className="eyebrow">VLACORA CONTENT</span><h2>Social Studio</h2><p>Kies een template uit de aparte Templatebouwer, vul alleen de inhoud in en plan daarna review/publicatie. De grafische opbouw kan hier niet per ongeluk verschoven worden.</p></div>
+      <div><span className="eyebrow">PULSE CONTENT</span><h2>Social Studio</h2><p>Kies een template uit de aparte Templatebouwer, vul alleen de inhoud in en plan daarna review/publicatie. De grafische opbouw kan hier niet per ongeluk verschoven worden.</p></div>
       <div className="button-row"><button className="ghost" disabled={busy} onClick={()=>void autofill()}>⚡ Vul HUB-data in</button>{canEditContent&&<button className="primary" disabled={busy||!selectedTemplate} onClick={()=>void persistPost()}>Bewaar concept</button>}</div>
     </div>
     {notice&&<div className="inline-notice standalone">{notice}</div>}
@@ -449,7 +451,7 @@ export default function SocialStudioModule({stationSlug,permissions,initialTab="
         <div className="brand-kit-grid">
           <label>Merknaam<input value={brand.brand_name} onChange={e=>setBrand({...brand,brand_name:e.target.value})}/></label>
           <label>Logo URL<input value={brand.logo_url} onChange={e=>setBrand({...brand,logo_url:e.target.value})} placeholder="of kies een asset hieronder"/></label>
-          <label>Font<select value={brand.font_family} onChange={e=>setBrand({...brand,font_family:e.target.value})}><option>Inter</option><option>Arial</option><option>Georgia</option><option>Trebuchet MS</option><option>Verdana</option></select></label>
+          <label>Lettertype<select value={brand.font_family} onChange={e=>setBrand({...brand,font_family:e.target.value})}>{BUILDER_FONTS.map(font=><option key={font.value} value={font.value} style={{fontFamily:font.value}}>{font.label}</option>)}</select></label>
           <label>Standaard CTA<input value={brand.default_cta} onChange={e=>setBrand({...brand,default_cta:e.target.value})}/></label>
           <label className="wide-brand-field">Standaard hashtags<input value={brand.default_hashtags} onChange={e=>setBrand({...brand,default_hashtags:e.target.value})}/></label>
         </div>

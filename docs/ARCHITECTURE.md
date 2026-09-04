@@ -1,11 +1,11 @@
-# VLACORA HUB architecture — standalone 0.23.1
+# PULSE architecture — standalone workspace
 
-VLACORA HUB is een zelfstandige editorial/organisation HUB. De actieve applicatie heeft geen dependency op een playout-engine, rotation-engine, encoder, stream of listener-statistics provider.
+PULSE is een zelfstandige editorial/organisation workspace. De actieve applicatie heeft geen dependency op een playout-engine, rotation-engine, encoder, stream of listener-statistics provider.
 
 ## Huidige architectuur
 
 ```text
-Browser / VLACORA HUB
+Browser / PULSE
         |
         +-- Supabase Auth
         |      `-- vaste user UUID / login
@@ -29,7 +29,7 @@ Browser / VLACORA HUB
 
 ## Zenderbeheer
 
-Zenders zijn VLACORA-records in `public.hub_stations`. Alleen `superadmin` mag zenders aanmaken, wijzigen, activeren/deactiveren en verwijderen. Configuratie kan via `vlacora_clone_station_configuration(...)` per sectie naar een andere zender worden gekopieerd. Gebruikersaccounts zelf worden niet gekloond.
+Zenders zijn PULSE-records in `public.hub_stations`. Alleen `superadmin` mag zenders aanmaken, wijzigen, activeren/deactiveren en verwijderen. Configuratie kan via `vlacora_clone_station_configuration(...)` per sectie naar een andere zender worden gekopieerd. Gebruikersaccounts zelf worden niet gekloond.
 
 ## Programma-identiteit
 
@@ -41,7 +41,7 @@ Zenders zijn VLACORA-records in `public.hub_stations`. Alleen `superadmin` mag z
 
 - `personal`: uitsluitend de eigenaar; admins hebben geen lees-bypass;
 - `station`: gedeeld met bevoegde leden van de zender;
-- `organization`: VLACORA-breed.
+- `organization`: PULSE-breed.
 
 Bronitems zoals social planning en muziekmeetings kunnen in de UI worden samengevoegd zonder hun data dubbel in de agenda op te slaan.
 
@@ -55,11 +55,11 @@ Editorial workspaces gebruiken Talk-items en bewaren wijzigingen in `hub_editori
 
 ## Social workflow
 
-Social Studio scheidt productie in rustige onderdelen (Studio, Brand kit, Templates, Contentkalender, Copyblokken, Assets). Het grafische patroon is canvas/preview links, invulbare velden rechts en export als expliciete actie. Automatische publicatie naar Meta/TikTok is bewust nog niet ingebouwd om extra provider-afhankelijkheid, tokens, polling en kosten te vermijden.
+Social Studio is voor dagelijkse contentproductie; Social beheer is voor brand kit/assets en de aparte Templatebouwer werkt als mini-Canva met canvas, lagen, drag/drop, afbeeldingen, vormen, placeholders, lettertypekeuze en export. Automatische publicatie naar Meta/TikTok is bewust nog niet ingebouwd om extra provider-afhankelijkheid, tokens, polling en kosten te vermijden.
 
 ## Bestanden
 
-`hub_attachments` bevat metadata/koppeling; de bytes staan in de private bucket `vlacora-hub-files`. Zo gebruikt de hele HUB één upload/download-infrastructuur in plaats van een aparte opslagimplementatie per module.
+`hub_attachments` bevat metadata/koppeling; de bytes staan in de private bucket `vlacora-hub-files`. Zo gebruikt PULSE één upload/download-infrastructuur in plaats van een aparte opslagimplementatie per module.
 
 ## Toekomstige PostgreSQL-migratie
 

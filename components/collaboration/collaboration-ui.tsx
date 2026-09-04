@@ -130,7 +130,7 @@ export function TodayCollaboration({stationName,onOpenNotifications,onOpenPresen
       <button className="ghost wide" onClick={onOpenNotifications}>Open alle meldingen →</button>
     </div>
     <div className="card">
-      <div className="section-head"><div><h3>Team bezig</h3><p>Live aanwezigheid in VLACORA</p></div><button className="ghost" onClick={onOpenPresence}>Alles bekijken</button></div>
+      <div className="section-head"><div><h3>Team bezig</h3><p>Live aanwezigheid in PULSE</p></div><button className="ghost" onClick={onOpenPresence}>Alles bekijken</button></div>
       <div className="today-presence-list">{c.presence.slice(0,6).map(p=><div className="today-presence" key={p.key}><div className="avatar presence-avatar">{p.initials}<span/></div><div><strong>{p.name}{p.isMe?" • jij":""}</strong><span>{p.detail}</span><small>{p.stationSlug}</small></div></div>)}
       {!c.presence.length&&<div className="empty-live-state compact"><strong>Nog niemand zichtbaar</strong><span>Presence wordt actief zodra de HUB met login gebruikt wordt.</span></div>}</div>
     </div>

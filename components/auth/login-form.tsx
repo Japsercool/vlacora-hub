@@ -42,11 +42,11 @@ export default function LoginForm(){
       const redirectTo=`${window.location.origin}/auth/callback?next=/reset-password`;
       await createClient().auth.resetPasswordForEmail(clean,{redirectTo});
       // Deliberately generic: don't reveal whether an account exists.
-      setMessage("Als dit e-mailadres bij VLACORA hoort, ontvang je zo meteen een link om een nieuw wachtwoord te kiezen.");
+      setMessage("Als dit e-mailadres bij PULSE hoort, ontvang je zo meteen een link om een nieuw wachtwoord te kiezen.");
       setCooldown(RESET_COOLDOWN_SECONDS);
     }catch{
       // Same generic message avoids account enumeration and needless retries.
-      setMessage("Als dit e-mailadres bij VLACORA hoort, ontvang je zo meteen een link om een nieuw wachtwoord te kiezen.");
+      setMessage("Als dit e-mailadres bij PULSE hoort, ontvang je zo meteen een link om een nieuw wachtwoord te kiezen.");
       setCooldown(RESET_COOLDOWN_SECONDS);
     }finally{
       setResetBusy(false);
@@ -54,8 +54,8 @@ export default function LoginForm(){
   }
 
   return <div className="login-card">
-    <div className="login-brand"><div className="brand-mark">V</div><div><strong>VLACORA</strong><span>HUB</span></div></div>
-    <div><span className="eyebrow">TEAM LOGIN</span><h1>{forgotOpen?"Wachtwoord vergeten":"Welkom terug"}</h1><p>{forgotOpen?"We sturen een beveiligde resetlink naar je e-mailadres.":"Log in met je VLACORA-teamaccount."}</p></div>
+    <div className="login-brand pulse-login-brand"><img src="/brand/pulse-icon.png" alt="PULSE"/><div><strong>PULSE</strong><span>YOUR STATION. ONE TEAM. ALL IN SYNC.</span></div></div>
+    <div><span className="eyebrow">TEAM LOGIN</span><h1>{forgotOpen?"Wachtwoord vergeten":"Welkom terug"}</h1><p>{forgotOpen?"We sturen een beveiligde resetlink naar je e-mailadres.":"Log in met je PULSE-teamaccount."}</p></div>
 
     {error&&<div className="login-error">{error}</div>}
     {message&&<div className="login-success">{message}</div>}

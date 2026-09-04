@@ -176,11 +176,11 @@ export default function MusicMeetingsModule({stationSlug}:{stationSlug:string}){
 
     {!meeting?<div className="card empty-live-state"><strong>Nog geen meeting geselecteerd</strong><span>Kies hierboven een bestaande meeting of maak er één aan.</span></div>:<>
       {showAdd&&<div className="card meeting-add-songs">
-        <div className="section-head"><div><h3>Songs toevoegen aan {meeting.title}</h3><p>Uit de VLACORA-muziekbibliotheek of handmatig.</p></div><button className="mini-btn" onClick={()=>setShowAdd(false)}>×</button></div>
-        <div className="source-tabs"><button className={addMode==="library"?"active":""} onClick={()=>setAddMode("library")}>VLACORA Muziek</button><button className={addMode==="manual"?"active":""} onClick={()=>setAddMode("manual")}>Handmatig</button></div>
+        <div className="section-head"><div><h3>Songs toevoegen aan {meeting.title}</h3><p>Uit de PULSE-muziekbibliotheek of handmatig.</p></div><button className="mini-btn" onClick={()=>setShowAdd(false)}>×</button></div>
+        <div className="source-tabs"><button className={addMode==="library"?"active":""} onClick={()=>setAddMode("library")}>PULSE Muziek</button><button className={addMode==="manual"?"active":""} onClick={()=>setAddMode("manual")}>Handmatig</button></div>
         {addMode==="manual"?<div className="meeting-manual-add"><label className="field">Artiest<input className="input" value={manual.artist} onChange={e=>setManual({...manual,artist:e.target.value})}/></label><label className="field">Titel<input className="input" value={manual.title} onChange={e=>setManual({...manual,title:e.target.value})}/></label><label className="field">Categorie<input className="input" value={manual.category} onChange={e=>setManual({...manual,category:e.target.value})}/></label><label className="field">Preview/audio URL<input className="input" value={manual.audioUrl} onChange={e=>setManual({...manual,audioUrl:e.target.value})} placeholder="optioneel"/></label><button className="primary" onClick={()=>void addManualSong()}>Song toevoegen</button></div>
         :<div className="meeting-library-add">
-          {!librarySongs.length?<div className="empty-live-state compact"><strong>Je muziekbibliotheek is leeg</strong><span>Voeg eerst songs toe via VLACORA Muziek, of gebruik Handmatig.</span></div>:<div className="meeting-song-picker">{librarySongs.map(song=><div key={song.id} className="meeting-song-option"><div><strong>{song.artist||"—"}</strong><span>{song.title}</span><small>{song.musicFolder||song.category||"VLACORA"}</small></div><button className="mini-btn" onClick={()=>void addLibrarySong(song)}>＋ Toevoegen</button></div>)}</div>}
+          {!librarySongs.length?<div className="empty-live-state compact"><strong>Je muziekbibliotheek is leeg</strong><span>Voeg eerst songs toe via PULSE Muziek, of gebruik Handmatig.</span></div>:<div className="meeting-song-picker">{librarySongs.map(song=><div key={song.id} className="meeting-song-option"><div><strong>{song.artist||"—"}</strong><span>{song.title}</span><small>{song.musicFolder||song.category||"PULSE"}</small></div><button className="mini-btn" onClick={()=>void addLibrarySong(song)}>＋ Toevoegen</button></div>)}</div>}
         </div>}
       </div>}
 
@@ -196,12 +196,12 @@ export default function MusicMeetingsModule({stationSlug}:{stationSlug:string}){
         </aside>
 
         <main className="card meeting-main-v182">
-          {!track?<div className="empty-live-state"><strong>Voeg een song toe</strong><span>Je meeting is klaar. Voeg nu songs toe uit VLACORA Muziek of handmatig.</span></div>:<>
+          {!track?<div className="empty-live-state"><strong>Voeg een song toe</strong><span>Je meeting is klaar. Voeg nu songs toe uit PULSE Muziek of handmatig.</span></div>:<>
             <div className="section-head"><div><span className="eyebrow">{String(tracks.findIndex(x=>x.id===track.id)+1).padStart(2,"0")} / {tracks.length}</span><h2>{track.artist} – {track.title}</h2><p>{track.musicFolder||track.category||track.source}</p></div><div className="button-row">{track.audioUrl&&<button className="primary soft" onClick={()=>window.open(track.audioUrl,"_blank")}>▶ Beluister</button>}<button className="mini-btn" onClick={()=>void moveTrack(-1)}>↑</button><button className="mini-btn" onClick={()=>void moveTrack(1)}>↓</button></div></div>
             <div className="meeting-score-row"><div className="score-big">{teamAverage==null?"—":teamAverage.toFixed(1).replace(".",",")}<small>/10 teamgemiddelde</small></div><label className="field meeting-own-score">Mijn score<input className="input" type="number" min="0" max="10" step=".1" value={score} onChange={e=>setScore(e.target.value)} placeholder="0–10"/></label></div>
             <div className="decision-grid">{decisions.map((x,i)=><button className={`decision d${i} ${decision===x?"selected-decision":""}`} onClick={()=>setDecision(x)} key={x}>{x}</button>)}</div>
             <label className="field">Notitie<textarea className="input textarea" value={note} onChange={e=>setNote(e.target.value)} placeholder="Waarom wel/niet? Daytime fit, energie, doelgroep, rotatie…"/></label>
-            <div className="meeting-review-meta"><span>{reviews.length} beoordeling{reviews.length===1?"":"en"} voor deze song</span><span>{track.sourceSongId?"Uit VLACORA Muziek":"Handmatig toegevoegd"}</span></div>
+            <div className="meeting-review-meta"><span>{reviews.length} beoordeling{reviews.length===1?"":"en"} voor deze song</span><span>{track.sourceSongId?"Uit PULSE Muziek":"Handmatig toegevoegd"}</span></div>
             <div className="button-row meeting-save-row"><button className="ghost danger-text" onClick={()=>void removeTrack()}>Verwijder uit meeting</button><button className="primary" onClick={()=>void saveReviewAndNext()}>Beoordeling opslaan & volgende →</button></div>
           </>}
         </main>
